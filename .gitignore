@@ -1,1 +1,55 @@
+# ==========================
+# Global
+# ==========================
+.env
+*.env
+*.log
+*.sqlite3
+*.pyc
+*.pyo
+*.pyd
+*.swp
+__pycache__/
+.DS_Store
+Thumbs.db
 
+# ==========================
+# Python (Backend)
+# ==========================
+backend/venv/
+backend/__pycache__/
+*.py[cod]
+backend/*.pyc
+
+# ✅ Ignore entire config folder
+config/
+
+# ==========================
+# Node / React (Frontend)
+# ==========================
+frontend/node_modules/
+frontend/build/
+frontend/.env
+
+# ==========================
+# Docker
+# ==========================
+Dockerfile
+
+# ==========================
+# IDEs and Editors
+# ==========================
+.vscode/
+.idea/
+*.code-workspace
+
+# ==========================
+# OS-specific files
+# ==========================
+# macOS
+*.DS_Store
+
+# Windows
+ehthumbs.db
+Thumbs.db
+Desktop.ini

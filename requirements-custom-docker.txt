@@ -1,0 +1,6 @@
+flask-cors
+pymysql
+mysqlclient
+mysql-connector-python
+psycopg2-binary
+pandas
