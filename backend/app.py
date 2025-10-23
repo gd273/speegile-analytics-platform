@@ -6,8 +6,17 @@ import os
 import requests
 import json
 
+from werkzeug.utils import secure_filename
+import pandas as pd
+from sqlalchemy import create_engine, text 
+import logging
+import sqlite3
+
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "your_flask_secret_key_12345")
+
+# Allowed extensions for file upload
+ALLOWED_EXTENSIONS = {'xlsx'}
 
 CORS(app, resources={r"/api/*": {
     "origins": ["http://localhost:3000"],
@@ -23,6 +32,32 @@ SUPERSET_URL = "http://localhost:8088"
 SUPERSET_ADMIN_USERNAME = "admin"
 SUPERSET_ADMIN_PASSWORD = "admin123"
 
+# ============================================================================
+# DATABASE SETUP (Using SQLite for demonstration, replace with MySQL)
+# ============================================================================
+
+# To use MySQL, replace this line with your MySQL connection string, e.g.:
+# DATABASE_URL = 'mysql+mysqlconnector://user:password@host:port/database_name'
+# Ensure you have 'pip install mysql-connector-python' installed.
+# Using SQLite for a self-contained example. 
+# DATABASE_URL = 'sqlite:///app_data.db'
+DATABASE_URL = 'mysql+mysqlconnector://root:mishka123@localhost:3306/user_database'
+# Install: pip install pandas openpyxl sqlalchemy
+
+try:
+    # This engine will be used by pandas to write to the database
+    engine = create_engine(DATABASE_URL)
+    # Check connection (SQLite is always successful here, but good practice for MySQL)
+    with engine.connect() as connection:
+        result = connection.execute(text("SELECT 1"))
+        print(f"Database connection successful. Result: {result.scalar()}")
+except Exception as e:
+    print(f"🚨 DATABASE CONNECTION FAILED: {e}")
+    engine = None
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 # ============================================================================
 # HARDCODED USER DATABASE WITH ROLES
 # Map: React login credentials → Superset guest username + roles
@@ -180,46 +215,7 @@ def filter_dashboards_by_user_roles(dashboards, user_roles):
     
     print(f"\n✓ User has access to {len(filtered)} out of {len(dashboards)} dashboards\n")
     return filtered
-
-# def get_embedded_dashboard_uuid(filtered_dashboard_list,access_token):
-#     embedded_dashboards = []
-#     if not filtered_dashboard_list:
-#         return []
-    
-#     for filtered_dashboard in filtered_dashboard_list:
-#         try:
-#             response = requests.get(
-#                 f"{SUPERSET_URL}/api/v1/dashboard/{filtered_dashboard.get('id')}/embedded",
-#                 # params={"q": json.dumps(query)},
-#                 headers={
-#                     "Authorization": f"Bearer {access_token}",
-#                     "Content-Type": "application/json"
-#                 },
-#                 timeout=10
-#             )
-            
-#             if response.status_code == 200:
-#                 embedded_uuid = response.json().get("uuid")
-#                 # print(f"✓ Fetched {len(dashboards)} dashboards from Superset")
-#                 filtered_dashboard['uuid'] = embedded_uuid
-#                 embedded_dashboards.append(filtered_dashboard)
-
-#                 # return dashboards
-#             elif response.status_code == 404:
-#                 # 404 often means the embedded configuration hasn't been created for this dashboard ID
-#                 print(f"⚠️ Embedded configuration not found (404) for Dashboard ID {filtered_dashboard.get('id')}. Please create the link in Superset UI.")
-#             else:
-#                 # Catch other API errors
-#                 print(f"✗ Failed to get embedded uuid for Dashboard ID {filtered_dashboard.get('id')}. Status: {response.status_code}")
-#                 print(f"   Response: {response.text}")
-#         except requests.exceptions.Timeout:
-#             print(f"✗ Request timed out for Dashboard ID {filtered_dashboard.get('id')}.")
-#         except requests.exceptions.RequestException as e:
-#             print(f"✗ Error making API request for Dashboard ID {filtered_dashboard.get('id')}: {e}")
-#         except Exception as e:
-#             print(f"✗ General error processing Dashboard ID {filtered_dashboard.get('id')}: {e}")
-
-#     return embedded_dashboards
+  
 def get_embedded_dashboard_uuid(filtered_dashboard_list, access_token):
     embedded_dashboards = []
     
@@ -272,6 +268,58 @@ def get_embedded_dashboard_uuid(filtered_dashboard_list, access_token):
 
     return embedded_dashboards
 
+# ============================================================================
+# NEW: FILE UPLOAD ENDPOINT
+# ============================================================================
+@app.route('/api/upload-excel', methods=['POST'])
+def upload_excel():
+    if 'user' not in session:
+        return jsonify({"success": False, "error": "Unauthorized. Please log in."}), 401
+
+    if 'excel_file' not in request.files:
+        return jsonify({"success": False, "error": "No file part in the request"}), 400
+
+    file = request.files['excel_file']
+    if file.filename == '':
+        return jsonify({"success": False, "error": "No selected file"}), 400
+
+    if file and allowed_file(file.filename):
+        try:
+            # Secure the filename for use as a table name base
+            filename = secure_filename(file.filename)
+            
+            # Read the Excel file into a pandas DataFrame
+            # The uploaded file stream can be passed directly to pandas.read_excel
+            df = pd.read_excel(file.stream, engine='openpyxl')
+            
+            # Sanitize column names (e.g., replace spaces with underscores)
+            # This is critical for database table compatibility
+            df.columns = [col.replace(' ', '_').replace('.', '').lower() for col in df.columns]
+            
+            # Use the sanitized filename (without extension) as the table name
+            table_name = filename.rsplit('.', 1)[0].lower().replace('-', '_')
+            
+            if engine is None:
+                raise Exception("Database engine is not initialized.")
+            
+            # Write the DataFrame to the database
+            # if_exists='replace' will overwrite the table if it exists.
+            df.to_sql(table_name, con=engine, if_exists='append', index=False)
+            
+            logging.info(f"Successfully uploaded {df.shape[0]} rows to table: {table_name}")
+
+            # Return success response
+            return jsonify({
+                "success": True, 
+                "message": f"File '{filename}' uploaded and data saved successfully to table '{table_name}'."
+            }), 200
+
+        except Exception as e:
+            logging.error(f"Error during file processing/database insertion: {e}")
+            return jsonify({"success": False, "error": f"Data processing failed: {str(e)}"}), 500
+    else:
+        return jsonify({"success": False, "error": "File type not allowed. Only .xlsx files are permitted."}), 400
+
 #---------------------------------------------------------------------------------------------------
 # AUTHENTICATION ENDPOINTS
 #---------------------------------------------------------------------------------------------------
@@ -320,6 +368,7 @@ def login():
     session['superset_username'] = user_data["superset_username"]
     session['roles'] = user_data["roles"]
     session.permanent = True
+    session['logged_in']= True
     
     print(f"✓ LOGIN SUCCESS")
     print(f"  React User: {username}")

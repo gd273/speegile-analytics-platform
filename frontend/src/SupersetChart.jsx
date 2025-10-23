@@ -12,7 +12,7 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
   const BACKEND_URL = "http://localhost:5000/api/guest-token";
   const SUPERSET_DOMAIN = "http://localhost:8088";
 
-  console.log("SupersetChart Component Rendered. Dashboard ID:", dashboardId);
+  // console.log("SupersetChart Component Rendered. Dashboard ID:", dashboardId);
 
   // 🔹 Validate JWT expiration + log details
   const validateToken = (token) => {
@@ -20,40 +20,40 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
       const decoded = jwtDecode(token);
       const now = Date.now() / 1000;
 
-      console.log("🔎 [TOKEN DECODED]");
-      console.log(" - Expiration (exp):", decoded.exp);
-      console.log(" - Expiration (human):", new Date(decoded.exp * 1000));
-      console.log(" - Resources:", decoded.resources || "N/A");
-      // console.log(" - Roles:", decoded.user?.roles || "N/A");
-      console.log(" - Full decoded token:", decoded);
+      // console.log("🔎 [TOKEN DECODED]");
+      // console.log(" - Expiration (exp):", decoded.exp);
+      // console.log(" - Expiration (human):", new Date(decoded.exp * 1000));
+      // console.log(" - Resources:", decoded.resources || "N/A");
+      // // console.log(" - Roles:", decoded.user?.roles || "N/A");
+      // console.log(" - Full decoded token:", decoded);
 
       if (decoded.exp && decoded.exp < now) {
-        console.error("[TOKEN ERROR] Guest token expired at:", decoded.exp);
+        // console.error("[TOKEN ERROR] Guest token expired at:", decoded.exp);
         return false;
       }
-      console.log("[TOKEN OK] Guest token is valid until:", decoded.exp);
+      // console.log("[TOKEN OK] Guest token is valid until:", decoded.exp);
       return true;
     } catch (err) {
-      console.error("[TOKEN ERROR] Invalid token:", err.message);
+      // console.error("[TOKEN ERROR] Invalid token:", err.message);
       return false;
     }
   };
 
   useEffect(() => {
-    console.log("\n--- useEffect Hook Fired ---");
-    console.log("Current dashboardId state:", dashboardId);
+    // console.log("\n--- useEffect Hook Fired ---");
+    // console.log("Current dashboardId state:", dashboardId);
 
     if (!dashboardId) {
-      console.log("No dashboardId provided. Exiting useEffect.");
+      // console.log("No dashboardId provided. Exiting useEffect.");
       return;
     }
 
-    console.log("Target Superset Domain:", SUPERSET_DOMAIN);
-    console.log("Target Backend URL:", BACKEND_URL);
+    // console.log("Target Superset Domain:", SUPERSET_DOMAIN);
+    // console.log("Target Backend URL:", BACKEND_URL);
 
     const loadDashboard = async () => {
       try {
-        console.log(`[PROCESS] Starting loadDashboard for ID: ${dashboardId}`);
+        // console.log(`[PROCESS] Starting loadDashboard for ID: ${dashboardId}`);
         setStatus("loading");
         setErrorMessage("");
 
@@ -62,7 +62,7 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
           containerRef.current.innerHTML = "";
         }
 
-        console.log(`[API CALL] Requesting guest token from: ${BACKEND_URL}`);
+        // console.log(`[API CALL] Requesting guest token from: ${BACKEND_URL}`);
         const apiStartTime = Date.now();
         const response = await axios.get(BACKEND_URL, {
           params: { dashboardId },
@@ -71,9 +71,9 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
         });
         const apiEndTime = Date.now();
 
-        console.log(`[API RESPONSE] Received in ${apiEndTime - apiStartTime}ms`);
-        console.log("API Response Status:", response.status);
-        console.log("API Response Data:", response.data);
+        // console.log(`[API RESPONSE] Received in ${apiEndTime - apiStartTime}ms`);
+        // console.log("API Response Status:", response.status);
+        // console.log("API Response Data:", response.data);
 
         const { guestToken } = response.data;
 
@@ -81,9 +81,9 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
           throw new Error("Invalid or expired guestToken returned by backend");
         }
 
-        console.log(
-          `[TOKEN INFO] Guest token snippet: ${guestToken.substring(0, 30)}...`
-        );
+        // console.log(
+        //   `[TOKEN INFO] Guest token snippet: ${guestToken.substring(0, 30)}...`
+        // );
         // 🔹 Embed Superset dashboard
         const embedStartTime = Date.now();
         await embedDashboard({
@@ -91,7 +91,7 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
           supersetDomain: SUPERSET_DOMAIN,
           mountPoint: containerRef.current,
           fetchGuestToken: async () => {
-            console.log("[SDK CALL] fetchGuestToken executed.");
+            // console.log("[SDK CALL] fetchGuestToken executed.");
             return guestToken;
           },
           dashboardUiConfig: {
@@ -112,10 +112,10 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
         // );
         setStatus("success");
       } catch (err) {
-        console.error("[ERROR BLOCK] Embedding failed:", err);
+        // console.error("[ERROR BLOCK] Embedding failed:", err);
         let message = "Unknown error occurred";
         if (err.response) {
-  // Check if it's an authentication error
+          // Check if it's an authentication error
           if (err.response.status === 401) {
             message = "Authentication required. Please log in again.";
             // Optionally, trigger a re-login by reloading the page
@@ -129,7 +129,7 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
 
         setErrorMessage(message);
         setStatus("error");
-        console.log(`[STATUS CHANGE] Error message: ${message}`);
+        // console.log(`[STATUS CHANGE] Error message: ${message}`);
       }
     };
 
@@ -149,19 +149,19 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
     const parent = containerRef.current.parentElement;
     const size = parent?.getBoundingClientRect();
     if (size) {
-      console.log("📐 Parent size:", size.width, "x", size.height);
+      // console.log("📐 Parent size:", size.width, "x", size.height);
     }
   }
 }, []);
 
   return (
-  <div className="bg-white p-4 rounded-xl shadow-lg mb-8 border border-gray-200">
+  <div className="bg-white p-2 rounded-xl shadow-lg mb-4 border border-gray-200">
     {/* ... (title and status) */}
 
     <div
       ref={containerRef}
       style={{
-        width: "100%",
+        width: "50%",
         overflow: "auto", // Allow this section to scroll if needed
         position: "relative",
         borderRadius: "8px",

@@ -38,7 +38,7 @@ const Login = ({ onLoginSuccess }) => {
                 <img
                     src="/Speegilelogo.jpeg"
                     alt="Speegile logo"
-                    className="h-10 w-10 object-contain rounded-full"
+                    className="h-16 w-16 md:h-20 md:w-20 lg:h-24 lg:w-24 object-contain rounded-full"
                 />
             </a>
             <h1 className="text-2xl font-bold text-gray-800 mb-1">
