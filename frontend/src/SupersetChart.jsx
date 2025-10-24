@@ -108,14 +108,14 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
   }, [dashboardId]);
 
   return (
-  <div className="bg-white p-2 rounded-xl shadow-lg mb-4 border border-gray-200">
+  <div className="bg-white p-2 rounded-md shadow-lg mb-4 border border-gray-200">
     <div
       ref={containerRef}
       style={{
-        width: "50%",
+        width: "auto",
         overflow: "auto",
         position: "relative",
-        borderRadius: "8px",
+        borderRadius: "4px",
       }}
     />
   </div>
