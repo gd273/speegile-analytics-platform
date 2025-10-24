@@ -12,24 +12,26 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [dashboardsLoading, setDashboardsLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // State to manage the current view: 'dashboards' or 'upload'
   const [currentView, setCurrentView] = useState('dashboards'); 
 
   useEffect(() => {
+    console.log("App.js checkauth");
     checkAuth();
   }, []);
 
   const checkAuth = async () => {
     try {
+      console.log("App.js checkauth im fn");
       const response = await api.get('/check-auth');
 
       if (response.data.authenticated) {
         setIsAuthenticated(true);
         setUser(response.data.user);
         // Fetch dashboards after authentication is confirmed
+        console.log("App.js checkauth im fn and trying to fetch dasboard");
         await fetchDashboards();
       } else {
+        console.log("❌ User not authenticated")
         setIsAuthenticated(false);
         setUser(null);
       }
@@ -43,6 +45,7 @@ function App() {
   };
 
   const fetchDashboards = async () => {
+    console.log("App.js in fetchdashboard");
     console.log("📊 Fetching accessible dashboards...");
     setDashboardsLoading(true);
     setError(null);
@@ -73,13 +76,16 @@ function App() {
   };
 
   const handleLoginSuccess = async (userData) => {
+    console.log("App.js in handleLoginSuccess");
     setIsAuthenticated(true);
     setUser(userData);
     // Fetch dashboards after successful login
+    await checkAuth();
     await fetchDashboards();
   };
 
   const handleLogout = async () => {
+    console.log("App.js in handleLogout");
     console.log("🔴 Logout clicked");
     
     try {
@@ -92,157 +98,228 @@ function App() {
       setIsAuthenticated(false);
       setUser(null);
       setDashboards([]);
+      setCurrentView('dashboards');
     }
   };
 
     // Function to switch between views, passed to UploadExcel
-  const navigate = async (view) => {
+  // const navigate = async (view) => {
+  //   console.log("App.js in navigate");
+  //   setCurrentView(view);
+  //   if (view === 'dashboards') {
+  //     // Re-fetch dashboards in case the new data affects them (optional)
+  //     await fetchDashboards(); 
+  //   }
+  // };
+  // In App.js
+const navigate = async (view) => {
+    console.log(`🔄 Navigating to: ${view}`);
     setCurrentView(view);
+    
+    // Add a small delay to avoid concurrent requests
     if (view === 'dashboards') {
-      // Re-fetch dashboards in case the new data affects them (optional)
-      await fetchDashboards(); 
+        // Small delay to let other requests complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await fetchDashboards(); 
     }
-  };
+};
 
-  if (loading) {
+//   if (loading) {
+//     console.log("App.js in loading check condition");
+//     return (
+//       <div className="flex items-center justify-center h-screen bg-gray-100">
+//         <div className="text-xl text-gray-600">Loading...</div>
+//       </div>
+//     );
+//   }
+
+//   if (!isAuthenticated) {
+//     console.log("App.js in !isAuthenticated");
+//     return <Login onLoginSuccess={handleLoginSuccess} />;
+//   }
+
+//   return (
+//     <div className="flex flex-col min-h-screen bg-gray-50">
+//       {/* Header/Nav with dynamic button and user info */}
+//       <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg p-4 flex justify-between items-center border-b border-gray-100">
+//         <h1 className="text-2xl font-bold text-indigo-700 flex items-center">
+//             <Home className="w-6 h-6 mr-2" />
+//             Analytics Platform
+//         </h1>
+//         <div className="flex items-center space-x-4">
+//           <span className="text-sm font-medium text-gray-600">Welcome, {user?.name || 'User'}!</span>
+            
+//           {/* Dynamic Navigation Button */}
+//           {currentView === 'dashboards' ? (
+//             <button
+//               onClick={() => navigate('upload')}
+//               className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition flex items-center gap-1"
+//             >
+//               <UploadCloud className="w-4 h-4" />
+//               Upload Data
+//             </button>
+//           ) : (
+//             <button
+//               onClick={() => navigate('dashboards')}
+//               className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-1"
+//             >
+//               <Home className="w-4 h-4" />
+//               Return to Dashboard
+//             </button>
+//           )}
+
+//           <button
+//             onClick={handleLogout}
+//             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100 transition flex items-center gap-1"
+//           >
+//             <LogOut className="w-4 h-4" />
+//             Logout
+//           </button>
+//         </div>
+//       </header>
+
+//       <main className="flex-1 overflow-y-auto px-4 pb-8 pt-24">
+//         <div className="max-w-screen-2xl mx-auto">
+          
+//           {/* Conditional Rendering based on currentView */}
+//           {currentView === 'dashboards' && (
+//             <>
+//               {dashboardsLoading && (
+//                 <div className="flex items-center justify-center py-12">
+//                   <Loader2 className="w-6 h-6 text-indigo-600 animate-spin mr-3" />
+//                   <div className="text-xl text-gray-600">Loading dashboards...</div>
+//                 </div>
+//               )}
+
+//               {error && (
+//                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 shadow-sm">
+//                   <h3 className="text-red-800 font-semibold">Error Loading Dashboards</h3>
+//                   <p className="text-red-600 mt-2">{error}</p>
+//                   <button
+//                     onClick={fetchDashboards}
+//                     className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
+//                   >
+//                     Retry
+//                   </button>
+//                 </div>
+//               )}
+
+//               {!dashboardsLoading && !error && dashboards.length === 0 && (
+//                 <div className="text-center py-12 bg-white rounded-xl shadow-md">
+//                   <h2 className="text-2xl text-gray-600">No dashboards available</h2>
+//                   <p className="text-gray-500 mt-2">
+//                     You don't have access to any dashboards yet.
+//                   </p>
+//                 </div>
+//               )}
+
+//               {dashboards.map((dash) => (
+//                 <div key={dash.id} className="mb-8">
+//                   <SupersetChart 
+//                     dashboardId={dash.id} 
+//                     chartTitle={dash.title} 
+//                   />
+//                 </div>
+//               ))}
+//             </>
+//           )}
+
+//           {currentView === 'upload' && (
+//             // Pass the navigate function down to the UploadExcel component
+//             <UploadExcel navigate={navigate} />
+//           )}
+
+//         </div>
+//       </main>
+//     </div>
+//   );
+// }
+
+// export default App;
+if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-100">
-        <div className="text-xl text-gray-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+        <p className="ml-3 text-lg text-gray-700">Loading application...</p>
       </div>
     );
   }
 
+  // If not authenticated, show the Login component
   if (!isAuthenticated) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // return (
-  //   <div className="flex flex-col h-screen">
-  //     <header className="fixed top-0 left-0 w-full bg-white shadow z-50">
-  //          <div className="py-4 px-6 flex items-center justify-between max-w-screen-2xl mx-auto"> 
-  //       <a href="/" className="flex items-center gap-3 text-3xl font-extrabold text-blue-700 hover:text-blue-800 transition">
-  //           <img
-  //               src="/SpeegileLogo.jpeg"
-  //               alt="Speegile logo"
-  //               className="h-16 w-16 md:h-20 md:w-20 lg:h-24 lg:w-24 object-contain rounded-full" // Increased size and added rounded-full
-  //           />
-  //           <span className="hidden sm:inline">Embedded Analytics</span> {/* Only show on medium screens and up */}
-  //       </a>
-        
-  //       <div className="flex items-center gap-4">
-  //           <span className="text-gray-600 text-sm">
-  //               User: 
-  //               <span className="font-semibold text-gray-800 ml-1">{user?.name || user?.username}</span>
-  //           </span>
-  //           {user?.roles && (
-  //               <span className="hidden md:inline text-xs bg-blue-100 text-blue-700 py-1 px-3 rounded-full font-medium border border-blue-200">
-  //                   Roles: {user.roles.join(", ")}
-  //               </span>
-  //           )}
-  //           <button
-  //               onClick={handleLogout}
-  //               className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition shadow-md hover:shadow-lg"
-  //           >
-  //               Logout
-  //           </button>
-  //       </div>
-  //   </div>
-  //     </header>
-
-  //     <main className="flex-1 overflow-y-auto px-4 pb-8 pt-24">
-  //       <div className="max-w-screen-2xl mx-auto">
-  //         {dashboardsLoading && (
-  //           <div className="flex items-center justify-center py-12">
-  //             <div className="text-xl text-gray-600">Loading dashboards...</div>
-  //           </div>
-  //         )}
-
-  //         {error && (
-  //           <div className="bg-red-50 border border-red-200 rounded p-4 mb-6">
-  //             <h3 className="text-red-800 font-semibold">Error Loading Dashboards</h3>
-  //             <p className="text-red-600 mt-2">{error}</p>
-  //             <button
-  //               onClick={fetchDashboards}
-  //               className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-  //             >
-  //               Retry
-  //             </button>
-  //           </div>
-  //         )}
-
-  //         {!dashboardsLoading && !error && dashboards.length === 0 && (
-  //           <div className="text-center py-12">
-  //             <h2 className="text-2xl text-gray-600">No dashboards available</h2>
-  //             <p className="text-gray-500 mt-2">
-  //               You don't have access to any dashboards yet.
-  //             </p>
-  //           </div>
-  //         )}
-
-  //         {dashboards.map((dash) => (
-  //           <div key={dash.id} className="my-4 min-h-[1000px]">
-  //             <SupersetChart dashboardId={dash.id} chartTitle={dash.title} />
-  //           </div>
-  //         ))}
-  //       </div>
-  //     </main>
-  //   </div>
-  // );
+  // If authenticated, show the main application UI
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Header/Nav with dynamic button and user info */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg p-4 flex justify-between items-center border-b border-gray-100">
-        <h1 className="text-2xl font-bold text-indigo-700 flex items-center">
-            <Home className="w-6 h-6 mr-2" />
-            Analytics Platform
-        </h1>
-        <div className="flex items-center space-x-4">
-          <span className="text-sm font-medium text-gray-600">Welcome, {user?.name || 'User'}!</span>
-            
-          {/* Dynamic Navigation Button */}
-          {currentView === 'dashboards' ? (
-            <button
-              onClick={() => navigate('upload')}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition flex items-center gap-1"
-            >
-              <UploadCloud className="w-4 h-4" />
-              Upload Data
-            </button>
-          ) : (
+    <div className="min-h-screen bg-gray-100 font-sans flex">
+      {/* Sidebar Navigation */}
+      <nav className="w-56 bg-white shadow-xl flex flex-col p-4 border-r border-gray-200">
+        <div className="flex-grow">
+          <h1 className="text-2xl font-bold text-blue-600 mb-6 border-b pb-4">Data Portal</h1>
+          
+          <div className="space-y-2">
             <button
               onClick={() => navigate('dashboards')}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-1"
+              className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
+                currentView === 'dashboards' ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+              }`}
             >
-              <Home className="w-4 h-4" />
-              Return to Dashboard
+              <Home className="w-5 h-5" />
+              Dashboards
             </button>
+            <button
+              onClick={() => navigate('upload')}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
+                currentView === 'upload' ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <UploadCloud className="w-5 h-5" />
+              Upload Data
+            </button>
+          </div>
+        </div>
+        
+        {/* User and Logout Section */}
+        <div className="pt-4 border-t border-gray-200">
+          {user && (
+            <p className="text-sm text-gray-700 mb-3 truncate">
+              Signed in as: <span className="font-medium">{user.name || user.username}</span>
+            </p>
           )}
-
           <button
             onClick={handleLogout}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100 transition flex items-center gap-1"
+            className="w-full flex items-center gap-3 p-3 rounded-lg text-red-600 hover:bg-red-50 transition font-medium"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-5 h-5" />
             Logout
           </button>
         </div>
-      </header>
+      </nav>
 
-      <main className="flex-1 overflow-y-auto px-4 pb-8 pt-24">
-        <div className="max-w-screen-2xl mx-auto">
-          
-          {/* Conditional Rendering based on currentView */}
+      {/* Main Content Area */}
+      <main className="flex-1 p-8 overflow-y-auto">
+        <header className="mb-8 border-b pb-4">
+          <h2 className="text-3xl font-semibold text-gray-800">
+            {currentView === 'dashboards' ? 'Superset Dashboards' : 'Upload New Data'}
+          </h2>
+          <p className="text-gray-500 mt-1">
+            {currentView === 'dashboards' ? 'Visualizations of your data, embedded directly from Superset.' : 'Submit Excel files to update your data source.'}
+          </p>
+        </header>
+
+        <div className="max-w-7xl mx-auto">
           {currentView === 'dashboards' && (
             <>
               {dashboardsLoading && (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 text-indigo-600 animate-spin mr-3" />
-                  <div className="text-xl text-gray-600">Loading dashboards...</div>
+                <div className="text-center py-12">
+                  <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto" />
+                  <p className="mt-3 text-gray-600">Loading dashboards...</p>
                 </div>
               )}
 
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 shadow-sm">
+                <div className="p-4 bg-red-50 rounded-xl mb-6 shadow-sm">
                   <h3 className="text-red-800 font-semibold">Error Loading Dashboards</h3>
                   <p className="text-red-600 mt-2">{error}</p>
                   <button
