@@ -12,6 +12,9 @@
 __pycache__/
 .DS_Store
 Thumbs.db
+.env.local
+.env.*.local
+.env.*.secret
 
 # ==========================
 # Python (Backend)
@@ -35,6 +38,8 @@ frontend/.env
 # Docker
 # ==========================
 Dockerfile
+docker-compose.override.yml
+secrets/
 
 # ==========================
 # IDEs and Editors

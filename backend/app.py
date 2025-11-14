@@ -8,17 +8,19 @@ import json
 from datetime import timedelta
 from werkzeug.utils import secure_filename
 import pandas as pd
-from sqlalchemy import create_engine, text 
+from sqlalchemy import create_engine, text, inspect
 import logging
 import sqlite3
 from flask_session import Session
-
+from dotenv import load_dotenv
 import os
+
+load_dotenv()
 if not os.path.exists('./.flask_session/'):
     os.makedirs('./.flask_session/')
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "your_flask_secret_key_12345")
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 print("======================================================================")
 print(f"Flask App Initialized.")
@@ -50,10 +52,14 @@ Session(app)
 
 # Allowed extensions for file upload
 ALLOWED_EXTENSIONS = {'xlsx'}
+# Load CORS origins from .env
+raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")
 
+# Support multiple origins (comma-separated)
+CORS_ORIGINS = [o.strip() for o in raw_origins.split(",") if o.strip()]
 CORS(app, 
     resources={r"/api/*": {
-        "origins": ["http://localhost:3000"],
+        "origins": CORS_ORIGINS,
         "supports_credentials": True,
         "allow_headers": ["Content-Type", "Authorization"],
         "expose_headers": ["Set-Cookie"],
@@ -63,13 +69,14 @@ CORS(app,
     supports_credentials=True
 )
 
-GUEST_TOKEN_SECRET = os.getenv("GUEST_TOKEN_SECRET", "my_secure_embedding_secret_12345")
-SUPERSET_URL = "http://localhost:8088"
-SUPERSET_ADMIN_USERNAME = "admin"
-SUPERSET_ADMIN_PASSWORD = "admin123"
-
-DATABASE_URL = 'mysql+mysqlconnector://root:mishka123@localhost:3306/user_database'
-
+# GUEST_TOKEN_SECRET = os.getenv("GUEST_TOKEN_SECRET", "my_secure_embedding_secret_12345")
+# SUPERSET_URL = "http://localhost:8088"
+SUPERSET_ADMIN_USERNAME = os.getenv("SUPERSET_ADMIN_USERNAME")
+SUPERSET_ADMIN_PASSWORD = os.getenv("SUPERSET_ADMIN_PASSWORD")
+SUPERSET_URL = os.getenv("SUPERSET_URL")
+# DATABASE_URL = 'mysql+mysqlconnector://root:mishka123@localhost:3306/user_database'
+DATABASE_URL = os.getenv("APP_DATABASE_URL")
+GUEST_TOKEN_JWT_SECRET = os.getenv("GUEST_TOKEN_JWT_SECRET")
 
 try:
     
@@ -510,7 +517,7 @@ def generate_guest_token():
     }
     
     try:
-        token = jwt.encode(payload, GUEST_TOKEN_SECRET, algorithm="HS256")
+        token = jwt.encode(payload, GUEST_TOKEN_JWT_SECRET, algorithm="HS256")
         return jsonify({"guestToken": token}), 200
     except Exception as e:
         print(f"✗ JWT Encoding Error: {e}")
@@ -523,8 +530,12 @@ def generate_guest_token():
 @app.route('/api/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
+    """
+    Handles Excel file upload, processing sheets one-by-one, and inserting/replacing 
+    data into corresponding database tables based on sheet names.
+    """
     username = session.get('user')
-    print(f"✅ Upload authorized for user: {username}")
+    logging.info(f"✅ Upload authorized for user: {username}")
 
     if 'excel_file' not in request.files:
         return jsonify({"success": False, "error": "No file part in the request"}), 400
@@ -533,138 +544,93 @@ def upload_excel():
     if file.filename == '':
         return jsonify({"success": False, "error": "No selected file"}), 400
 
+    if engine is None:
+        logging.error("Database engine is not initialized.")
+        return jsonify({"success": False, "error": "Database service is unavailable."}), 503
+
     if file and allowed_file(file.filename):
         try:
             filename = secure_filename(file.filename)
+            all_sheet_results = []
             
-            # Read the Excel file into a pandas DataFrame
-            df = pd.read_excel(file.stream, engine='openpyxl')
+            # Use ExcelFile to load sheet names first (low memory)
+            xls = pd.ExcelFile(file.stream, engine='openpyxl')
+            sheet_names_list = xls.sheet_names
             
-            # Sanitize column names
-            df.columns = [col.replace(' ', '_').replace('.', '').lower() for col in df.columns]
-            
-            # Use the sanitized filename as the table name
-            table_name = filename.rsplit('.', 1)[0].lower().replace('-', '_')
-            
-            if engine is None:
-                raise Exception("Database engine is not initialized.")
-            
-            # Check if table exists and handle accordingly
-            with engine.connect() as connection:
-                # Check if table exists
-                table_exists = connection.execute(
-                    text(f"SHOW TABLES LIKE '{table_name}'")
-                ).fetchone()
-                
-                if table_exists:
-                    # # Table exists - give user options
-                    # # Option 1: Replace the entire table
-                    # df.to_sql(table_name, con=engine, if_exists='replace', index=False)
-                    # message = f"File '{filename}' uploaded successfully. Existing table '{table_name}' was replaced with {df.shape[0]} new rows."
-                    
-                    # Option 2: Only append new rows (uncomment if you prefer this)
-                    # # Get max ID from existing table
-                    max_id = connection.execute(
-                        text(f"SELECT MAX(id) FROM {table_name}")
-                    ).scalar() or 0
-                    
-                    # Adjust IDs in new data
-                    if 'id' in df.columns:
-                        df['id'] = df['id'] + max_id
-                    
-                    df.to_sql(table_name, con=engine, if_exists='append', index=False)
-                    message = f"File '{filename}' uploaded successfully. Added {df.shape[0]} rows to existing table '{table_name}'."
-                else:
-                    # Table doesn't exist - create new
-                    df.to_sql(table_name, con=engine, if_exists='replace', index=False)
-                    message = f"File '{filename}' uploaded successfully. Created new table '{table_name}' with {df.shape[0]} rows."
-            
-            logging.info(f"Successfully processed file: {filename} -> table: {table_name}")
+            inspector = inspect(engine) # Initialize inspector once
 
+            for sheet_name in sheet_names_list:
+                
+                # 1. Read single sheet data (loads only one sheet into memory)
+                df = xls.parse(sheet_name)
+                
+                # Skip empty sheets entirely
+                if df.empty:
+                    all_sheet_results.append({
+                        "sheet_name": sheet_name,
+                        "table_name": None,
+                        "status": "Skipped (Empty Sheet)",
+                        "rows_uploaded": 0
+                    })
+                    logging.warning(f"Skipped empty sheet: {sheet_name}")
+                    continue
+
+                # 2. Sanitize column names for database compatibility
+                df.columns = [col.replace(' ', '_').replace('.', '').lower() for col in df.columns]
+                
+                # 3. Sanitize sheet name for table name
+                # Removed the incorrect .rsplit logic
+                table_name = sheet_name.lower().replace(' ', '_').replace('.', '').replace('-', '_')
+                
+                # 4. Check existence for reporting purposes
+                table_exists = table_name in inspector.get_table_names()
+                
+                try:
+                    # 5. Insert/Replace Data (Using 'replace' is atomic: it drops and recreates the table 
+                    # based on the new DF schema, which is best for full refreshes.)
+                    df.to_sql(table_name, con=engine, if_exists='replace', index=False)
+                    
+                    status = "Replaced (Schema Updated)" if table_exists else "Created"
+                    
+                    all_sheet_results.append({
+                        "sheet_name": sheet_name,
+                        "table_name": table_name,
+                        "status": status,
+                        "rows_uploaded": df.shape[0]
+                    })
+                    logging.info(f"Successfully processed sheet: {sheet_name} -> table: {table_name}. Status: {status}")
+
+                except Exception as db_e:
+                    # Catch specific database errors within the loop
+                    all_sheet_results.append({
+                        "sheet_name": sheet_name,
+                        "table_name": table_name,
+                        "status": "Failed to Insert",
+                        "error": str(db_e),
+                        "rows_uploaded": 0
+                    })
+                    logging.error(f"DB Error processing sheet {sheet_name}: {db_e}")
+
+            # 6. Return aggregated results
             return jsonify({
-                "success": True, 
-                "message": message,
-                "table_name": table_name,
-                "rows_uploaded": df.shape[0]
+                "success": True,
+                "message": f"File '{filename}' processed successfully. See details for {len(sheet_names_list)} sheets.",
+                "results": all_sheet_results
             }), 200
 
         except Exception as e:
-            logging.error(f"Error during file processing/database insertion: {e}")
+            # Catch file reading errors (e.g., file corruption, openpyxl errors)
+            logging.error(f"Error during file processing: {e}")
             return jsonify({
                 "success": False, 
-                "error": f"Data processing failed: {str(e)}"
+                "error": f"File reading or processing failed: {str(e)}"
             }), 500
     else:
         return jsonify({
             "success": False, 
             "error": "File type not allowed. Only .xlsx files are permitted."
         }), 400
-# @app.route('/api/upload-excel', methods=['POST'])
-# # @log_session_check
-# @login_required
-# def upload_excel():
 
-#     print(f"\n{'='*70}")
-#     print("API Hit: POST /api/upload-excel")
-#     print(f"Session ID cookie: {request.cookies.get('session')}")
-#     print(f"Request headers: {dict(request.headers)}")
-#     print(f"Session contents: {dict(session)}")
-#     print(f"Has 'user' in session: {'user' in session}")
-#     print(f"{'='*70}\n")
-    
-#     # if 'user' not in session:  # ← Use 'user' instead of 'logged_in'
-#     #     print(f"❌ Upload rejected: No user in session")
-#     #     print(f"   Session contents: {dict(session)}")
-#     #     return jsonify({"success": False, "error": "Unauthorized. Please log in."}), 401
-    
-#     username = session.get('user')
-#     print(f"✅ Upload authorized for user: {username}")
-#     print(f"✅ Upload authorized for user: {session.get('user')}")
-
-#     if 'excel_file' not in request.files:
-#         return jsonify({"success": False, "error": "No file part in the request"}), 400
-
-#     file = request.files['excel_file']
-#     if file.filename == '':
-#         return jsonify({"success": False, "error": "No selected file"}), 400
-
-#     if file and allowed_file(file.filename):
-#         try:
-#             # Secure the filename for use as a table name base
-#             filename = secure_filename(file.filename)
-            
-#             # Read the Excel file into a pandas DataFrame
-#             # The uploaded file stream can be passed directly to pandas.read_excel
-#             df = pd.read_excel(file.stream, engine='openpyxl')
-            
-#             # Sanitize column names (e.g., replace spaces with underscores)
-#             # This is critical for database table compatibility
-#             df.columns = [col.replace(' ', '_').replace('.', '').lower() for col in df.columns]
-            
-#             # Use the sanitized filename (without extension) as the table name
-#             table_name = filename.rsplit('.', 1)[0].lower().replace('-', '_')
-            
-#             if engine is None:
-#                 raise Exception("Database engine is not initialized.")
-            
-#             # Write the DataFrame to the database
-#             # if_exists='replace' will overwrite the table if it exists.
-#             df.to_sql(table_name, con=engine, if_exists='replace', index=False)
-#             # message = f"Table '{table_name}' replaced with {df.shape[0]} new rows."
-            
-#             logging.info(f"Successfully uploaded {df.shape[0]} rows to table: {table_name}")
-
-#             # Return success response
-#             return jsonify({
-#                 "success": True, 
-#                 "message": f"File '{filename}' uploaded and data saved successfully to table '{table_name}'."
-#             }), 200
-
-#         except Exception as e:
-#             logging.error(f"Error during file processing/database insertion: {e}")
-#             return jsonify({"success": False, "error": f"Data processing failed: {str(e)}"}), 500
-#     else:
-#         return jsonify({"success": False, "error": "File type not allowed. Only .xlsx files are permitted."}), 400
 
 #---------------------------------------------------------------------------------------------------
 # ADMIN/DEBUG ENDPOINTS
