@@ -102,16 +102,6 @@ function App() {
     }
   };
 
-    // Function to switch between views, passed to UploadExcel
-  // const navigate = async (view) => {
-  //   console.log("App.js in navigate");
-  //   setCurrentView(view);
-  //   if (view === 'dashboards') {
-  //     // Re-fetch dashboards in case the new data affects them (optional)
-  //     await fetchDashboards(); 
-  //   }
-  // };
-  // In App.js
 const navigate = async (view) => {
     console.log(`🔄 Navigating to: ${view}`);
     setCurrentView(view);
@@ -124,118 +114,7 @@ const navigate = async (view) => {
     }
 };
 
-//   if (loading) {
-//     console.log("App.js in loading check condition");
-//     return (
-//       <div className="flex items-center justify-center h-screen bg-gray-100">
-//         <div className="text-xl text-gray-600">Loading...</div>
-//       </div>
-//     );
-//   }
 
-//   if (!isAuthenticated) {
-//     console.log("App.js in !isAuthenticated");
-//     return <Login onLoginSuccess={handleLoginSuccess} />;
-//   }
-
-//   return (
-//     <div className="flex flex-col min-h-screen bg-gray-50">
-//       {/* Header/Nav with dynamic button and user info */}
-//       <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg p-4 flex justify-between items-center border-b border-gray-100">
-//         <h1 className="text-2xl font-bold text-indigo-700 flex items-center">
-//             <Home className="w-6 h-6 mr-2" />
-//             Analytics Platform
-//         </h1>
-//         <div className="flex items-center space-x-4">
-//           <span className="text-sm font-medium text-gray-600">Welcome, {user?.name || 'User'}!</span>
-            
-//           {/* Dynamic Navigation Button */}
-//           {currentView === 'dashboards' ? (
-//             <button
-//               onClick={() => navigate('upload')}
-//               className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition flex items-center gap-1"
-//             >
-//               <UploadCloud className="w-4 h-4" />
-//               Upload Data
-//             </button>
-//           ) : (
-//             <button
-//               onClick={() => navigate('dashboards')}
-//               className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-1"
-//             >
-//               <Home className="w-4 h-4" />
-//               Return to Dashboard
-//             </button>
-//           )}
-
-//           <button
-//             onClick={handleLogout}
-//             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100 transition flex items-center gap-1"
-//           >
-//             <LogOut className="w-4 h-4" />
-//             Logout
-//           </button>
-//         </div>
-//       </header>
-
-//       <main className="flex-1 overflow-y-auto px-4 pb-8 pt-24">
-//         <div className="max-w-screen-2xl mx-auto">
-          
-//           {/* Conditional Rendering based on currentView */}
-//           {currentView === 'dashboards' && (
-//             <>
-//               {dashboardsLoading && (
-//                 <div className="flex items-center justify-center py-12">
-//                   <Loader2 className="w-6 h-6 text-indigo-600 animate-spin mr-3" />
-//                   <div className="text-xl text-gray-600">Loading dashboards...</div>
-//                 </div>
-//               )}
-
-//               {error && (
-//                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 shadow-sm">
-//                   <h3 className="text-red-800 font-semibold">Error Loading Dashboards</h3>
-//                   <p className="text-red-600 mt-2">{error}</p>
-//                   <button
-//                     onClick={fetchDashboards}
-//                     className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
-//                   >
-//                     Retry
-//                   </button>
-//                 </div>
-//               )}
-
-//               {!dashboardsLoading && !error && dashboards.length === 0 && (
-//                 <div className="text-center py-12 bg-white rounded-xl shadow-md">
-//                   <h2 className="text-2xl text-gray-600">No dashboards available</h2>
-//                   <p className="text-gray-500 mt-2">
-//                     You don't have access to any dashboards yet.
-//                   </p>
-//                 </div>
-//               )}
-
-//               {dashboards.map((dash) => (
-//                 <div key={dash.id} className="mb-8">
-//                   <SupersetChart 
-//                     dashboardId={dash.id} 
-//                     chartTitle={dash.title} 
-//                   />
-//                 </div>
-//               ))}
-//             </>
-//           )}
-
-//           {currentView === 'upload' && (
-//             // Pass the navigate function down to the UploadExcel component
-//             <UploadExcel navigate={navigate} />
-//           )}
-
-//         </div>
-//       </main>
-//     </div>
-//   );
-// }
-
-// export default App;
 if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">

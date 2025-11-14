@@ -10,7 +10,8 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
   const [errorMessage, setErrorMessage] = useState("");
 
   const BACKEND_URL = "http://localhost:5000/api/guest-token";
-  const SUPERSET_DOMAIN = "http://localhost:8088";
+  const BACKEND_API_URL = `${BACKEND_URL}/api/guest-token`;
+  const SUPERSET_DOMAIN = process.env.REACT_APP_SUPERSET_BASE_URL;
 
 
   // 🔹 Validate JWT expiration + log details
@@ -44,7 +45,7 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
         }
 
         const apiStartTime = Date.now();
-        const response = await axios.get(BACKEND_URL, {
+        const response = await axios.get(BACKEND_API_URL, {
           params: { dashboardId },
           timeout: 10000,
           withCredentials: true,

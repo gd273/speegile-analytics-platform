@@ -4,6 +4,7 @@ FEATURE_FLAGS = {
     "ALERT_REPORTS": True,
     "EMBEDDABLE_CHARTS": True,
     "DASHBOARD_RBAC": True,
+    "DRILL_BY": True,
 }
 GUEST_TOKEN_JWT_SECRET = 'my_secure_embedding_secret_12345'
 GUEST_TOKEN_JWT_EXP_SECONDS = 600  # 10 minutes
