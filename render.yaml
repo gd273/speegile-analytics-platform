@@ -5,10 +5,9 @@ services:
   - type: web
     name: superset
     runtime: docker
-    # repo: https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME # Not needed if connected via Blueprint UI
     rootDir: .
     dockerfilePath: ./Dockerfile
-    plan: standard # Superset needs RAM
+    plan: standard
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -33,7 +32,7 @@ services:
         value: production
 
   # -------------------------------------------------------
-  # 2. BACKEND API (Docker - Python/Flask)
+  # 2. BACKEND API (Docker)
   # -------------------------------------------------------
   - type: web
     name: backend
@@ -59,17 +58,17 @@ services:
           envVarKey: RENDER_EXTERNAL_URL
       - key: SUPERSET_ADMIN_USERNAME
         value: admin
-      # These must be manually synced after deploy
       - key: SUPERSET_ADMIN_PASSWORD
-        sync: false 
+        sync: false
       - key: GUEST_TOKEN_JWT_SECRET
-        sync: false 
+        sync: false
       - key: CORS_ALLOW_ORIGINS
-        value: "*" 
+        value: "*"
 
   # -------------------------------------------------------
-  # 3. FRONTEND (React Static Site)
+  # 3. FRONTEND (Static Site)
   # -------------------------------------------------------
+  # Ensure "type: static" is strictly adhered to
   - type: static
     name: frontend
     rootDir: frontend
@@ -87,15 +86,15 @@ services:
           envVarKey: RENDER_EXTERNAL_URL
 
   # -------------------------------------------------------
-  # 4. REDIS (Private Service) - MOVED HERE
+  # 4. REDIS (Private Service)
   # -------------------------------------------------------
   - type: redis
     name: shared-redis
-    plan: starter # Free tier exists
-    ipAllowList: [] # Allow internal connections only
+    plan: starter
+    ipAllowList: []
 
 databases:
   - name: shared-postgres
-    plan: starter # Free tier exists but expires after 30 days
+    plan: starter
     databaseName: superset
     user: superset
