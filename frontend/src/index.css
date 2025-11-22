@@ -20,3 +20,8 @@ iframe {
   border: 2px solid #ccc;
   border-radius: 8px;
 }
+.bg-grid-pattern {
+  background-color: white;
+  background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+  background-size: 16px 16px;
+}

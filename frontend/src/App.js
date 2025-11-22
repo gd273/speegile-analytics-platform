@@ -1,37 +1,36 @@
+
 import React, { useState, useEffect } from "react";
 import api from "./api";
 import SupersetChart from "./SupersetChart";
 import Login from "./Login";
 import UploadExcel from "./UploadExcel";
-import { LogOut, Home, UploadCloud, Loader2 } from "lucide-react"; 
+// import CreateUser from "./CreateUser"; // Import the new component
+import { LogOut, Home, UploadCloud, Loader2, UserPlus } from "lucide-react"; 
+import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 
+
+console.log("DEBUG: REACT_APP_API_BASE_URL =", process.env.REACT_APP_API_BASE_URL);
+
+// --- Main App Wrapper ---
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
-  const [dashboards, setDashboards] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dashboardsLoading, setDashboardsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [currentView, setCurrentView] = useState('dashboards'); 
+  const navigate = useNavigate();
+  const location = useLocation();
 
+  // Check Auth on Load
   useEffect(() => {
-    console.log("App.js checkauth");
     checkAuth();
   }, []);
 
   const checkAuth = async () => {
     try {
-      console.log("App.js checkauth im fn");
       const response = await api.get('/check-auth');
-
       if (response.data.authenticated) {
         setIsAuthenticated(true);
         setUser(response.data.user);
-        // Fetch dashboards after authentication is confirmed
-        console.log("App.js checkauth im fn and trying to fetch dasboard");
-        await fetchDashboards();
       } else {
-        console.log("❌ User not authenticated")
         setIsAuthenticated(false);
         setUser(null);
       }
@@ -44,78 +43,25 @@ function App() {
     }
   };
 
-  const fetchDashboards = async () => {
-    console.log("App.js in fetchdashboard");
-    console.log("📊 Fetching accessible dashboards...");
-    setDashboardsLoading(true);
-    setError(null);
-
-    try {
-      const response = await api.get('/dashboards');
-      console.log("✅ Dashboards API Response:", response.data);
-
-      if (response.data.success) {
-        const dashboardList = response.data.dashboards.map(dash => ({
-          id: dash.embedded_uuid,  // Use UUID for embedding
-          title: dash.dashboard_title,
-          url: dash.url,
-          roles: dash.roles
-        }));
-
-        setDashboards(dashboardList);
-        console.log(`✅ Loaded ${dashboardList.length} dashboards for user`);
-      } else {
-        setError("Failed to load dashboards");
-      }
-    } catch (err) {
-      console.error("❌ Failed to fetch dashboards:", err);
-      setError(err.response?.data?.error || "Failed to load dashboards");
-    } finally {
-      setDashboardsLoading(false);
-    }
-  };
-
-  const handleLoginSuccess = async (userData) => {
-    console.log("App.js in handleLoginSuccess");
+  const handleLoginSuccess = (userData) => {
     setIsAuthenticated(true);
     setUser(userData);
-    // Fetch dashboards after successful login
-    await checkAuth();
-    await fetchDashboards();
+    navigate('/dashboards'); // Go to dashboards after login
   };
 
   const handleLogout = async () => {
-    console.log("App.js in handleLogout");
-    console.log("🔴 Logout clicked");
-    
     try {
-      const response = await api.post('/logout');
-      console.log("✅ Backend logout successful:", response.data);
+      await api.post('/logout');
     } catch (err) {
-      console.error("❌ Backend logout failed:", err);
+      console.error("Logout failed:", err);
     } finally {
-      console.log("🧹 Clearing local state...");
       setIsAuthenticated(false);
       setUser(null);
-      setDashboards([]);
-      setCurrentView('dashboards');
+      navigate('/');
     }
   };
 
-const navigate = async (view) => {
-    console.log(`🔄 Navigating to: ${view}`);
-    setCurrentView(view);
-    
-    // Add a small delay to avoid concurrent requests
-    if (view === 'dashboards') {
-        // Small delay to let other requests complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await fetchDashboards(); 
-    }
-};
-
-
-if (loading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
@@ -124,48 +70,63 @@ if (loading) {
     );
   }
 
-  // If not authenticated, show the Login component
+  // If not authenticated, show Login
   if (!isAuthenticated) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // If authenticated, show the main application UI
+  // Helper to check active route for styling
+  const isActive = (path) => location.pathname === path;
+
   return (
     <div className="min-h-screen bg-gray-100 font-sans flex">
       {/* Sidebar Navigation */}
-      <nav className="w-56 bg-white shadow-xl flex flex-col p-4 border-r border-gray-200">
+      <nav className="w-64 bg-white shadow-xl flex flex-col p-4 border-r border-gray-200">
         <div className="flex-grow">
-          <h1 className="text-2xl font-bold text-blue-600 mb-6 border-b pb-4">Data Portal</h1>
+          <h1 className="text-2xl font-bold text-blue-600 mb-6 border-b pb-4 pl-2">Data Portal</h1>
           
           <div className="space-y-2">
-            <button
-              onClick={() => navigate('dashboards')}
+            <Link
+              to="/dashboards"
               className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
-                currentView === 'dashboards' ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                isActive('/dashboards') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               <Home className="w-5 h-5" />
               Dashboards
-            </button>
-            <button
-              onClick={() => navigate('upload')}
+            </Link>
+
+            <Link
+              to="/upload"
               className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
-                currentView === 'upload' ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                isActive('/upload') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               <UploadCloud className="w-5 h-5" />
               Upload Data
-            </button>
+            </Link>
+
+            {/* Admin Link - Only visible to Admins */}
+            {/*{user && user.roles.includes('Admin') && (
+              <Link 
+                to="/admin/create-user"
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
+                  isActive('/admin/create-user') ? 'bg-red-50 text-red-600 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <UserPlus className="w-5 h-5 text-red-500" />
+                <span className="text-red-600">Add User</span>
+              </Link>
+            )}
+           */}
           </div>
         </div>
         
-        {/* User and Logout Section */}
+        {/* User Info & Logout */}
         <div className="pt-4 border-t border-gray-200">
-          {user && (
-            <p className="text-sm text-gray-700 mb-3 truncate">
-              Signed in as: <span className="font-medium">{user.name || user.username}</span>
-            </p>
-          )}
+          <p className="text-sm text-gray-700 mb-3 truncate px-2">
+            Signed in as: <span className="font-medium">{user.name || user.username}</span>
+          </p>
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 p-3 rounded-lg text-red-600 hover:bg-red-50 transition font-medium"
@@ -176,67 +137,82 @@ if (loading) {
         </div>
       </nav>
 
-      {/* Main Content Area */}
+      {/* Main Content Area - Handles Routing */}
       <main className="flex-1 p-8 overflow-y-auto">
-        <header className="mb-8 border-b pb-4">
-          <h2 className="text-3xl font-semibold text-gray-800">
-            {currentView === 'dashboards' ? 'Superset Dashboards' : 'Upload New Data'}
-          </h2>
-          <p className="text-gray-500 mt-1">
-            {currentView === 'dashboards' ? 'Visualizations of your data, embedded directly from Superset.' : 'Submit Excel files to update your data source.'}
-          </p>
-        </header>
-
-        <div className="max-w-7xl mx-auto">
-          {currentView === 'dashboards' && (
-            <>
-              {dashboardsLoading && (
-                <div className="text-center py-12">
-                  <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto" />
-                  <p className="mt-3 text-gray-600">Loading dashboards...</p>
-                </div>
-              )}
-
-              {error && (
-                <div className="p-4 bg-red-50 rounded-xl mb-6 shadow-sm">
-                  <h3 className="text-red-800 font-semibold">Error Loading Dashboards</h3>
-                  <p className="text-red-600 mt-2">{error}</p>
-                  <button
-                    onClick={fetchDashboards}
-                    className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-
-              {!dashboardsLoading && !error && dashboards.length === 0 && (
-                <div className="text-center py-12 bg-white rounded-xl shadow-md">
-                  <h2 className="text-2xl text-gray-600">No dashboards available</h2>
-                  <p className="text-gray-500 mt-2">
-                    You don't have access to any dashboards yet.
-                  </p>
-                </div>
-              )}
-
-              {dashboards.map((dash) => (
-                <div key={dash.id} className="mb-8">
-                  <SupersetChart 
-                    dashboardId={dash.id} 
-                    chartTitle={dash.title} 
-                  />
-                </div>
-              ))}
-            </>
-          )}
-
-          {currentView === 'upload' && (
-            // Pass the navigate function down to the UploadExcel component
-            <UploadExcel navigate={navigate} />
-          )}
-
-        </div>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboards" replace />} />
+          <Route path="/dashboards" element={<DashboardView />} />
+          <Route path="/upload" element={<UploadExcel navigate={navigate} />} />
+          {/*<Route path="/admin/create-user" element={<CreateUser />} />*/}
+        </Routes>
       </main>
+    </div>
+  );
+}
+
+// --- Sub-Component for Dashboards Logic ---
+// We moved this logic out of App() to keep the main file clean
+function DashboardView() {
+  const [dashboards, setDashboards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchDashboards();
+  }, []);
+
+  const fetchDashboards = async () => {
+    try {
+      const response = await api.get('/dashboards');
+      if (response.data.success) {
+        const dashboardList = response.data.dashboards.map(dash => ({
+          id: dash.embedded_uuid,
+          title: dash.dashboard_title,
+          url: dash.url,
+          roles: dash.roles
+        }));
+        setDashboards(dashboardList);
+      } else {
+        setError("Failed to load dashboards");
+      }
+    } catch (err) {
+      setError("Failed to load dashboards");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      <header className="mb-8 border-b pb-4">
+        <h2 className="text-3xl font-semibold text-gray-800">Superset Dashboards</h2>
+        <p className="text-gray-500 mt-1">Visualizations embedded directly from Superset.</p>
+      </header>
+
+      {loading && (
+        <div className="text-center py-12">
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto" />
+          <p className="mt-3 text-gray-600">Loading dashboards...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-4 bg-red-50 rounded-xl text-red-600 mb-6">
+          {error} <button onClick={fetchDashboards} className="underline ml-2 font-bold">Retry</button>
+        </div>
+      )}
+
+      {!loading && !error && dashboards.length === 0 && (
+        <div className="text-center py-12 bg-white rounded-xl shadow-md">
+          <p className="text-gray-500">You don't have access to any dashboards yet.</p>
+        </div>
+      )}
+
+      {dashboards.map((dash) => (
+        <div key={dash.id} className="mb-8">
+          <SupersetChart dashboardId={dash.id} chartTitle={dash.title} />
+        </div>
+      ))}
     </div>
   );
 }

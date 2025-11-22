@@ -1,20 +1,19 @@
 # ==========================
-# Global
+# Global / Secrets
 # ==========================
 .env
 *.env
 *.log
 *.sqlite3
-*.pyc
-*.pyo
-*.pyd
-*.swp
-__pycache__/
-.DS_Store
-Thumbs.db
-.env.local
-.env.*.local
-.env.*.secret
+*.dump
+*.bak
+
+# ==========================
+# Superset Data (Keep this local only!)
+# ==========================
+superset_home/
+superset_home_bak/
+superset_db.dump
 
 # ==========================
 # Python (Backend)
@@ -23,9 +22,7 @@ backend/venv/
 backend/__pycache__/
 *.py[cod]
 backend/*.pyc
-
-# ✅ Ignore entire config folder
-config/
+__pycache__/
 
 # ==========================
 # Node / React (Frontend)
@@ -37,9 +34,16 @@ frontend/.env
 # ==========================
 # Docker
 # ==========================
-Dockerfile
+# DO NOT IGNORE Dockerfile! We need it for Render.
 docker-compose.override.yml
-secrets/
+
+# ==========================
+# Config
+# ==========================
+# DO NOT IGNORE config/ folder! 
+# We need config/superset_config.py for the build.
+# But if you have other secrets in there, ignore specific files:
+# config/secrets.py 
 
 # ==========================
 # IDEs and Editors
@@ -47,14 +51,5 @@ secrets/
 .vscode/
 .idea/
 *.code-workspace
-
-# ==========================
-# OS-specific files
-# ==========================
-# macOS
-*.DS_Store
-
-# Windows
-ehthumbs.db
+.DS_Store
 Thumbs.db
-Desktop.ini

@@ -1,0 +1,65 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    env_file:
+      - .env
+    environment:
+      APP_DATABASE_URL: "postgresql+psycopg2://client:client123@db:5432/clientdata"
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+      - superset
+    volumes:
+      - ./backend:/app:cached
+    command: >
+      /bin/sh -c "
+        /app/wait-for-db.sh db 5432 30 &&
+        python app.py
+      "
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - superset_db_data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  superset:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myorg/superset-custom:latest
+    env_file: .env
+    environment:
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./config/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - superset_home:/home/superset
+    command: >
+      /bin/sh -c "
+        /app/.venv/bin/superset db upgrade &&
+        /app/.venv/bin/superset fab create-admin --username admin --firstname Admin --lastname User --email admin@example.com --password admin &&
+        /app/.venv/bin/superset init &&
+        gunicorn --bind 0.0.0.0:8088 'superset.app:create_app()'
+      "
+
+volumes:
+  superset_db_data:
+  superset_home:

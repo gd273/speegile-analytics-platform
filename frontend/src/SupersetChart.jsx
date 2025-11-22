@@ -1,17 +1,15 @@
 
 import React, { useEffect, useState, useRef } from "react";
-import axios from "axios";
 import { embedDashboard } from "@superset-ui/embedded-sdk";
 import { jwtDecode } from "jwt-decode";
+import api from "./api";
 
 const SupersetChart = ({ dashboardId, chartTitle }) => {
   const containerRef = useRef(null);
   const [status, setStatus] = useState("initial");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const BACKEND_URL = "http://localhost:5000/api/guest-token";
-  const BACKEND_API_URL = `${BACKEND_URL}/api/guest-token`;
-  const SUPERSET_DOMAIN = process.env.REACT_APP_SUPERSET_BASE_URL;
+  const SUPERSET_DOMAIN = (process.env.REACT_APP_SUPERSET_BASE_URL || "http://localhost:8088").replace(/\/+$/, "");
 
 
   // 🔹 Validate JWT expiration + log details
@@ -44,13 +42,10 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
           containerRef.current.innerHTML = "";
         }
 
-        const apiStartTime = Date.now();
-        const response = await axios.get(BACKEND_API_URL, {
+        const response = await api.get("/guest-token", {
           params: { dashboardId },
           timeout: 10000,
-          withCredentials: true,
         });
-        const apiEndTime = Date.now();
 
 
         const { guestToken } = response.data;
@@ -59,22 +54,16 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
           throw new Error("Invalid or expired guestToken returned by backend");
         }
 
-        const embedStartTime = Date.now();
         await embedDashboard({
           id: dashboardId.toString(),
           supersetDomain: SUPERSET_DOMAIN,
           mountPoint: containerRef.current,
-          fetchGuestToken: async () => {
-            return guestToken;
-          },
+          fetchGuestToken: async () => guestToken,
           dashboardUiConfig: {
             hideTitle: true,
             hideTab: true,
             hideChartControls: true,
-            filters: {
-              expanded: true,
-              visible: true,
-            },
+            filters: {expanded: true,visible: true},
           },
           debug: true,
         });
@@ -86,10 +75,13 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
             message = "Authentication required. Please log in again.";
             setTimeout(() => window.location.reload(), 2000);
           } else {
-            message = `Backend error: ${err.response.status} - ${
-              err.response.data?.error || err.response.statusText
-            }`;
+            const backendMsg = err.response.data?.error || err.response.statusText;
+            message = `Backend error: ${err.response.status} — ${backendMsg}`;
           }
+        } else if (err.request) {
+          message = "Network error: unable to reach backend. Check backend URL and CORS.";
+        } else {
+          message = err.message || message;
         }
 
         setErrorMessage(message);
@@ -117,6 +109,7 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
         overflow: "auto",
         position: "relative",
         borderRadius: "4px",
+        height: "800px"
       }}
     />
   </div>

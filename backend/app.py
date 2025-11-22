@@ -5,6 +5,7 @@ import time
 import os
 import requests
 import json
+import redis
 from datetime import timedelta
 from werkzeug.utils import secure_filename
 import pandas as pd
@@ -13,112 +14,224 @@ import logging
 import sqlite3
 from flask_session import Session
 from dotenv import load_dotenv
-import os
+from pathlib import Path
+from werkzeug.security import generate_password_hash, check_password_hash
+# load_dotenv()
+# if not os.path.exists('./.flask_session/'):
+#     os.makedirs('./.flask_session/')
 
-load_dotenv()
-if not os.path.exists('./.flask_session/'):
-    os.makedirs('./.flask_session/')
+# app = Flask(__name__)
+# app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+# print("======================================================================")
+# print(f"Flask App Initialized.")
+# print(f"SECRET_KEY Hash Check (First 8 chars): {app.secret_key[:8]}...")
+# print("======================================================================")
+
+# # Create the session directory if it doesn't exist
+
+# # app.secret_key = "your_flask_secret_key_12345"
+
+# # app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # or 'None' if using HTTPS
+# # app.config['SESSION_COOKIE_HTTPONLY'] = True
+# # app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+# # app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
+# app.config.update(
+#     SESSION_TYPE='filesystem',
+#     SESSION_COOKIE_NAME='flask_session',
+#     SESSION_COOKIE_HTTPONLY=True,
+#     SESSION_COOKIE_SAMESITE='Lax',
+#     SESSION_COOKIE_SECURE=False,  # False for HTTP (localhost), True for HTTPS
+#     PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
+#     SESSION_COOKIE_PATH='/',
+#     SESSION_FILE_DIR='./.flask_session/',
+#     SESSION_PERMANENT=False,
+#     SESSION_COOKIE_DOMAIN=None  # Important for localhost
+# )
+# # app.config['SECRET_KEY'] = app.secret_key
+# Session(app)
+
+# # Allowed extensions for file upload
+# ALLOWED_EXTENSIONS = {'xlsx'}
+# # Load CORS origins from .env
+# raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")
+
+# # Support multiple origins (comma-separated)
+# CORS_ORIGINS = [o.strip() for o in raw_origins.split(",") if o.strip()]
+# CORS(app, 
+#     resources={r"/api/*": {
+#         "origins": CORS_ORIGINS,
+#         "supports_credentials": True,
+#         "allow_headers": ["Content-Type", "Authorization"],
+#         "expose_headers": ["Set-Cookie"],
+#         "methods": ["GET", "POST", "OPTIONS"],
+#         "allow_credentials": True
+#     }},
+#     supports_credentials=True
+# )
+
+# # GUEST_TOKEN_SECRET = os.getenv("GUEST_TOKEN_SECRET", "my_secure_embedding_secret_12345")
+# # SUPERSET_URL = "http://localhost:8088"
+# SUPERSET_ADMIN_USERNAME = os.getenv("SUPERSET_ADMIN_USERNAME")
+# SUPERSET_ADMIN_PASSWORD = os.getenv("SUPERSET_ADMIN_PASSWORD")
+# SUPERSET_URL = os.getenv("SUPERSET_URL")
+# # DATABASE_URL = 'mysql+mysqlconnector://root:mishka123@localhost:3306/user_database'
+# DATABASE_URL = os.getenv("APP_DATABASE_URL")
+# GUEST_TOKEN_JWT_SECRET = os.getenv("GUEST_TOKEN_JWT_SECRET")
+
+# try:
+    
+#     engine = create_engine(DATABASE_URL)
+    
+#     with engine.connect() as connection:
+#         result = connection.execute(text("SELECT 1"))
+#         print(f"Database connection successful. Result: {result.scalar()}")
+# except Exception as e:
+#     print(f"🚨 DATABASE CONNECTION FAILED: {e}")
+#     engine = None
+import os as _os
+
+# -------------------- ENV loading & expansion --------------------
+# Load root .env (assumes this file is in backend/ and .env is in repo root)
+ROOT = Path(__file__).resolve().parents[1]  # repo root
+DOTENV = ROOT / ".env"
+if DOTENV.exists():
+    load_dotenv(dotenv_path=str(DOTENV), override=False)
+else:
+    # Fallback: load default .env (if any) in current dir
+    load_dotenv(override=False)
+
+# Expand nested env vars in APP_DATABASE_URL (handles ${APP_DB_USER} style)
+raw_db = os.getenv("APP_DATABASE_URL")
+if raw_db:
+    os.environ["APP_DATABASE_URL"] = _os.path.expandvars(raw_db)
+
+# # -------------------- session dir --------------------
+# if not os.path.exists('./.flask_session/'):
+#     os.makedirs('./.flask_session/')
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+# make sure FLASK_SECRET_KEY exists; provide a safe dev fallback if not
+flask_secret = os.getenv("FLASK_SECRET_KEY") or os.getenv("SECRET_KEY") or "dev_fallback_secret_please_change"
+app.secret_key = flask_secret
+
 
 print("======================================================================")
-print(f"Flask App Initialized.")
-print(f"SECRET_KEY Hash Check (First 8 chars): {app.secret_key[:8]}...")
+print(f"Flask App Initialized with REDIS Session Storage.")
+print(f"Connecting to Redis at: {REDIS_URL}")
 print("======================================================================")
 
-# Create the session directory if it doesn't exist
-
-# app.secret_key = "your_flask_secret_key_12345"
-
-# app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # or 'None' if using HTTPS
-# app.config['SESSION_COOKIE_HTTPONLY'] = True
-# app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
-# app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
 app.config.update(
-    SESSION_TYPE='filesystem',
+    SESSION_TYPE='redis',
+    SESSION_REDIS=redis.from_url(REDIS_URL),
     SESSION_COOKIE_NAME='flask_session',
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=False,  # False for HTTP (localhost), True for HTTPS
+    SESSION_COOKIE_SECURE=True if os.getenv("FLASK_ENV") == "production" else False,
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
-    SESSION_COOKIE_PATH='/',
-    SESSION_FILE_DIR='./.flask_session/',
+    # SESSION_FILE_DIR='./.flask_session/',
     SESSION_PERMANENT=False,
-    SESSION_COOKIE_DOMAIN=None  # Important for localhost
+    SESSION_COOKIE_DOMAIN=None
 )
-# app.config['SECRET_KEY'] = app.secret_key
 Session(app)
 
 # Allowed extensions for file upload
 ALLOWED_EXTENSIONS = {'xlsx'}
-# Load CORS origins from .env
-raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")
 
-# Support multiple origins (comma-separated)
+# Load CORS origins from env
+raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")
 CORS_ORIGINS = [o.strip() for o in raw_origins.split(",") if o.strip()]
-CORS(app, 
-    resources={r"/api/*": {
-        "origins": CORS_ORIGINS,
-        "supports_credentials": True,
-        "allow_headers": ["Content-Type", "Authorization"],
-        "expose_headers": ["Set-Cookie"],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_credentials": True
-    }},
-    supports_credentials=True
+CORS(app,
+     resources={r"/api/*": {
+         "origins": CORS_ORIGINS,
+         "supports_credentials": True,
+         "allow_headers": ["Content-Type", "Authorization"],
+         "expose_headers": ["Set-Cookie"],
+         "methods": ["GET", "POST", "OPTIONS"],
+         "allow_credentials": True
+     }},
+     supports_credentials=True
 )
 
-# GUEST_TOKEN_SECRET = os.getenv("GUEST_TOKEN_SECRET", "my_secure_embedding_secret_12345")
-# SUPERSET_URL = "http://localhost:8088"
+# Superset / DB config from env
 SUPERSET_ADMIN_USERNAME = os.getenv("SUPERSET_ADMIN_USERNAME")
 SUPERSET_ADMIN_PASSWORD = os.getenv("SUPERSET_ADMIN_PASSWORD")
 SUPERSET_URL = os.getenv("SUPERSET_URL")
-# DATABASE_URL = 'mysql+mysqlconnector://root:mishka123@localhost:3306/user_database'
 DATABASE_URL = os.getenv("APP_DATABASE_URL")
 GUEST_TOKEN_JWT_SECRET = os.getenv("GUEST_TOKEN_JWT_SECRET")
 
-try:
-    
-    engine = create_engine(DATABASE_URL)
-    
-    with engine.connect() as connection:
-        result = connection.execute(text("SELECT 1"))
-        print(f"Database connection successful. Result: {result.scalar()}")
-except Exception as e:
-    print(f"🚨 DATABASE CONNECTION FAILED: {e}")
-    engine = None
-
+# -------------------- create engine (if URL present) --------------------
+engine = None
+if DATABASE_URL:
+    try:
+        engine = create_engine(DATABASE_URL)
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT 1"))
+            print(f"Database connection successful. Result: {result.scalar()}")
+    except Exception as e:
+        print(f"🚨 DATABASE CONNECTION FAILED: {e}")
+        engine = None
+else:
+    print("⚠️ APP_DATABASE_URL is not set in environment. Database features will be disabled.")
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-USERS = {
-    "User_1": {
-        "password": "john123",
-        "name": "User_1",
-        "superset_username": "User_1",
-        "roles": ["dashboard1viewer","DASHBOARD-READ-BASE"]  # Must match Superset role names exactly
-    },
-    "User_2": {
-        "password": "jane123",
-        "name": "User_2",
-        "superset_username": "User_2",
-        "roles": ["dashboard2viewer","DASHBOARD-READ-BASE"]
-    },
-    "User_3": {
-        "password": "bob123",
-        "name": "User_3",
-        "superset_username": "User_3",
-        "roles": ["dashboard3viewer", "DASHBOARD-READ-BASE"]
-    },
-    "alice": {
-        "password": "alice123",
-        "name": "Alice Johnson",
-        "superset_username": "admin",
-        "roles": ["Admin"]
-    }
-}
+# USERS = {
+#     "User_1": {
+#         "password": "john123",
+#         "name": "User_1",
+#         "superset_username": "User_1",
+#         "roles": ["dashboard1viewer","DASHBOARD-READ-BASE"]  # Must match Superset role names exactly
+#     },
+#     "User_2": {
+#         "password": "jane123",
+#         "name": "User_2",
+#         "superset_username": "User_2",
+#         "roles": ["dashboard2viewer","DASHBOARD-READ-BASE"]
+#     },
+#     "User_3": {
+#         "password": "bob123",
+#         "name": "User_3",
+#         "superset_username": "User_3",
+#         "roles": ["dashboard3viewer", "DASHBOARD-READ-BASE"]
+#     },
+#     "alice": {
+#         "password": "alice123",
+#         "name": "Alice Johnson",
+#         "superset_username": "admin",
+#         "roles": ["Admin"]
+#     }
+# }
+
+def get_user_from_db(username):
+    """Fetch user details from the application database"""
+    if not engine:
+        print("🚨 DB Engine not available")
+        return None
+
+    try:
+        with engine.connect() as conn:
+            # Simple SQL query to find the user
+            query = text("SELECT username, password_hash, name, superset_username, roles FROM users WHERE username = :u")
+            result = conn.execute(query, {"u": username}).fetchone()
+            
+            if result:
+                # Convert the row to a standard dictionary
+                return {
+                    "username": result[0],
+                    "password_hash": result[1],
+                    "name": result[2],
+                    "superset_username": result[3],
+                    "roles": json.loads(result[4]) if result[4] else [] # Assuming roles stored as JSON array
+                }
+            return None
+    except Exception as e:
+        print(f"✗ Error fetching user: {e}")
+        return None
 
 def get_superset_access_token():
 
@@ -279,11 +392,9 @@ def get_embedded_dashboard_uuid(filtered_dashboard_list, access_token):
     return embedded_dashboards
 
 
-
-#---------------------------------------------------------------------------------------------------
-# AUTHENTICATION ENDPOINTS
-#---------------------------------------------------------------------------------------------------
-
+# ---------------------------------------------------------
+# HELPER: Admin Permission Check
+# ---------------------------------------------------------
 def login_required(f):
     from functools import wraps
     @wraps(f)
@@ -292,6 +403,75 @@ def login_required(f):
             return jsonify({"error": "Authentication required"}), 401
         return f(*args, **kwargs)
     return decorated_function
+
+def admin_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 1. Must be logged in
+        if 'user' not in session:
+            return jsonify({"error": "Authentication required"}), 401
+        
+        # 2. Must have 'Admin' role
+        # Adjust this string to match exactly what your Admin role is named
+        if 'Admin' not in session.get('roles', []):
+            return jsonify({"error": "Access denied: Admins only"}), 403
+            
+        return f(*args, **kwargs)
+    return decorated_function
+
+# # ---------------------------------------------------------
+# # ENDPOINT: Create User
+# # ---------------------------------------------------------
+# @app.route("/api/admin/create-user", methods=["POST"])
+# @login_required
+# @admin_required
+# def create_user():
+#     data = request.get_json()
+    
+#     # Extract fields exactly as you requested
+#     new_username = data.get("username")         # Login Username
+#     raw_password = data.get("password")         # Login Password
+#     name = data.get("name")                     # Display Name
+#     superset_mapping = data.get("superset_username") # Superset User to map to
+#     roles = data.get("roles")                   # List of roles
+    
+#     if not all([new_username, raw_password, superset_mapping, roles]):
+#         return jsonify({"error": "Missing fields"}), 400
+
+#     # Hash the password immediately
+#     p_hash = generate_password_hash(raw_password)
+    
+#     try:
+#         with engine.connect() as conn:
+#             # Check for duplicates
+#             existing = conn.execute(text("SELECT 1 FROM users WHERE username=:u"), {"u": new_username}).fetchone()
+#             if existing:
+#                 return jsonify({"error": "Username already exists"}), 409
+
+#             # Insert
+#             conn.execute(text("""
+#                 INSERT INTO users (username, password_hash, name, superset_username, roles)
+#                 VALUES (:u, :p, :n, :s, :r)
+#             """), {
+#                 "u": new_username,
+#                 "p": p_hash,
+#                 "n": name,
+#                 "s": superset_mapping,
+#                 "r": json.dumps(roles) # Store list as JSON string
+#             })
+#             conn.commit()
+            
+#         return jsonify({"success": True, "message": f"User {new_username} created"}), 201
+        
+#     except Exception as e:
+#         print(f"Error: {e}")
+#         return jsonify({"error": "Database error"}), 500
+#---------------------------------------------------------------------------------------------------
+# AUTHENTICATION ENDPOINTS
+#---------------------------------------------------------------------------------------------------
+
+
 
 # def log_session_check(f):
 #     """A decorator that logs the session contents before executing a route."""
@@ -322,15 +502,26 @@ def login():
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
     
+    user_data = get_user_from_db(username)
+
     # Check credentials
-    if username not in USERS or USERS[username]["password"] != password:
+    # if username not in USERS or USERS[username]["password"] != password:
+    #     return jsonify({"error": "Invalid username or password"}), 401
+
+    # 2. VALIDATE PASSWORD (HASHED)
+    # We use check_password_hash to compare the input password with the stored hash
+    if not user_data or not check_password_hash(user_data["password_hash"], password):
         return jsonify({"error": "Invalid username or password"}), 401
     
     
-    user_data = USERS[username]
+    # user_data = USERS[username]
     session.clear()
     session.permanent = True
-    session['user'] = username
+    # session['user'] = username
+    # session['name'] = user_data["name"]
+    # session['superset_username'] = user_data["superset_username"]
+    # session['roles'] = user_data["roles"]
+    session['user'] = user_data["username"]
     session['name'] = user_data["name"]
     session['superset_username'] = user_data["superset_username"]
     session['roles'] = user_data["roles"]
@@ -349,20 +540,20 @@ def login():
     response = jsonify({
         "success": True,
         "user": {
-            "username": username,
+            "username": user_data["username"],
             "name": user_data["name"],
             "roles": user_data["roles"]
         }
     })
 
-    response.set_cookie(
-        'session',
-        value=session.sid if hasattr(session, 'sid') else '',
-        httponly=True,
-        samesite='Lax',
-        secure=False,  # False for localhost HTTP
-        max_age=3600
-    )
+    # response.set_cookie(
+    #     'session',
+    #     value=session.sid if hasattr(session, 'sid') else '',
+    #     httponly=True,
+    #     samesite='Lax',
+    #     secure=False,  # False for localhost HTTP
+    #     max_age=3600
+    # )
     
     return response, 200
 
@@ -669,8 +860,53 @@ def test_superset_connection():
         "dashboards": [{"title": d.get("dashboard_title"), "roles": [r["name"] for r in d.get("roles", [])]} for d in dashboards]
     }), 200
 
+@app.route("/api/seed-db", methods=["GET"])
+def seed_db():
+    """Quick utility to create the users table and a test user"""
+    if not engine:
+        return "No DB Connection", 500
+        
+    try:
+        with engine.connect() as conn:
+            # 1. Create the Users Table (if it doesn't exist yet)
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(50) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    name VARCHAR(100),
+                    superset_username VARCHAR(100),
+                    roles TEXT
+                );
+            """))
+            
+            # 2. Create the 'admin' user with password 'admin123'
+            # We generate the hash dynamically here
+            p_hash = generate_password_hash("admin123")
+            roles_json = json.dumps(["Admin", "DASHBOARD-READ-BASE"])
+            
+            # 3. Insert the user (using ON CONFLICT to prevent errors if run twice)
+            conn.execute(text("""
+                INSERT INTO users (username, password_hash, name, superset_username, roles)
+                VALUES (:u, :p, :n, :s, :r)
+                ON CONFLICT (username) DO NOTHING
+            """), {
+                "u": "admin", 
+                "p": p_hash, 
+                "n": "Admin User", 
+                "s": "admin", 
+                "r": roles_json
+            })
+            
+            conn.commit()
+            return "Database seeded with table and 'admin' user!", 200
+    except Exception as e:
+        return f"Error: {e}", 500
 # if __name__ == "__main__":
 #     app.run(host="0.0.0.0", port=5000, debug=True)
 
+# if __name__ == '__main__':
+#     app.run(debug=False)
+
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=False)
