@@ -5,10 +5,10 @@ services:
   - type: web
     name: superset
     runtime: docker
-    repo: https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME # Optional, Render usually auto-detects
+    # repo: https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME # Not needed if connected via Blueprint UI
     rootDir: .
     dockerfilePath: ./Dockerfile
-    plan: standard # Superset needs RAM (Starter or Standard recommended)
+    plan: standard # Superset needs RAM
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -59,15 +59,13 @@ services:
           envVarKey: RENDER_EXTERNAL_URL
       - key: SUPERSET_ADMIN_USERNAME
         value: admin
-      # Must match the value generated for Superset above
-      # (You will manually sync this in the dashboard after creation if needed, 
-      # or we use a group. For simple blueprints, we'll use a placeholder)
+      # These must be manually synced after deploy
       - key: SUPERSET_ADMIN_PASSWORD
-        sync: false # You must copy-paste this from Superset's env vars after deploy
+        sync: false 
       - key: GUEST_TOKEN_JWT_SECRET
-        sync: false # You must copy-paste this from Superset's env vars after deploy
+        sync: false 
       - key: CORS_ALLOW_ORIGINS
-        value: "*" # Tighten this to your frontend URL after deployment
+        value: "*" 
 
   # -------------------------------------------------------
   # 3. FRONTEND (React Static Site)
@@ -88,14 +86,16 @@ services:
           name: backend
           envVarKey: RENDER_EXTERNAL_URL
 
+  # -------------------------------------------------------
+  # 4. REDIS (Private Service) - MOVED HERE
+  # -------------------------------------------------------
+  - type: redis
+    name: shared-redis
+    plan: starter # Free tier exists
+    ipAllowList: [] # Allow internal connections only
+
 databases:
   - name: shared-postgres
     plan: starter # Free tier exists but expires after 30 days
     databaseName: superset
     user: superset
-
-services:
-  - type: redis
-    name: shared-redis
-    plan: starter # Free tier exists
-    ipAllowList: [] # Allow internal connections only
