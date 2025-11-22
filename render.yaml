@@ -95,6 +95,6 @@ services:
 
 databases:
   - name: shared-postgres
-    plan: starter
+    plan: free
     databaseName: superset
     user: superset
