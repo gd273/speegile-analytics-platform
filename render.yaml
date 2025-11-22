@@ -66,14 +66,14 @@ services:
         value: "*"
 
   # -------------------------------------------------------
-  # 3. FRONTEND (Static Site)
+  # 3. FRONTEND (Static Site as Web Service)
   # -------------------------------------------------------
-  # Ensure "type: static" is strictly adhered to
-  - type: static
+  - type: web
     name: frontend
+    env: static
     rootDir: frontend
     buildCommand: npm install && npm run build
-    publishDir: build
+    staticPublishPath: build
     routes:
       - type: rewrite
         source: /*
