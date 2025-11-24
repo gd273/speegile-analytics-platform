@@ -7,7 +7,7 @@ services:
     runtime: docker
     rootDir: .
     dockerfilePath: ./Dockerfile
-    plan: free
+    plan: starter
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -39,6 +39,7 @@ services:
     runtime: docker
     rootDir: backend
     dockerfilePath: Dockerfile
+    plan: starter
     envVars:
       - key: APP_DATABASE_URL
         fromDatabase:
@@ -72,6 +73,7 @@ services:
     name: frontend
     env: static
     rootDir: frontend
+    plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: build
     routes:
