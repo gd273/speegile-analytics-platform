@@ -9,7 +9,7 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
   const [status, setStatus] = useState("initial");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const SUPERSET_DOMAIN = (process.env.REACT_APP_SUPERSET_BASE_URL || "http://localhost:8088").replace(/\/+$/, "");
+  const SUPERSET_DOMAIN = process.env.REACT_APP_SUPERSET_BASE_URL;
 
 
   // 🔹 Validate JWT expiration + log details
