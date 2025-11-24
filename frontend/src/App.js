@@ -81,7 +81,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100 font-sans flex">
       {/* Sidebar Navigation */}
-      <nav className="w-64 bg-white shadow-xl flex flex-col p-4 border-r border-gray-200">
+      <nav className="w-56 lg:w-64 bg-white shadow-xl flex flex-col p-4 border-r border-gray-200">
         <div className="flex-grow">
           <h1 className="text-2xl font-bold text-blue-600 mb-6 border-b pb-4 pl-2">Data Portal</h1>
           
@@ -138,7 +138,7 @@ function App() {
       </nav>
 
       {/* Main Content Area - Handles Routing */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-8 overflow-y-auto max-w-7xl mx-auto w-full">
         <Routes>
           <Route path="/" element={<Navigate to="/dashboards" replace />} />
           <Route path="/dashboards" element={<DashboardView />} />
@@ -185,8 +185,7 @@ function DashboardView() {
   return (
     <div className="max-w-7xl mx-auto">
       <header className="mb-8 border-b pb-4">
-        <h2 className="text-3xl font-semibold text-gray-800">Superset Dashboards</h2>
-        <p className="text-gray-500 mt-1">Visualizations embedded directly from Superset.</p>
+        <h2 className="text-3xl font-semibold text-gray-800">Brizz Enterprise</h2>
       </header>
 
       {loading && (
