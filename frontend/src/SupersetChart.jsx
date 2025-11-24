@@ -105,11 +105,11 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
     <div
       ref={containerRef}
       style={{
-        width: "auto",
-        overflow: "auto",
+        width: "100%",
+        aspectRatio: "16 / 9",
         position: "relative",
-        borderRadius: "4px",
-        height: "800px"
+        borderRadius: "8px",
+        overflow: "hidden",
       }}
     />
   </div>
