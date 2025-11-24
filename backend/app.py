@@ -1245,7 +1245,7 @@ def generate_guest_token():
         "resources": [{"type": "dashboard", "id": dashboard_id_str}],
         "rls_rules": [],
         "exp": expiration_time,
-        "aud": "superset",
+        "aud": "audi",
         "type": "guest"
     }
     
