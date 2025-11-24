@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     libffi-dev \
     python3-dev \
     pkg-config \
+    netcat-openbsd \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
@@ -30,4 +31,20 @@ RUN if [ -x /app/.venv/bin/python ]; then \
       python3 -m pip install --no-cache-dir --timeout=300 -r /app/requirements.txt ; \
     fi
 
+# --- NEW SECTIONS START HERE (CRITICAL FOR RENDER) ---
+
+# 4. Copy the Superset Config
+# We must copy from your local 'config/' folder to where Superset looks (/app/pythonpath)
+COPY config/superset_config.py /app/pythonpath/superset_config.py
+
+# 5. Copy the startup script & make it executable
+COPY superset-init.sh /app/superset-init.sh
+RUN chmod +x /app/superset-init.sh
+
+# --- NEW SECTIONS END HERE ---
+
 USER superset
+
+# 6. Set the entrypoint to our custom init script
+# This forces Render to run your migration script every time it starts
+ENTRYPOINT ["/app/superset-init.sh"]

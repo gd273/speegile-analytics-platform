@@ -23,11 +23,11 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: GUEST_TOKEN_JWT_SECRET
-        generateValue: true
+        sync: false                  # <--- CHANGED: Now matches Backend
       - key: SUPERSET_ADMIN_USERNAME
         value: admin
       - key: SUPERSET_ADMIN_PASSWORD
-        generateValue: true
+        sync: false                  # <--- CHANGED: Now matches Backend
       - key: FLASK_ENV
         value: production
 

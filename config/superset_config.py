@@ -1,74 +1,3 @@
-# # config/superset_config.py (add near top)
-# import os
-
-# # # Prefer environment-provided DB URI; fallback to local sqlite for dev
-# # SQLALCHEMY_DATABASE_URI = os.getenv(
-# #     "SQLALCHEMY_DATABASE_URI",
-# #     "sqlite:////home/superset/superset.db"
-# # )
-
-# # Read SECRET_KEY from environment for safety
-# SECRET_KEY = os.getenv("SUPERSET_SECRET_KEY", "WKlKnTnZFn-AWCWT3qhn8lrHZeMlruXrjw7ZlF6wF9E")
-
-# # SECRET_KEY = 'WKlKnTnZFn-AWCWT3qhn8lrHZeMlruXrjw7ZlF6wF9E'
-# FEATURE_FLAGS = {
-#     "EMBEDDED_SUPERSET": True,
-#     "ALERT_REPORTS": True,
-#     "EMBEDDABLE_CHARTS": True,
-#     "DASHBOARD_RBAC": True,
-#     "DRILL_BY": True,
-# }
-# GUEST_TOKEN_JWT_SECRET = 'my_secure_embedding_secret_12345'
-# GUEST_TOKEN_JWT_EXP_SECONDS = 600  # 10 minutes
-# GUEST_TOKEN_JWT_ALGO = "HS256"
-# TALISMAN_ENABLED = False
-# GUEST_TOKEN_HEADER_NAME = "X-GuestToken"
-# DEBUG = True
-# GUEST_ROLE_NAME = "Gamma copy"
-# GUEST_TOKEN_JWT_SECRET = "my_secure_embedding_secret_12345"
-# GUEST_TOKEN_JWT_AUDIENCE = "audi"
-# TALISMAN_ENABLED = False
-# # DASHBOARD_RBAC = True
-# OVERRIDE_HTTP_HEADERS = {
-#     "X-Frame-Options": "ALLOWALL",
-#     "Content-Security-Policy": "frame-ancestors 'self' http://localhost:3000"
-# }
-# ENABLE_CORS = True
-# CORS_OPTIONS = {
-#     'supports_credentials': True,
-#     'allow_headers': ['*'],
-#     'resources': ['*'],
-#     'origins': ['*']
-# }
-
-# ALLOWED_REFERRER_DOMAINS = [
-#     "http://localhost:3000",  # exact match
-#     "http://localhost:3000/",  # with slash
-#     "localhost:3000",          # just domain:port
-#     "http://127.0.0.1:3000",   # optional for dev
-#     "localhost:5000",
-#     "localhost:8088"
-# ]
-
-# # Keep users logged in for 24 hours
-# SESSION_COOKIE_DURATION = 86400  # seconds
-# PERMANENT_SESSION_LIFETIME = 86400
-# SESSION_REFRESH_EACH_REQUEST = False  # Changed to False
-# SESSION_PROTECTION = None  # NEW: Disable Flask-Login's session protection
-# SESSION_COOKIE_HTTPONLY = True
-# SESSION_COOKIE_SECURE = False
-# SESSION_COOKIE_SAMESITE = 'Lax'
-
-
-# # CSRF configuration
-# WTF_CSRF_ENABLED = True
-# WTF_CSRF_TIME_LIMIT = None  # NEW: No expiration on CSRF tokens
-
-# FAB_ADD_SECURITY_API = True
-# ENABLE_SWAGGER_UI = True
-
-
-
 
 import os
 
@@ -161,3 +90,17 @@ WTF_CSRF_ENABLED = True
 WTF_CSRF_TIME_LIMIT = None
 FAB_ADD_SECURITY_API = True
 ENABLE_SWAGGER_UI = True
+# ---------------------------------------------------------
+# 7. CACHE CONFIG (Redis) - CRITICAL FOR RENDER
+# ---------------------------------------------------------
+REDIS_URL = os.getenv("REDIS_URL")
+if REDIS_URL:
+    CACHE_CONFIG = {
+        "CACHE_TYPE": "RedisCache",
+        "CACHE_DEFAULT_TIMEOUT": 300,
+        "CACHE_KEY_PREFIX": "superset_",
+        "CACHE_REDIS_URL": REDIS_URL,
+    }
+    DATA_CACHE_CONFIG = CACHE_CONFIG
+    FILTER_STATE_CACHE_CONFIG = CACHE_CONFIG
+    EXPLORE_FORM_DATA_CACHE_CONFIG = CACHE_CONFIG
