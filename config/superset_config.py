@@ -42,7 +42,7 @@ IS_PRODUCTION = os.getenv("FLASK_ENV") == "production"
 GUEST_TOKEN_JWT_EXP_SECONDS = 3600  # 1 hour
 GUEST_TOKEN_JWT_ALGO = "HS256"
 GUEST_TOKEN_HEADER_NAME = "X-GuestToken"
-GUEST_ROLE_NAME = "Gamma copy"
+GUEST_ROLE_NAME = "Gamma"
 GUEST_TOKEN_JWT_AUDIENCE = "audi"
 
 # CORS & Headers
