@@ -499,14 +499,21 @@ def login():
     
     print(f"Login attempt for username: '{username}'")
     
-    if not username or not password:
-        return jsonify({"error": "Username and password required"}), 400
+    # if not username or not password:
+    #     return jsonify({"error": "Username and password required"}), 400
     
-    # user_data = get_user_from_db(username)
+    # # user_data = get_user_from_db(username)
 
-    # Check credentials
-    if username not in USERS or USERS[username]["password"] != password:
-        return jsonify({"error": "Invalid username or password"}), 401
+    # # Check credentials
+    # if username not in USERS or USERS[username]["password"] != password:
+    #     return jsonify({"error": "Invalid username or password"}), 401
+    # 1. Check if user exists in Dictionary
+    if username not in USERS:
+        return jsonify({"error": "Invalid username"}), 401
+
+    # 2. Check Password (Plain Text for Hardcoded)
+    if USERS[username]["password"] != password:
+        return jsonify({"error": "Invalid password"}), 401
 
     # 2. VALIDATE PASSWORD (HASHED)
     # We use check_password_hash to compare the input password with the stored hash
