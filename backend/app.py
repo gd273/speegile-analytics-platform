@@ -180,32 +180,32 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# USERS = {
-#     "User_1": {
-#         "password": "john123",
-#         "name": "User_1",
-#         "superset_username": "User_1",
-#         "roles": ["dashboard1viewer","DASHBOARD-READ-BASE"]  # Must match Superset role names exactly
-#     },
-#     "User_2": {
-#         "password": "jane123",
-#         "name": "User_2",
-#         "superset_username": "User_2",
-#         "roles": ["dashboard2viewer","DASHBOARD-READ-BASE"]
-#     },
-#     "User_3": {
-#         "password": "bob123",
-#         "name": "User_3",
-#         "superset_username": "User_3",
-#         "roles": ["dashboard3viewer", "DASHBOARD-READ-BASE"]
-#     },
-#     "alice": {
-#         "password": "alice123",
-#         "name": "Alice Johnson",
-#         "superset_username": "admin",
-#         "roles": ["Admin"]
-#     }
-# }
+USERS = {
+    "User_1": {
+        "password": "john123",
+        "name": "User_1",
+        "superset_username": "User_1",
+        "roles": ["dashboard1viewer","DASHBOARD-READ-BASE"]  # Must match Superset role names exactly
+    },
+    "User_2": {
+        "password": "jane123",
+        "name": "User_2",
+        "superset_username": "User_2",
+        "roles": ["dashboard2viewer","DASHBOARD-READ-BASE"]
+    },
+    "User_3": {
+        "password": "bob123",
+        "name": "User_3",
+        "superset_username": "User_3",
+        "roles": ["dashboard3viewer", "DASHBOARD-READ-BASE"]
+    },
+    "alice": {
+        "password": "alice123",
+        "name": "Alice Johnson",
+        "superset_username": "admin",
+        "roles": ["Admin"]
+    }
+}
 
 def get_user_from_db(username):
     """Fetch user details from the application database"""
@@ -502,29 +502,29 @@ def login():
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
     
-    user_data = get_user_from_db(username)
+    # user_data = get_user_from_db(username)
 
     # Check credentials
-    # if username not in USERS or USERS[username]["password"] != password:
-    #     return jsonify({"error": "Invalid username or password"}), 401
+    if username not in USERS or USERS[username]["password"] != password:
+        return jsonify({"error": "Invalid username or password"}), 401
 
     # 2. VALIDATE PASSWORD (HASHED)
     # We use check_password_hash to compare the input password with the stored hash
-    if not user_data or not check_password_hash(user_data["password_hash"], password):
-        return jsonify({"error": "Invalid username or password"}), 401
+    # if not user_data or not check_password_hash(user_data["password_hash"], password):
+        # return jsonify({"error": "Invalid username or password"}), 401
     
     
-    # user_data = USERS[username]
+    user_data = USERS[username]
     session.clear()
     session.permanent = True
-    # session['user'] = username
-    # session['name'] = user_data["name"]
-    # session['superset_username'] = user_data["superset_username"]
-    # session['roles'] = user_data["roles"]
-    session['user'] = user_data["username"]
+    session['user'] = username
     session['name'] = user_data["name"]
     session['superset_username'] = user_data["superset_username"]
     session['roles'] = user_data["roles"]
+    # session['user'] = user_data["username"]
+    # session['name'] = user_data["name"]
+    # session['superset_username'] = user_data["superset_username"]
+    # session['roles'] = user_data["roles"]
     session.permanent = True  # Set permanent AFTER setting data
     session.modified = True  # Explicitly mark as modified
     # session.permanent = True
@@ -681,9 +681,9 @@ def generate_guest_token():
     """
     
     dashboard_id_str = request.args.get("dashboardId")
-    username = session.get('user')
+    # username = session.get('user')
     superset_username = session.get('superset_username')
-    user_roles = session.get('roles', [])
+    # user_roles = session.get('roles', [])
     
     if not dashboard_id_str:
         return jsonify({"error": "dashboardId is required"}), 400
@@ -725,8 +725,8 @@ def upload_excel():
     Handles Excel file upload, processing sheets one-by-one, and inserting/replacing 
     data into corresponding database tables based on sheet names.
     """
-    username = session.get('user')
-    logging.info(f"✅ Upload authorized for user: {username}")
+    # username = session.get('user')
+    # logging.info(f"✅ Upload authorized for user: {username}")
 
     if 'excel_file' not in request.files:
         return jsonify({"success": False, "error": "No file part in the request"}), 400
@@ -827,81 +827,81 @@ def upload_excel():
 # ADMIN/DEBUG ENDPOINTS
 #---------------------------------------------------------------------------------------------------
 
-@app.route("/api/session-test", methods=["GET"])
-def session_test():
-    """Test endpoint to verify session persistence"""
-    return jsonify({
-        "has_session": 'user' in session,
-        "user": session.get('user'),
-        "session_id": request.cookies.get('session'),
-        "session_data": dict(session)
-    }), 200
+# @app.route("/api/session-test", methods=["GET"])
+# def session_test():
+#     """Test endpoint to verify session persistence"""
+#     return jsonify({
+#         "has_session": 'user' in session,
+#         "user": session.get('user'),
+#         "session_id": request.cookies.get('session'),
+#         "session_data": dict(session)
+#     }), 200
 
-@app.route("/api/test-superset-connection", methods=["GET"])
-def test_superset_connection():
-    """
-    Test endpoint to verify Superset API connection
-    """
-    print("\nTesting Superset connection...")
+# @app.route("/api/test-superset-connection", methods=["GET"])
+# def test_superset_connection():
+#     """
+#     Test endpoint to verify Superset API connection
+#     """
+#     print("\nTesting Superset connection...")
     
-    access_token = get_superset_access_token()
-    if not access_token:
-        return jsonify({
-            "success": False,
-            "message": "Failed to get access token from Superset"
-        }), 500
+#     access_token = get_superset_access_token()
+#     if not access_token:
+#         return jsonify({
+#             "success": False,
+#             "message": "Failed to get access token from Superset"
+#         }), 500
     
-    dashboards = get_all_dashboards_from_superset(access_token)
+#     dashboards = get_all_dashboards_from_superset(access_token)
     
-    return jsonify({
-        "success": True,
-        "message": "Successfully connected to Superset",
-        "dashboard_count": len(dashboards),
-        "dashboards": [{"title": d.get("dashboard_title"), "roles": [r["name"] for r in d.get("roles", [])]} for d in dashboards]
-    }), 200
+#     return jsonify({
+#         "success": True,
+#         "message": "Successfully connected to Superset",
+#         "dashboard_count": len(dashboards),
+#         "dashboards": [{"title": d.get("dashboard_title"), "roles": [r["name"] for r in d.get("roles", [])]} for d in dashboards]
+#     }), 200
 
-@app.route("/api/seed-db", methods=["GET"])
-def seed_db():
-    """Quick utility to create the users table and a test user"""
-    if not engine:
-        return "No DB Connection", 500
+# @app.route("/api/seed-db", methods=["GET"])
+# def seed_db():
+#     """Quick utility to create the users table and a test user"""
+#     if not engine:
+#         return "No DB Connection", 500
         
-    try:
-        with engine.connect() as conn:
-            # 1. Create the Users Table (if it doesn't exist yet)
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    username VARCHAR(50) UNIQUE NOT NULL,
-                    password_hash VARCHAR(255) NOT NULL,
-                    name VARCHAR(100),
-                    superset_username VARCHAR(100),
-                    roles TEXT
-                );
-            """))
+#     try:
+#         with engine.connect() as conn:
+#             # 1. Create the Users Table (if it doesn't exist yet)
+#             conn.execute(text("""
+#                 CREATE TABLE IF NOT EXISTS users (
+#                     id SERIAL PRIMARY KEY,
+#                     username VARCHAR(50) UNIQUE NOT NULL,
+#                     password_hash VARCHAR(255) NOT NULL,
+#                     name VARCHAR(100),
+#                     superset_username VARCHAR(100),
+#                     roles TEXT
+#                 );
+#             """))
             
-            # 2. Create the 'admin' user with password 'admin123'
-            # We generate the hash dynamically here
-            p_hash = generate_password_hash("admin123")
-            roles_json = json.dumps(["Admin", "DASHBOARD-READ-BASE"])
+#             # 2. Create the 'admin' user with password 'admin123'
+#             # We generate the hash dynamically here
+#             p_hash = generate_password_hash("admin123")
+#             roles_json = json.dumps(["Admin", "DASHBOARD-READ-BASE"])
             
-            # 3. Insert the user (using ON CONFLICT to prevent errors if run twice)
-            conn.execute(text("""
-                INSERT INTO users (username, password_hash, name, superset_username, roles)
-                VALUES (:u, :p, :n, :s, :r)
-                ON CONFLICT (username) DO NOTHING
-            """), {
-                "u": "admin", 
-                "p": p_hash, 
-                "n": "Admin User", 
-                "s": "admin", 
-                "r": roles_json
-            })
+#             # 3. Insert the user (using ON CONFLICT to prevent errors if run twice)
+#             conn.execute(text("""
+#                 INSERT INTO users (username, password_hash, name, superset_username, roles)
+#                 VALUES (:u, :p, :n, :s, :r)
+#                 ON CONFLICT (username) DO NOTHING
+#             """), {
+#                 "u": "admin", 
+#                 "p": p_hash, 
+#                 "n": "Admin User", 
+#                 "s": "admin", 
+#                 "r": roles_json
+#             })
             
-            conn.commit()
-            return "Database seeded with table and 'admin' user!", 200
-    except Exception as e:
-        return f"Error: {e}", 500
+#             conn.commit()
+#             return "Database seeded with table and 'admin' user!", 200
+#     except Exception as e:
+#         return f"Error: {e}", 500
 # if __name__ == "__main__":
 #     app.run(host="0.0.0.0", port=5000, debug=True)
 
