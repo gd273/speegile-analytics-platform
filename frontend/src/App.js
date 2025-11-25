@@ -79,11 +79,17 @@ function App() {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans flex">
+    <div className="h-screen bg-gray-100 font-sans flex overflow-hidden">
       {/* Sidebar Navigation */}
-      <nav className="w-56 lg:w-64 bg-white shadow-xl flex flex-col p-4 border-r border-gray-200">
-        <div className="flex-grow">
-          <h1 className="text-2xl font-bold text-blue-600 mb-6 border-b pb-4 pl-2">Data Portal</h1>
+      <nav className="w-56 lg:w-64 bg-white shadow-xl flex flex-col p-4 border-r border-gray-200 flex-shrink-0">
+        <div className="mb-6">
+          <div className="mb-6 border-b border-gray-200 pb-4 px-2">
+             <img 
+               src="/SpeegileLogo.jpeg" 
+               alt="Speegile Logo" 
+               className="w-40 h-auto object-contain" 
+             />
+          </div>
           
           <div className="space-y-2">
             <Link
@@ -135,10 +141,11 @@ function App() {
             Logout
           </button>
         </div>
+        <div className="flex-grow"></div>
       </nav>
 
       {/* Main Content Area - Handles Routing */}
-      <main className="flex-1 p-8 overflow-y-auto max-w-7xl mx-auto w-full">
+      <main className="flex-1 overflow-y-auto p-8 bg-gray-100">
         <Routes>
           <Route path="/" element={<Navigate to="/dashboards" replace />} />
           <Route path="/dashboards" element={<DashboardView />} />
