@@ -16,9 +16,9 @@ code {
 }
 iframe {
   width: 100%;
-  height: 75vh;
-  border: 2px solid #ccc;
-  border-radius: 8px;
+  height: 100%;
+  border: none;
+  display: block;
 }
 .bg-grid-pattern {
   background-color: white;
