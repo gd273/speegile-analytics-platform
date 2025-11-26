@@ -101,12 +101,12 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
   }, [dashboardId]);
 
   return (
-  <div className="bg-white p-2 rounded-md shadow-lg mb-4 border border-gray-200">
+  <div className="bg-white p-4 rounded-md shadow-lg mb-4 border border-gray-200">
     <div
       ref={containerRef}
       style={{
         width: "100%",
-        aspectRatio: "16 / 9",
+        height: "75vh",
         position: "relative",
         borderRadius: "8px",
         overflow: "hidden",
