@@ -81,7 +81,7 @@ function App() {
   return (
     <div className="h-screen bg-gray-100 font-sans flex flex-col overflow-hidden">
       {/* Sidebar Navigation */}
-      <nav className="w-full bg-white shadow-md flex items-center p-4 border-b border-gray-200">
+      <nav className="w-full bg-white shadow-md flex items-center justify-between p-4 border-b border-gray-200">
         <div className="flex items-center gap-8">
           <div className="flex-shrink-0">
              <img 
@@ -127,6 +127,12 @@ function App() {
            */}
           </div>
         </div>
+
+        <div className="absolute left-1/2 transform -translate-x-1/2">
+           <span className="text-xl font-bold text-gray-800 tracking-tight">
+             Brizz Enterprise
+           </span>
+        </div>
         
         {/* User Info & Logout */}
         <div className="flex items-center gap-6 ml-auto">
@@ -160,6 +166,7 @@ function App() {
 // We moved this logic out of App() to keep the main file clean
 function DashboardView() {
   const [dashboards, setDashboards] = useState([]);
+  const [selectedDashboardId, setSelectedDashboardId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -187,13 +194,42 @@ function DashboardView() {
       setLoading(false);
     }
   };
+  
+  const activeDashboard = dashboards.find(d => d.id === selectedDashboardId);
 
   return (
     <div className="w-full">
-      <header className="mb-8 border-b pb-4">
-        <h2 className="text-3xl font-semibold text-gray-800">Brizz Enterprise</h2>
-      </header>
-
+      {/* 2. THE DROPDOWN SECTION */}
+      {!loading && !error && dashboards.length > 0 && (
+        <div className="mb-6 flex items-center justify-between">
+            <div className="relative inline-block w-64">
+              <select
+                value={selectedDashboardId}
+                onChange={(e) => setSelectedDashboardId(e.target.value)}
+                className="block w-full px-4 py-2 pr-8 leading-tight bg-white border border-gray-300 rounded shadow appearance-none hover:border-gray-400 focus:outline-none focus:shadow-outline text-gray-700 font-medium"
+              >
+                {dashboards.map((dash) => (
+                  <option key={dash.id} value={dash.id}>
+                    {dash.title}
+                  </option>
+                ))}
+              </select>
+              {/* Custom Arrow Icon for the Select Box */}
+              <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-700">
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                  <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd"></path>
+                </svg>
+              </div>
+            </div>
+            
+            {/* Optional: Show Title of current dashboard on the right or center */}
+            {activeDashboard && (
+               <h2 className="text-xl font-semibold text-gray-700">
+                 {activeDashboard.title}
+               </h2>
+            )}
+        </div>
+      )}
       {loading && (
         <div className="text-center py-12">
           <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto" />
@@ -213,11 +249,27 @@ function DashboardView() {
         </div>
       )}
 
-      {dashboards.map((dash) => (
+      {/*{dashboards.map((dash) => (
         <div key={dash.id} className="mb-8">
           <SupersetChart dashboardId={dash.id} chartTitle={dash.title} />
         </div>
-      ))}
+      ))}*/}
+      {/* 3. CONDITIONAL RENDERING: Display only the ACTIVE dashboard */}
+      {activeDashboard ? (
+        <div key={activeDashboard.id} className="mb-8">
+          <SupersetChart 
+             dashboardId={activeDashboard.id} 
+             chartTitle={activeDashboard.title} 
+          />
+        </div>
+      ) : (
+        // Fallback if nothing is selected (rare due to auto-select)
+        !loading && dashboards.length > 0 && (
+            <div className="text-center py-12 text-gray-500">
+                Select a dashboard to view data.
+            </div>
+        )
+      )}
     </div>
   );
 }
