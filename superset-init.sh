@@ -1,27 +1,79 @@
+# #!/bin/bash
+# set -e
+
+# echo "Running Superset Init Script..."
+
+# # 1. Initialize DB
+# superset db upgrade
+
+# # 2. Init Roles
+# superset init
+
+# # 3. Create Admin
+# if [ "$SUPERSET_ADMIN_USERNAME" ]; then
+#     echo "Creating admin user $SUPERSET_ADMIN_USERNAME..."
+#     superset fab create-admin \
+#         --username "$SUPERSET_ADMIN_USERNAME" \
+#         --firstname "Superset" \
+#         --lastname "Admin" \
+#         --email "$SUPERSET_ADMIN_EMAIL" \
+#         --password "$SUPERSET_ADMIN_PASSWORD" \
+#         || true
+# fi
+
+# # 4. Start Server (Explicit Gunicorn command)
+# echo "Starting Server..."
+# gunicorn \
+#     --bind "0.0.0.0:8088" \
+#     --access-logfile - \
+#     --error-logfile - \
+#     --workers 1 \
+#     --worker-class gthread \
+#     --threads 20 \
+#     --timeout 60 \
+#     --limit-request-line 0 \
+#     --limit-request-field_size 0 \
+#     "superset.app:create_app()"
+
 #!/bin/bash
 set -e
 
 echo "Running Superset Init Script..."
 
-# 1. Initialize DB (SAFE to run multiple times)
+# Wait for database to be ready
+echo "Waiting for database..."
+sleep 5
+
+# 1. Initialize DB
+echo "Initializing database..."
 superset db upgrade
 
-# 2. Init Roles (SAFE to run multiple times)
+# 2. Init Roles
+echo "Initializing roles..."
 superset init
 
-# 3. Create Admin (only if env vars are present)
-# This will fail harmlessly if the user already exists
+# 3. Create Admin
 if [ "$SUPERSET_ADMIN_USERNAME" ]; then
     echo "Creating admin user $SUPERSET_ADMIN_USERNAME..."
     superset fab create-admin \
         --username "$SUPERSET_ADMIN_USERNAME" \
         --firstname "Superset" \
         --lastname "Admin" \
-        --email "admin@example.com" \
+        --email "$SUPERSET_ADMIN_EMAIL" \
         --password "$SUPERSET_ADMIN_PASSWORD" \
-        || true
+        2>/dev/null || echo "Admin user may already exist"
 fi
 
 # 4. Start Server
-echo "Starting Server..."
-/usr/bin/run-server.sh
+echo "Starting Gunicorn server..."
+gunicorn \
+    --bind "0.0.0.0:8088" \
+    --access-logfile - \
+    --error-logfile - \
+    --workers 1 \
+    --worker-class gthread \
+    --threads 20 \
+    --timeout 60 \
+    --limit-request-line 0 \
+    --limit-request-field_size 0 \
+    "superset.app:create_app()"

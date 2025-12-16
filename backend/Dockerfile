@@ -25,4 +25,6 @@ RUN chmod +x /app/wait-for-db.sh
 RUN pip install gunicorn
 EXPOSE 5000
 # CMD ["sh", "-c", "/app/wait-for-db.sh db 5432 30 && python app.py"]
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
+# CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
+# Do NOT use "flask run"
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "3", "--timeout", "120", "app:app"]

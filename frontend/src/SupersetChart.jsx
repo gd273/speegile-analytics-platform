@@ -62,10 +62,11 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
           dashboardUiConfig: {
             hideTitle: true,
             hideTab: true,
-            hideChartControls: true,
+            hideChartControls: false,
             filters: {expanded: true,visible: true},
           },
           debug: true,
+          iframeSandboxExtras: ['allow-downloads']
         });
         setStatus("success");
       } catch (err) {
