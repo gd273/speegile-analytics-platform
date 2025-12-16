@@ -80,6 +80,10 @@ services:
         fromDatabase:
           name: shared-postgres
           property: connectionString
+      - key: SQLALCHEMY_DATABASE_URI
+        fromDatabase:
+          name: shared-postgres
+          property: connectionString
       - key: REDIS_URL
         fromService:
           type: redis
