@@ -72,7 +72,7 @@ services:
     runtime: docker
     rootDir: .
     dockerfilePath: Dockerfile
-    dockerCommand: ./superset-init.sh
+    dockerCommand: sh superset-init.sh
     envVars:
       - key: PORT
         value: 8088
