@@ -90,7 +90,7 @@ services:
           name: shared-redis
           property: connectionString
       - key: SUPERSET_SECRET_KEY
-        generateValue: true
+        generateValue: false
       - key: SUPERSET_ADMIN_USERNAME
         value: admin
       - key: SUPERSET_ADMIN_PASSWORD
