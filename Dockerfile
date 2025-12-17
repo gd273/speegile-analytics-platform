@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file into image
-COPY backend/requirements.txt /app/requirements.txt
+COPY requirements-custom-docker.txt /app/requirements.txt
 
 # Ensure pip is available inside /app/.venv, then install requirements into that venv
 # Use python -m ensurepip to bootstrap pip if missing, then upgrade pip, then install requirements
