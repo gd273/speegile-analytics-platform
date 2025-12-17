@@ -1,9 +1,9 @@
 # Step 1: Build the React App
 FROM node:18-alpine as build
 WORKDIR /app
-COPY package*.json ./
+COPY frontend/package*.json ./
 RUN npm install
-COPY . .
+COPY frontend/ ./
 
 # CRITICAL: Build Arguments for BOTH APIs
 ARG REACT_APP_API_BASE_URL
