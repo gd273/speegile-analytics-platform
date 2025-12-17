@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY . /app
 
 # Make the wait script executable
-RUN chmod +x /app/wait-for-db.sh
+RUN chmod +x /app/backend/wait-for-db.sh
 RUN pip install gunicorn
 EXPOSE 5000
 # CMD ["sh", "-c", "/app/wait-for-db.sh db 5432 30 && python app.py"]
