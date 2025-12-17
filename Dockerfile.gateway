@@ -16,10 +16,10 @@ EXPOSE 80
 # It only starts Nginx once they answer "Yes".
 CMD ["/bin/sh", "-c", "\
     echo 'Waiting for backend:5000...'; \
-    while ! nc -z backend.onrender.internal 5000; do sleep 2; done; \
+    while ! nc -z backend.onrender.com 5000; do sleep 2; done; \
     echo 'Backend is UP!'; \
     echo 'Waiting for superset:8088...'; \
-    while ! nc -z superset.onrender.internal 8088; do sleep 2; done; \
+    while ! nc -z superset.onrender.com 8088; do sleep 2; done; \
     echo 'Superset is UP!'; \
     echo 'Starting Nginx...'; \
     nginx -g 'daemon off;'"]
