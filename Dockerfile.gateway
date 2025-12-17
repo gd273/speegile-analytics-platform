@@ -7,7 +7,7 @@ RUN apk add --no-cache netcat-openbsd
 
 # 2. Setup Config (Same as before)
 RUN rm /etc/nginx/conf.d/default.conf
-COPY nginx/nginx.render.conf /etc/nginx/nginx.conf
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
 
 EXPOSE 80
 
