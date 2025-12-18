@@ -261,3 +261,19 @@ EXPLORE_FORM_DATA_CACHE_CONFIG = CACHE_CONFIG
 ENABLE_PROXY_FIX = True
 # SESSION_COOKIE_SECURE = False
 # SESSION_COOKIE_SAMESITE = "Lax"
+
+
+# ---------------------------------------------------------
+# Render-only reverse proxy support (SAFE)
+# ---------------------------------------------------------
+IS_RENDER = os.getenv("RENDER", "").lower() == "true"
+
+if IS_RENDER:
+    # Tell Superset it lives under /superset (Render only)
+    APPLICATION_ROOT = "/superset"
+
+    # Generate correct redirects and absolute URLs
+    SUPERSET_WEBSERVER_BASEURL = os.getenv(
+        "SUPERSET_BASE_URL",
+        "https://gateway-dev-gwnu.onrender.com/superset"
+    )
