@@ -18,8 +18,9 @@ RUN npm run build
 FROM nginx:alpine
 COPY --from=build /app/build /usr/share/nginx/html
 # COPY CUSTOM NGINX CONFIG
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+RUN rm /etc/nginx/conf.d/default.conf
 # Configure Nginx to listen on Port 3000
-RUN sed -i 's/listen       80;/listen       3000;/' /etc/nginx/conf.d/default.conf
+# RUN sed -i 's/listen       80;/listen       3000;/' /etc/nginx/conf.d/default.conf
 EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]
