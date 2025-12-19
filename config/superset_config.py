@@ -272,5 +272,13 @@ if IS_RENDER:
     # Tell Superset it lives under /superset (Render only)
     APPLICATION_ROOT = "/superset"
     STATIC_URL_PATH = "/superset/static"
+    ENABLE_PROXY_FIX = True
+    PROXY_FIX_CONFIG = {
+        "x_for": 1,
+        "x_proto": 1,
+        "x_host": 1,
+        "x_port": 1,
+        "x_prefix": 1,
+    }
     # Generate correct redirects and absolute URLs
     SUPERSET_WEBSERVER_BASEURL = "https://gateway-dev-gwnu.onrender.com/superset"
