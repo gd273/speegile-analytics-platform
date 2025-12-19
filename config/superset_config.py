@@ -270,6 +270,7 @@ IS_RENDER = os.getenv("RENDER", "").lower() == "true"
 
 if IS_RENDER:
     # Tell Superset it lives under /superset (Render only)
+    ENABLE_WEBSERVER_BASEURL = True
     APPLICATION_ROOT = "/superset"
     STATIC_URL_PATH = "/superset/static"
     ENABLE_PROXY_FIX = True
