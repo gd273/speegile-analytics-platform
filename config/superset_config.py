@@ -274,9 +274,13 @@ if IS_RENDER:
     APPLICATION_ROOT = "/superset"
     SESSION_COOKIE_PATH = "/"
     STATIC_URL_PATH = "/static"
+    ENABLE_CORS = True
     ENABLE_PROXY_FIX = True
     SESSION_COOKIE_SAMESITE = "None"
     SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_REFRESH_EACH_REQUEST = False
+    SESSION_PROTECTION = None
     PROXY_FIX_CONFIG = {
         "x_for": 1,
         "x_proto": 1,
