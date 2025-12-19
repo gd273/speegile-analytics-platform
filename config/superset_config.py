@@ -272,8 +272,8 @@ if IS_RENDER:
     # Tell Superset it lives under /superset (Render only)
     ENABLE_WEBSERVER_BASEURL = True
     APPLICATION_ROOT = "/superset"
-    SESSION_COOKIE_PATH = "/superset"
-    STATIC_URL_PATH = "/superset/static"
+    SESSION_COOKIE_PATH = "/"
+    STATIC_URL_PATH = "/static"
     ENABLE_PROXY_FIX = True
     PROXY_FIX_CONFIG = {
         "x_for": 1,
