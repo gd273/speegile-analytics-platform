@@ -275,6 +275,8 @@ if IS_RENDER:
     SESSION_COOKIE_PATH = "/"
     STATIC_URL_PATH = "/static"
     ENABLE_PROXY_FIX = True
+    SESSION_COOKIE_SAMESITE = "None"
+    SESSION_COOKIE_SECURE = True
     PROXY_FIX_CONFIG = {
         "x_for": 1,
         "x_proto": 1,
@@ -282,5 +284,7 @@ if IS_RENDER:
         "x_port": 1,
         "x_prefix": 1,
     }
+    WTF_CSRF_ENABLED = True
+    WTF_CSRF_TIME_LIMIT = None
     # Generate correct redirects and absolute URLs
     SUPERSET_WEBSERVER_BASEURL = "https://gateway-dev-gwnu.onrender.com/superset"
