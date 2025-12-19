@@ -270,10 +270,7 @@ IS_RENDER = os.getenv("RENDER", "").lower() == "true"
 
 if IS_RENDER:
     # Tell Superset it lives under /superset (Render only)
-    APPLICATION_ROOT = "/superset"
+    # APPLICATION_ROOT = "/superset"
 
     # Generate correct redirects and absolute URLs
-    SUPERSET_WEBSERVER_BASEURL = os.getenv(
-        "SUPERSET_BASE_URL",
-        "https://gateway-dev-gwnu.onrender.com/superset"
-    )
+    SUPERSET_WEBSERVER_BASEURL = "https://gateway-dev-gwnu.onrender.com/superset"
