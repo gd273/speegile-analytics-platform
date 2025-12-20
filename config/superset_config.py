@@ -268,10 +268,35 @@ ENABLE_PROXY_FIX = True
 # ---------------------------------------------------------
 IS_RENDER = os.getenv("RENDER", "").lower() == "true"
 
+# if IS_RENDER:
+#     # Tell Superset it lives under /superset (Render only)
+#     ENABLE_WEBSERVER_BASEURL = True
+#     APPLICATION_ROOT = "/superset"
+#     SESSION_COOKIE_PATH = "/"
+#     STATIC_URL_PATH = "/static"
+#     ENABLE_CORS = True
+#     ENABLE_PROXY_FIX = True
+#     SESSION_COOKIE_SAMESITE = "None"
+#     SESSION_COOKIE_SECURE = True
+#     SESSION_COOKIE_HTTPONLY = True
+#     SESSION_REFRESH_EACH_REQUEST = False
+#     SESSION_PROTECTION = None
+#     PROXY_FIX_CONFIG = {
+#         "x_for": 1,
+#         "x_proto": 1,
+#         "x_host": 1,
+#         "x_port": 1,
+#         "x_prefix": 1,
+#     }
+#     WTF_CSRF_ENABLED = True
+#     WTF_CSRF_TIME_LIMIT = None
+#     # Generate correct redirects and absolute URLs
+#     SUPERSET_WEBSERVER_BASEURL = "https://gateway-dev-gwnu.onrender.com/superset"
+
 if IS_RENDER:
     # Tell Superset it lives under /superset (Render only)
-    ENABLE_WEBSERVER_BASEURL = True
-    APPLICATION_ROOT = "/superset"
+    # ENABLE_WEBSERVER_BASEURL = True
+    # APPLICATION_ROOT = "/superset"
     SESSION_COOKIE_PATH = "/"
     STATIC_URL_PATH = "/static"
     ENABLE_CORS = True
@@ -286,9 +311,9 @@ if IS_RENDER:
         "x_proto": 1,
         "x_host": 1,
         "x_port": 1,
-        "x_prefix": 1,
+        # "x_prefix": 1,
     }
     WTF_CSRF_ENABLED = True
     WTF_CSRF_TIME_LIMIT = None
     # Generate correct redirects and absolute URLs
-    SUPERSET_WEBSERVER_BASEURL = "https://gateway-dev-gwnu.onrender.com/superset"
+    # SUPERSET_WEBSERVER_BASEURL = "https://gateway-dev-gwnu.onrender.com/superset"
