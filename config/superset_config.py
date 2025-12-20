@@ -139,6 +139,186 @@
 # SESSION_COOKIE_PATH = '/superset'
 
 
+# import os
+
+# # ---------------------------------------------------------
+# # 1. DATABASE CONNECTION
+# # ---------------------------------------------------------
+# DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URI")
+# if not DATABASE_URL:
+#     raise Exception("SQLALCHEMY_DATABASE_URI not found in environment!")
+
+# if "postgres" in DATABASE_URL:
+#     SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace("postgres://", "postgresql://")
+# else:
+#     SQLALCHEMY_DATABASE_URI = DATABASE_URL
+
+# # ---------------------------------------------------------
+# # 2. SECURITY & SECRETS
+# # ---------------------------------------------------------
+# SECRET_KEY = os.getenv("SUPERSET_SECRET_KEY")
+# if not SECRET_KEY:
+#     raise Exception("SUPERSET_SECRET_KEY not set!")
+
+# GUEST_TOKEN_JWT_SECRET = os.getenv("GUEST_TOKEN_JWT_SECRET")
+# if not GUEST_TOKEN_JWT_SECRET:
+#     raise Exception("GUEST_TOKEN_JWT_SECRET not set!")
+
+# # ---------------------------------------------------------
+# # 3. FEATURE FLAGS
+# # ---------------------------------------------------------
+# FEATURE_FLAGS = {
+#     "EMBEDDED_SUPERSET": True,
+#     "ALERT_REPORTS": False,
+#     "EMBEDDABLE_CHARTS": True,
+#     "DASHBOARD_RBAC": True,
+#     "DRILL_BY": True,
+#     "ALLOW_FULL_CSV_EXPORT": True,
+#     "ENABLE_CHART_DOWNLOAD_WEBDRIVER_SCREENSHOT": False,
+#     "ENABLE_DASHBOARD_SCREENSHOT_ENDPOINTS": False,
+#     "ENABLE_DASHBOARD_DOWNLOAD_WEBDRIVER_SCREENSHOT": False,
+#     "DISPLAY_DOWNLOAD_AS_IMAGE": False,
+#     "DASHBOARD_VIRTUALIZATION": True,
+#     "THUMBNAILS": False,
+#     "ROW_LEVEL_SECURITY": True,
+# }
+
+# # ---------------------------------------------------------
+# # 4. EMBEDDING & COOKIES
+# # ---------------------------------------------------------
+# IS_PRODUCTION = os.getenv("FLASK_ENV") == "production"
+# FORCE_HTTP = os.getenv("FORCE_HTTP", "false").lower() == "true"
+
+# # Guest Token Settings
+# GUEST_TOKEN_JWT_EXP_SECONDS = 3600
+# GUEST_TOKEN_JWT_ALGO = "HS256"
+# GUEST_TOKEN_HEADER_NAME = "X-GuestToken"
+# GUEST_ROLE_NAME = "Admin"
+# GUEST_TOKEN_JWT_AUDIENCE = "audi"
+
+# # CORS & Headers
+# ENABLE_CORS = True
+# FRONTEND_URL = os.getenv("FRONTEND_URL", "http://speegile-analytics.ap-south-1.elasticbeanstalk.com")
+
+# CORS_OPTIONS = {
+#     'supports_credentials': True,
+#     'allow_headers': ['*'],
+#     'resources': ['*'],
+#     'origins': [FRONTEND_URL]
+# }
+
+# OVERRIDE_HTTP_HEADERS = {
+#     "X-Frame-Options": "ALLOWALL",
+#     "Content-Security-Policy": f"frame-ancestors 'self' {FRONTEND_URL}"
+# }
+
+# # ---------------------------------------------------------
+# # 5. SESSION & COOKIE SETTINGS
+# # ---------------------------------------------------------
+# SESSION_COOKIE_HTTPONLY = True
+# SESSION_REFRESH_EACH_REQUEST = False
+# SESSION_PROTECTION = None
+
+# # DO NOT set APPLICATION_ROOT or SESSION_COOKIE_PATH
+# # Nginx handles the /superset prefix via X-Script-Name header
+
+# if IS_PRODUCTION and not FORCE_HTTP:
+#     SESSION_COOKIE_SAMESITE = 'None'
+#     SESSION_COOKIE_SECURE = True
+#     DEBUG = False
+# else:
+#     SESSION_COOKIE_SAMESITE = 'Lax'
+#     SESSION_COOKIE_SECURE = False
+#     DEBUG = True
+
+# # ---------------------------------------------------------
+# # 6. SECURITY
+# # ---------------------------------------------------------
+# TALISMAN_ENABLED = False
+# WTF_CSRF_ENABLED = True
+# WTF_CSRF_TIME_LIMIT = None
+# FAB_ADD_SECURITY_API = True
+# ENABLE_SWAGGER_UI = False
+
+# # ---------------------------------------------------------
+# # 7. CACHE CONFIG (Redis)
+# # ---------------------------------------------------------
+# REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+
+# CACHE_CONFIG = {
+#     "CACHE_TYPE": "RedisCache",
+#     "CACHE_DEFAULT_TIMEOUT": 300,
+#     "CACHE_KEY_PREFIX": "superset_",
+#     "CACHE_REDIS_URL": REDIS_URL,
+# }
+# DATA_CACHE_CONFIG = CACHE_CONFIG
+# FILTER_STATE_CACHE_CONFIG = CACHE_CONFIG
+# EXPLORE_FORM_DATA_CACHE_CONFIG = CACHE_CONFIG
+
+# # ---------------------------------------------------------
+# # 8. PROXY FIX (for AWS ALB)
+# # ---------------------------------------------------------
+# ENABLE_PROXY_FIX = True
+# # SESSION_COOKIE_SECURE = False
+# # SESSION_COOKIE_SAMESITE = "Lax"
+
+
+# # ---------------------------------------------------------
+# # Render-only reverse proxy support (SAFE)
+# # ---------------------------------------------------------
+# IS_RENDER = os.getenv("RENDER", "").lower() == "true"
+
+# # if IS_RENDER:
+# #     # Tell Superset it lives under /superset (Render only)
+# #     ENABLE_WEBSERVER_BASEURL = True
+# #     APPLICATION_ROOT = "/superset"
+# #     SESSION_COOKIE_PATH = "/"
+# #     STATIC_URL_PATH = "/static"
+# #     ENABLE_CORS = True
+# #     ENABLE_PROXY_FIX = True
+# #     SESSION_COOKIE_SAMESITE = "None"
+# #     SESSION_COOKIE_SECURE = True
+# #     SESSION_COOKIE_HTTPONLY = True
+# #     SESSION_REFRESH_EACH_REQUEST = False
+# #     SESSION_PROTECTION = None
+# #     PROXY_FIX_CONFIG = {
+# #         "x_for": 1,
+# #         "x_proto": 1,
+# #         "x_host": 1,
+# #         "x_port": 1,
+# #         "x_prefix": 1,
+# #     }
+# #     WTF_CSRF_ENABLED = True
+# #     WTF_CSRF_TIME_LIMIT = None
+# #     # Generate correct redirects and absolute URLs
+# #     SUPERSET_WEBSERVER_BASEURL = "https://gateway-dev-gwnu.onrender.com/superset"
+
+# if IS_RENDER:
+#     # Tell Superset it lives under /superset (Render only)
+#     # ENABLE_WEBSERVER_BASEURL = True
+#     # APPLICATION_ROOT = "/superset"
+#     SESSION_COOKIE_PATH = "/"
+#     STATIC_URL_PATH = "/static"
+#     ENABLE_CORS = True
+#     ENABLE_PROXY_FIX = True
+#     SESSION_COOKIE_SAMESITE = "None"
+#     SESSION_COOKIE_SECURE = True
+#     SESSION_COOKIE_HTTPONLY = True
+#     SESSION_REFRESH_EACH_REQUEST = False
+#     SESSION_PROTECTION = None
+#     PROXY_FIX_CONFIG = {
+#         "x_for": 1,
+#         "x_proto": 1,
+#         "x_host": 1,
+#         "x_port": 1,
+#         # "x_prefix": 1,
+#     }
+#     WTF_CSRF_ENABLED = True
+#     WTF_CSRF_TIME_LIMIT = None
+#     # Generate correct redirects and absolute URLs
+#     # SUPERSET_WEBSERVER_BASEURL = "https://gateway-dev-gwnu.onrender.com/superset"
+
+
 import os
 
 # ---------------------------------------------------------
@@ -184,21 +364,19 @@ FEATURE_FLAGS = {
 }
 
 # ---------------------------------------------------------
-# 4. EMBEDDING & COOKIES
+# 4. GUEST TOKEN
 # ---------------------------------------------------------
-IS_PRODUCTION = os.getenv("FLASK_ENV") == "production"
-FORCE_HTTP = os.getenv("FORCE_HTTP", "false").lower() == "true"
-
-# Guest Token Settings
 GUEST_TOKEN_JWT_EXP_SECONDS = 3600
 GUEST_TOKEN_JWT_ALGO = "HS256"
 GUEST_TOKEN_HEADER_NAME = "X-GuestToken"
 GUEST_ROLE_NAME = "Admin"
 GUEST_TOKEN_JWT_AUDIENCE = "audi"
 
-# CORS & Headers
+# ---------------------------------------------------------
+# 5. CORS & HEADERS
+# ---------------------------------------------------------
 ENABLE_CORS = True
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://speegile-analytics.ap-south-1.elasticbeanstalk.com")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://gateway-dev-gwnu.onrender.com")
 
 CORS_OPTIONS = {
     'supports_credentials': True,
@@ -213,26 +391,17 @@ OVERRIDE_HTTP_HEADERS = {
 }
 
 # ---------------------------------------------------------
-# 5. SESSION & COOKIE SETTINGS
+# 6. SESSION & COOKIES
 # ---------------------------------------------------------
 SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_PATH = '/superset'  # Scope cookies to /superset
 SESSION_REFRESH_EACH_REQUEST = False
 SESSION_PROTECTION = None
 
-# DO NOT set APPLICATION_ROOT or SESSION_COOKIE_PATH
-# Nginx handles the /superset prefix via X-Script-Name header
-
-if IS_PRODUCTION and not FORCE_HTTP:
-    SESSION_COOKIE_SAMESITE = 'None'
-    SESSION_COOKIE_SECURE = True
-    DEBUG = False
-else:
-    SESSION_COOKIE_SAMESITE = 'Lax'
-    SESSION_COOKIE_SECURE = False
-    DEBUG = True
-
 # ---------------------------------------------------------
-# 6. SECURITY
+# 7. SECURITY
 # ---------------------------------------------------------
 TALISMAN_ENABLED = False
 WTF_CSRF_ENABLED = True
@@ -241,7 +410,7 @@ FAB_ADD_SECURITY_API = True
 ENABLE_SWAGGER_UI = False
 
 # ---------------------------------------------------------
-# 7. CACHE CONFIG (Redis)
+# 8. CACHE (Redis)
 # ---------------------------------------------------------
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
@@ -256,64 +425,28 @@ FILTER_STATE_CACHE_CONFIG = CACHE_CONFIG
 EXPLORE_FORM_DATA_CACHE_CONFIG = CACHE_CONFIG
 
 # ---------------------------------------------------------
-# 8. PROXY FIX (for AWS ALB)
+# 9. PROXY FIX
 # ---------------------------------------------------------
 ENABLE_PROXY_FIX = True
-# SESSION_COOKIE_SECURE = False
-# SESSION_COOKIE_SAMESITE = "Lax"
-
+PROXY_FIX_CONFIG = {
+    "x_for": 1,
+    "x_proto": 1,
+    "x_host": 1,
+    "x_port": 0,
+    "x_prefix": 0,
+}
 
 # ---------------------------------------------------------
-# Render-only reverse proxy support (SAFE)
+# 10. APPLICATION ROOT (CRITICAL)
 # ---------------------------------------------------------
-IS_RENDER = os.getenv("RENDER", "").lower() == "true"
+# Tell Superset it lives at /superset
+APPLICATION_ROOT = "/superset"
+SUPERSET_WEBSERVER_BASEURL = "https://gateway-dev-gwnu.onrender.com/superset"
 
-# if IS_RENDER:
-#     # Tell Superset it lives under /superset (Render only)
-#     ENABLE_WEBSERVER_BASEURL = True
-#     APPLICATION_ROOT = "/superset"
-#     SESSION_COOKIE_PATH = "/"
-#     STATIC_URL_PATH = "/static"
-#     ENABLE_CORS = True
-#     ENABLE_PROXY_FIX = True
-#     SESSION_COOKIE_SAMESITE = "None"
-#     SESSION_COOKIE_SECURE = True
-#     SESSION_COOKIE_HTTPONLY = True
-#     SESSION_REFRESH_EACH_REQUEST = False
-#     SESSION_PROTECTION = None
-#     PROXY_FIX_CONFIG = {
-#         "x_for": 1,
-#         "x_proto": 1,
-#         "x_host": 1,
-#         "x_port": 1,
-#         "x_prefix": 1,
-#     }
-#     WTF_CSRF_ENABLED = True
-#     WTF_CSRF_TIME_LIMIT = None
-#     # Generate correct redirects and absolute URLs
-#     SUPERSET_WEBSERVER_BASEURL = "https://gateway-dev-gwnu.onrender.com/superset"
-
-if IS_RENDER:
-    # Tell Superset it lives under /superset (Render only)
-    # ENABLE_WEBSERVER_BASEURL = True
-    # APPLICATION_ROOT = "/superset"
-    SESSION_COOKIE_PATH = "/"
-    STATIC_URL_PATH = "/static"
-    ENABLE_CORS = True
-    ENABLE_PROXY_FIX = True
-    SESSION_COOKIE_SAMESITE = "None"
-    SESSION_COOKIE_SECURE = True
-    SESSION_COOKIE_HTTPONLY = True
-    SESSION_REFRESH_EACH_REQUEST = False
-    SESSION_PROTECTION = None
-    PROXY_FIX_CONFIG = {
-        "x_for": 1,
-        "x_proto": 1,
-        "x_host": 1,
-        "x_port": 1,
-        # "x_prefix": 1,
-    }
-    WTF_CSRF_ENABLED = True
-    WTF_CSRF_TIME_LIMIT = None
-    # Generate correct redirects and absolute URLs
-    # SUPERSET_WEBSERVER_BASEURL = "https://gateway-dev-gwnu.onrender.com/superset"
+# ---------------------------------------------------------
+# 11. DATABASE POOL
+# ---------------------------------------------------------
+SQLALCHEMY_ENGINE_OPTIONS = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+}
