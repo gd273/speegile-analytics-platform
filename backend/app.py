@@ -59,7 +59,7 @@ ALLOWED_EXTENSIONS = {'xlsx'}
 raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")
 CORS_ORIGINS = [o.strip() for o in raw_origins.split(",") if o.strip()]
 CORS(app,
-     resources={r"/api/*": {
+     resources={r"/*": {
          "origins": CORS_ORIGINS,
          "supports_credentials": True,
          "allow_headers": ["Content-Type", "Authorization"],
