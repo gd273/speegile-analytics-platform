@@ -18,22 +18,34 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 # -------------------- ENV loading & expansion --------------------
+# finds evaluates full path of current file and cd..'s to 2 level up
 ROOT = Path(__file__).resolve().parents[1]
 DOTENV = ROOT / ".env"
 if DOTENV.exists():
+    # override = false means, Do NOT overwrite existing environment variables.
+    # only set variables that are not already defined
     load_dotenv(dotenv_path=str(DOTENV), override=False)
 else:
     load_dotenv(override=False)
 
-# Expand nested env vars
+# returns None if unset
 raw_db = os.getenv("APP_DATABASE_URL")
 if raw_db:
+    # replace say ${User} with john
     os.environ["APP_DATABASE_URL"] = _os.path.expandvars(raw_db)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+# Superset / DB config
+SUPERSET_ADMIN_USERNAME = os.getenv("SUPERSET_ADMIN_USERNAME")
+SUPERSET_ADMIN_PASSWORD = os.getenv("SUPERSET_ADMIN_PASSWORD")
+SUPERSET_URL = os.getenv("SUPERSET_URL")
+DATABASE_URL = os.getenv("APP_DATABASE_URL")
+GUEST_TOKEN_JWT_SECRET = os.getenv("GUEST_TOKEN_JWT_SECRET")
 
+#Creates a Flask application object
 app = Flask(__name__)
 
+# this should be immutable once set, keep it safe. The Flask secret key signs and protects all session/auth data
 flask_secret = os.getenv("FLASK_SECRET_KEY") or os.getenv("SECRET_KEY") or "dev_fallback_secret_please_change"
 app.secret_key = flask_secret
 
@@ -41,6 +53,8 @@ print("======================================================================")
 print(f"Flask App Initialized with REDIS Session Storage.")
 print("======================================================================")
 
+#configures how Flask sessions are stored, secured, scoped, and expired.
+# server side configuration using redis
 app.config.update(
     SESSION_TYPE='redis',
     SESSION_REDIS=redis.from_url(REDIS_URL),
@@ -52,12 +66,12 @@ app.config.update(
     SESSION_PERMANENT=False,
     SESSION_COOKIE_DOMAIN=None
 )
+# applies the app config for our sessions
 Session(app)
-
-ALLOWED_EXTENSIONS = {'xlsx'}
 
 raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")
 CORS_ORIGINS = [o.strip() for o in raw_origins.split(",") if o.strip()]
+# allow selected websites to connect to, https methods, headers
 CORS(app,
      resources={r"/*": {
          "origins": CORS_ORIGINS,
@@ -70,18 +84,13 @@ CORS(app,
      supports_credentials=True
 )
 S3_BUCKET = os.getenv("S3_BUCKET_NAME", "client-analytics-data-storage")
+# s3 client object
 s3_client = boto3.client(
     's3',
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
     region_name=os.getenv("AWS_REGION", "us-east-1")
 )
-# Superset / DB config
-SUPERSET_ADMIN_USERNAME = os.getenv("SUPERSET_ADMIN_USERNAME")
-SUPERSET_ADMIN_PASSWORD = os.getenv("SUPERSET_ADMIN_PASSWORD")
-SUPERSET_URL = os.getenv("SUPERSET_URL")
-DATABASE_URL = os.getenv("APP_DATABASE_URL")
-GUEST_TOKEN_JWT_SECRET = os.getenv("GUEST_TOKEN_JWT_SECRET")
 
 # ---------------------------------------------------------
 # DATABASE ENGINE (Critical for Login & Upload)
@@ -89,12 +98,14 @@ GUEST_TOKEN_JWT_SECRET = os.getenv("GUEST_TOKEN_JWT_SECRET")
 engine = None
 if DATABASE_URL:
     try:
+        # This does NOT connect to the database yet
         engine = create_engine(DATABASE_URL)
         print("✓ Database engine created successfully")
     except Exception as e:
         print(f"🚨 DATABASE CONNECTION FAILED: {e}")
         engine = None
 
+ALLOWED_EXTENSIONS = {'xlsx'}
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
