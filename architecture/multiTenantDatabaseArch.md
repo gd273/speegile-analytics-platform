@@ -1,3 +1,4 @@
+```mermaid
 graph TB
     subgraph "client-analytics-db (PostgreSQL 18)"
         subgraph "public schema"
@@ -37,3 +38,4 @@ graph TB
     style T1_TABLE2 fill:#A78BFA
     style T2_TABLE1 fill:#EC4899
     style T2_TABLE2 fill:#EC4899
+```

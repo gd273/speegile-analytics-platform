@@ -1,3 +1,4 @@
+```mermaid
 sequenceDiagram
     participant U as User
     participant F as Frontend
@@ -25,3 +26,4 @@ sequenceDiagram
     end
     
     Note over B,R: Session stored with:<br/>- user: email<br/>- tenant_id: 1<br/>- tenant_schema: "tenant_green_energy"<br/>- roles: ["Admin"]<br/>- superset_username: "admin"
+```

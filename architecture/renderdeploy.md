@@ -1,3 +1,4 @@
+```mermaid
 graph TB
     subgraph "GitHub Repository"
         REPO[speegile-analytics-platform<br/>Main Branch]
@@ -60,3 +61,4 @@ graph TB
     style SUPERSET_DB fill:#8B5CF6
     style REDIS_SVC fill:#EC4899
     style S3 fill:#3B82F6
+```

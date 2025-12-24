@@ -1,3 +1,4 @@
+```mermaid
 graph TB
     subgraph "Client Browser"
         USER[User]
@@ -44,3 +45,4 @@ graph TB
     style CLIENT_DB fill:#A78BFA
     style SUPERSET_DB fill:#A78BFA
     style S3 fill:#EC4899
+```mermaid

@@ -1,3 +1,4 @@
+```mermaid
 sequenceDiagram
     participant U as User
     participant F as Frontend
@@ -40,3 +41,4 @@ sequenceDiagram
     F-->>U: 22. Display embedded dashboard
     
     Note over F,S: Guest token expires in 5 minutes<br/>Frontend must request new token<br/>before expiry
+```mermaid

@@ -1,3 +1,4 @@
+```mermaid
 graph TB
     subgraph "Security Layers"
         subgraph "Transport Security"
@@ -53,3 +54,4 @@ graph TB
     style CORS fill:#8B5CF6
     style CSRF fill:#3B82F6
     style RATE_LIMIT fill:#EF4444,stroke:#DC2626,stroke-width:2px,stroke-dasharray: 5 5
+```

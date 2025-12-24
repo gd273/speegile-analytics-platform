@@ -1,3 +1,4 @@
+```mermaid
 flowchart TD
     START([User Accesses Platform])
     
@@ -32,3 +33,4 @@ flowchart TD
     style DISPLAY fill:#10B981
     style DATA_READY fill:#8B5CF6
     style ERROR_LOG fill:#EF4444
+```mermaid

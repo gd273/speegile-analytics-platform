@@ -1,3 +1,4 @@
+```mermaid
 sequenceDiagram
     participant U as User
     participant F as Frontend
@@ -46,3 +47,4 @@ sequenceDiagram
     rect rgb(200, 220, 255)
         Note over U,S3: Superset can now query<br/>the new data for dashboards
     end
+```
