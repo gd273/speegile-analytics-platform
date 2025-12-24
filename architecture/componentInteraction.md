@@ -1,3 +1,4 @@
+```mermaid
 graph LR
     subgraph "Frontend (React + Nginx)"
         LOGIN[Login Page]
@@ -51,3 +52,4 @@ graph LR
     style API fill:#EC4899
     style EMBED fill:#EC4899
     style QUERY fill:#EC4899
+```
