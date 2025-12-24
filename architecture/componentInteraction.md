@@ -4,24 +4,24 @@
 graph LR
 
     subgraph "Frontend (React + Nginx)"
-        LOGIN[Login Page]
-        DASH[Dashboard Page]
-        UPLOAD[Upload Page]
-        SDK[Superset Embedded SDK]
+        LOGIN["Login Page"]
+        DASH["Dashboard Page"]
+        UPLOAD["Upload Page"]
+        SDK["Superset Embedded SDK"]
     end
 
     subgraph "Backend (Flask API)"
-        AUTH[Authentication Middleware]
-        LOGIN_EP[/login endpoint]
-        DASH_EP[/dashboards endpoint]
-        TOKEN_EP[/guest-token endpoint]
-        UPLOAD_EP[/upload-excel endpoint]
+        AUTH["Authentication Middleware"]
+        LOGIN_EP["login endpoint"]
+        DASH_EP["dashboards endpoint"]
+        TOKEN_EP["guest-token endpoint"]
+        UPLOAD_EP["upload-excel endpoint"]
     end
 
     subgraph "Superset"
-        API[REST API]
-        EMBED[Embedded Dashboard Renderer]
-        QUERY[Query Engine]
+        API["REST API"]
+        EMBED["Embedded Dashboard Renderer"]
+        QUERY["Query Engine"]
     end
 
     LOGIN --> LOGIN_EP
@@ -38,8 +38,8 @@ graph LR
     EMBED --> QUERY
 
     UPLOAD --> UPLOAD_EP
-    UPLOAD_EP -.-> S3[(S3)]
-    UPLOAD_EP -.-> DB[(client-analytics-db)]
+    UPLOAD_EP -.-> S3["S3"]
+    UPLOAD_EP -.-> DB["client-analytics-db"]
 
     QUERY -.-> DB
 ```
