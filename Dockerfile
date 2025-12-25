@@ -41,6 +41,13 @@ COPY config/superset_config.py /app/pythonpath/superset_config.py
 COPY superset-init.sh /app/superset-init.sh
 RUN chmod +x /app/superset-init.sh
 
+# 6 Copy custom branding assets
+COPY config/branding/superset-logo-horiz.png /app/superset/static/assets/images/superset-logo-horiz.png
+
+COPY config/branding/superset-logo-stacked.png /app/superset/static/assets/images/superset-logo-stacked.png
+
+COPY config/branding/favicon.png /app/superset/static/assets/images/favicon.png
+
 # --- NEW SECTIONS END HERE ---
 
 USER superset

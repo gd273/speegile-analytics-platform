@@ -343,7 +343,7 @@ if not SECRET_KEY:
     raise Exception("SUPERSET_SECRET_KEY not set!")
 GUEST_TOKEN_JWT_SECRET = os.getenv("GUEST_TOKEN_JWT_SECRET", "my_secure_embedding_secret_12345")
 
-
+APP_NAME = "Speegile-Analytics"
 WEBDRIVER_TYPE = "chromedriver"
 WEBDRIVER_OPTION_ARGS = [
     "--headless",
