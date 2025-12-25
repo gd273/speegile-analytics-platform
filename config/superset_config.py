@@ -326,13 +326,20 @@ import os
 # ---------------------------------------------------------
 # Render provides 'DATABASE_URL' automatically. 
 # We check for that first. If not found, we use your local logic.
-DATABASE_URL = os.getenv("DATABASE_URL") 
-if DATABASE_URL and "postgres" in DATABASE_URL:
-    # SQLAlchemy requires 'postgresql://', but Render sometimes gives 'postgres://'
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace("postgres://", "postgresql://")
-else:
-    # Fallback for local dev (or SQLite)
-    SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:////app/superset_home/superset.db")
+# DATABASE_URL = os.getenv("DATABASE_URL") 
+# if DATABASE_URL and "postgres" in DATABASE_URL:
+#     # SQLAlchemy requires 'postgresql://', but Render sometimes gives 'postgres://'
+#     SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace("postgres://", "postgresql://")
+# else:
+#     # Fallback for local dev (or SQLite)
+#     SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:////app/superset_home/superset.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise Exception("DATABASE_URL is required on Render")
+
+SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace(
+    "postgres://", "postgresql://"
+)
 
 # ---------------------------------------------------------
 # 2. SECURITY & SECRETS
@@ -431,11 +438,20 @@ TALISMAN_ENABLED = False # Disable Talisman to prevent strict CSP blocking frame
 WTF_CSRF_ENABLED = True
 WTF_CSRF_TIME_LIMIT = None
 FAB_ADD_SECURITY_API = True
-ENABLE_SWAGGER_UI = True
+ENABLE_SWAGGER_UI = False
 # ---------------------------------------------------------
 # 7. CACHE CONFIG (Redis) - CRITICAL FOR RENDER
 # ---------------------------------------------------------
 REDIS_URL = os.getenv("REDIS_URL")
+if not REDIS_URL:
+    raise Exception("REDIS_URL is required")
+
+class CeleryConfig:
+    broker_url = REDIS_URL
+    result_backend = REDIS_URL
+
+CELERY_CONFIG = CeleryConfig
+
 if REDIS_URL:
     CACHE_CONFIG = {
         "CACHE_TYPE": "RedisCache",
