@@ -33,14 +33,6 @@ RUN if [ -x /app/.venv/bin/python ]; then \
 
 # --- NEW SECTIONS START HERE (CRITICAL FOR RENDER) ---
 
-# 4. Copy the Superset Config
-# We must copy from your local 'config/' folder to where Superset looks (/app/pythonpath)
-COPY config/superset_config.py /app/pythonpath/superset_config.py
-
-# 5. Copy the startup script & make it executable
-COPY superset-init.sh /app/superset-init.sh
-RUN chmod +x /app/superset-init.sh
-
 # --- BRANDING (CORRECT PATH) ---
 
 COPY config/branding/superset-logo-horiz.png \
@@ -51,6 +43,17 @@ COPY config/branding/superset-logo-horiz.png \
 
 COPY config/branding/favicon.png \
  /app/superset/static/assets/images/favicon.png
+
+
+# 4. Copy the Superset Config
+# We must copy from your local 'config/' folder to where Superset looks (/app/pythonpath)
+COPY config/superset_config.py /app/pythonpath/superset_config.py
+
+# 5. Copy the startup script & make it executable
+COPY superset-init.sh /app/superset-init.sh
+RUN chmod +x /app/superset-init.sh
+
+
 
 
 # --- NEW SECTIONS END HERE ---

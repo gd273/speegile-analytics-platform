@@ -351,6 +351,8 @@ if not SECRET_KEY:
 GUEST_TOKEN_JWT_SECRET = os.getenv("GUEST_TOKEN_JWT_SECRET", "my_secure_embedding_secret_12345")
 
 APP_NAME = "Speegile-Analytics"
+APP_ICON = "/app/superset/static/assests/images/superset-logo-horiz.png"
+LOGO_TOOLTIP = "Speegile-Analytics"
 WEBDRIVER_TYPE = "chromedriver"
 WEBDRIVER_OPTION_ARGS = [
     "--headless",
