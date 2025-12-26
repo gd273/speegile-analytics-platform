@@ -44,13 +44,13 @@ RUN chmod +x /app/superset-init.sh
 # --- BRANDING (CORRECT PATH) ---
 
 COPY config/branding/superset-logo-horiz.png \
- /app/superset-frontend/static/assets/images/superset-logo-horiz.png
+ /app/superset/static/assets/images/superset-logo-horiz.png
 
-COPY config/branding/superset-logo-stacked.png \
- /app/superset-frontend/static/assets/images/superset-logo-stacked.png
+# COPY config/branding/superset-logo-stacked.png \
+#  /app/superset/static/assets/images/superset-logo-stacked.png
 
 COPY config/branding/favicon.png \
- /app/superset-frontend/static/assets/images/favicon.png
+ /app/superset/static/assets/images/favicon.png
 
 
 # --- NEW SECTIONS END HERE ---
