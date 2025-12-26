@@ -352,6 +352,7 @@ GUEST_TOKEN_JWT_SECRET = os.getenv("GUEST_TOKEN_JWT_SECRET", "my_secure_embeddin
 
 APP_NAME = "Speegile-Analytics"
 APP_ICON = "/app/superset/static/assests/images/superset-logo-horiz.png"
+FAVICONS = [{"href":"/app/superset/static/assests/images/favicon.png"}]
 LOGO_TOOLTIP = "Speegile-Analytics"
 WEBDRIVER_TYPE = "chromedriver"
 WEBDRIVER_OPTION_ARGS = [
