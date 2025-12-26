@@ -63,7 +63,7 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
             hideTitle: true,
             hideTab: true,
             hideChartControls: false,
-            filters: {expanded: true,visible: true},
+            // filters: {expanded: true,visible: true},
           },
           debug: true,
           iframeSandboxExtras: ['allow-downloads']
