@@ -136,7 +136,7 @@ function App() {
         
         <div className="flex items-center gap-8">
           <div className="flex-shrink-0">
-             <img src="/SpeegileLogo.jpeg" alt="Speegile Logo" className="w-32 h-auto object-contain" />
+             <img src="/Shinde_Shoes_logo.jpeg" alt="Speegile Logo" className="w-32 h-auto object-contain" />
           </div>
           
           <div className="flex items-center gap-4">
@@ -181,8 +181,8 @@ function App() {
                   </div>
                 )}
             </div>
-            {/* -------------------------------------- */}
-
+            {/* 
+                Pending To Add New Code
             <Link
               to="/upload"
               className={`flex items-center gap-3 p-3 rounded-lg transition ${
@@ -192,13 +192,16 @@ function App() {
               <UploadCloud className="w-4 h-4" />
               Upload Data
             </Link>
+
+             */}
           </div>
         </div>
 
         {/* Center Title */}
         <div className="absolute left-1/2 transform -translate-x-1/2 pointer-events-none">
            <span className="text-xl font-bold text-gray-800 tracking-tight">
-             Brizz Enterprise
+             Shinde Shoes
+             {/* In Future We Will Make This Dynamic*/}
            </span>
         </div>
         
