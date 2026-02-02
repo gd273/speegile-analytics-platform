@@ -8,7 +8,7 @@ import requests
 import json
 import boto3
 import redis
-from datetime import timedelta
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import pandas as pd
 from sqlalchemy import create_engine, text
