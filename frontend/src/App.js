@@ -181,8 +181,8 @@ function App() {
                   </div>
                 )}
             </div>
-            {/* 
-                Pending To Add New Code
+            
+                {/* Pending To Add New Code */}
             <Link
               to="/upload"
               className={`flex items-center gap-3 p-3 rounded-lg transition ${
@@ -193,7 +193,7 @@ function App() {
               Upload Data
             </Link>
 
-             */}
+            
           </div>
         </div>
 
