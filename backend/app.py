@@ -505,7 +505,13 @@ def upload_excel():
                     
                     # 5. UPDATE STATUS TO PASS
                     conn.execute(text("UPDATE public.load_master SET status='Pass' WHERE id=:lid"), {"lid": load_id})
-                    
+
+                    print(f"DEBUG: Target Table Name is: {target_table_name}") # Check if this is None
+                    print(f"DEBUG: Sheets found: {xls.sheet_names}")         # Check if it sees your sheets
+                    for sheet in xls.sheet_names:
+                        df = xls.parse(sheet)
+                        print(f"DEBUG: Sheet {sheet} has {len(df)} rows")    # Check if data is actually loaded
+                        
                     trans.commit()
                     return jsonify({"success": True, "message": f"Data appended to {target_table_name}", "load_id": load_id}), 200        
                 except Exception as inner_e:
