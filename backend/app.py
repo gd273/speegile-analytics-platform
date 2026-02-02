@@ -533,5 +533,38 @@ def upload_excel():
             
     return jsonify({"success": False, "error": "Invalid file"}), 400
 
+
+## This Is The External API To Truncate A Table (Hardcoded)
+## It Deletes All Data From A Specific Table And Resets The Serial ID Counter
+## curently hardcoded to delete the t_apparel_sales table data in upload_data schema
+
+@app.route('/truncate-data', methods=['GET'])
+def truncate_table_simple():
+    # --- HARDCODED VALUES ---
+    TARGET_SCHEMA = "apparel_sales"
+    TARGET_TABLE = "t_apparel_sales"
+    # ------------------------
+
+    try:
+        with engine.connect() as conn:
+            # The Query: Truncate the table and reset the ID counter to 1
+            query = text(f'TRUNCATE TABLE "{TARGET_SCHEMA}"."{TARGET_TABLE}" RESTART IDENTITY CASCADE')
+            
+            conn.execute(query)
+            conn.commit()
+            
+            # Simple message for the browser screen
+            return f"""
+            <div style="font-family:sans-serif; text-align:center; margin-top:100px;">
+                <h1 style="color:green;">Table Truncated</h1>
+                <p>All data has been deleted from: <b>{TARGET_SCHEMA}.{TARGET_TABLE}</b></p>
+                <p>Serial IDs have been reset to 1.</p>
+            </div>
+            """, 200
+
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p>", 500
+
+
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
