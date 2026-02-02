@@ -454,10 +454,15 @@ def upload_excel():
                     
             #         trans.commit()
             #         return jsonify({"success": True, "message": "Processed & Archived", "load_id": load_id}), 200
+
+            
+            file_bytes = file.read()
+            print(f"DEBUG: File read successfully. Size: {len(file_bytes)} bytes", flush=True)
+
             with engine.connect() as conn:
                 trans = conn.begin()
                 try:
-                    # 1. CREATE LOAD MASTER ENTRY
+                    # 2. CREATE LOAD MASTER ENTRY
                     insert_master = text("""
                         INSERT INTO public.load_master (tenant_id, user_id, filename, status)
                         VALUES (:tid, :uid, :fname, 'Processing')
@@ -466,34 +471,36 @@ def upload_excel():
                     load_id = conn.execute(insert_master, {
                         "tid": tenant_id, "uid": user_id, "fname": clean_filename
                     }).scalar()
+                    print(f"DEBUG: Created Load ID: {load_id}", flush=True)
 
-                    # --- NEW LOGIC: FETCH CONFIGURED TABLE NAME ---
-                    # We look up the 'table_name' assigned to this tenant in the public.tenants table
+                    # 3. FETCH TARGET TABLE
                     get_table_query = text("SELECT table_name FROM public.tenants WHERE id = :tid")
                     target_table_name = conn.execute(get_table_query, {"tid": tenant_id}).scalar()
+                    print(f"DEBUG: Target Table found in DB: {target_table_name}", flush=True)
 
                     if not target_table_name:
+                        print("DEBUG: ERROR - No table_name found for this tenant!", flush=True)
                         trans.rollback()
-                        return jsonify({"success": False, "error": "No target table configured for this tenant"}), 400
-                    # ----------------------------------------------
+                        return jsonify({"success": False, "error": "No target table configured"}), 400
 
-                    # 2. PROCESS FILE
-                    xls = pd.ExcelFile(file.stream, engine='openpyxl')
-                    
-                    # 4. SAVE TO PRIVATE DB
-                    file.stream.seek(0)
+                    # 4. PROCESS EXCEL FROM BYTES
+                    # We pass file_bytes directly here
+                    xls = pd.ExcelFile(file_bytes, engine='openpyxl')
+                    print(f"DEBUG: Sheets found: {xls.sheet_names}", flush=True)
+
                     results = []
-
                     for sheet in xls.sheet_names:
                         df = xls.parse(sheet)
-                        if df.empty: continue
+                        print(f"DEBUG: Processing sheet '{sheet}' with {len(df)} rows", flush=True)
                         
-                        # Clean columns to match DB standards
+                        if df.empty:
+                            print(f"DEBUG: Skipping empty sheet: {sheet}", flush=True)
+                            continue
+                        
                         df.columns = [c.replace(' ', '_').lower() for c in df.columns]
                         df['load_id'] = load_id  
                         
-                        # 3. INSERT INTO THE FETCHED TABLE NAME
-                        # We use 'append' because you want to keep adding data to this fixed table.
+                        # 5. ACTUAL INSERT
                         df.to_sql(
                             target_table_name, 
                             con=conn, 
@@ -503,24 +510,20 @@ def upload_excel():
                         )
                         results.append(target_table_name)
                     
-                    # 5. UPDATE STATUS TO PASS
+                    # 6. FINAL COMMIT
                     conn.execute(text("UPDATE public.load_master SET status='Pass' WHERE id=:lid"), {"lid": load_id})
-
-                    print(f"DEBUG: Target Table Name is: {target_table_name}") # Check if this is None
-                    print(f"DEBUG: Sheets found: {xls.sheet_names}")         # Check if it sees your sheets
-                    for sheet in xls.sheet_names:
-                        df = xls.parse(sheet)
-                        print(f"DEBUG: Sheet {sheet} has {len(df)} rows")    # Check if data is actually loaded
-                        
                     trans.commit()
+                    
+                    print(f"DEBUG: Transaction Committed. Successfully uploaded to {target_table_name}", flush=True)
                     return jsonify({"success": True, "message": f"Data appended to {target_table_name}", "load_id": load_id}), 200        
+                
                 except Exception as inner_e:
                     trans.rollback()
-                    # Optional: Log the crash as a 'Fail' status if connection is still alive
-                    print(f"Processing Error: {inner_e}")
+                    print(f"DEBUG: CRITICAL ERROR: {str(inner_e)}", flush=True)
                     raise inner_e
 
         except Exception as e:
+            print(f"DEBUG: OUTER ERROR: {str(e)}", flush=True)
             return jsonify({"success": False, "error": str(e)}), 500
             
     return jsonify({"success": False, "error": "Invalid file"}), 400
