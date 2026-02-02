@@ -136,7 +136,7 @@ function App() {
         
         <div className="flex items-center gap-8">
           <div className="flex-shrink-0">
-             <img src="/SpeegileLogo.jpg" alt="Speegile Logo" className="w-32 h-auto object-contain" />
+             <img src="/SpeegileLogo.jpeg" alt="Speegile Logo" className="w-32 h-auto object-contain" />
           </div>
           
           <div className="flex items-center gap-4">
