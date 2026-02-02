@@ -418,12 +418,12 @@ def upload_excel():
                     
                     # 3. IF SUCCESS: ARCHIVE TO S3
                     # Format: {tenant_id}_{load_id}_{datetime}.xlsx
-                    new_s3_name = f"{tenant_id}_{load_id}_{timestamp_str}.xlsx"
-                    s3_key = f"{tenant_schema}/{new_s3_name}"
+                    # new_s3_name = f"{tenant_id}_{load_id}_{timestamp_str}.xlsx"
+                    # s3_key = f"{tenant_schema}/{new_s3_name}"
                     
                     # Reset file stream to 0 to read bytes for S3
-                    file.stream.seek(0)
-                    s3_client.upload_fileobj(file.stream, S3_BUCKET, s3_key)
+                    # file.stream.seek(0)
+                    # s3_client.upload_fileobj(file.stream, S3_BUCKET, s3_key)
                     
                     # 4. SAVE TO PRIVATE DB
                     # Reset stream again for Pandas
