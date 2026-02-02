@@ -16,6 +16,7 @@ import logging
 from flask_session import Session
 from dotenv import load_dotenv
 from pathlib import Path
+import io
 
 # -------------------- ENV loading & expansion --------------------
 # finds evaluates full path of current file and cd..'s to 2 level up
@@ -455,8 +456,9 @@ def upload_excel():
             #         trans.commit()
             #         return jsonify({"success": True, "message": "Processed & Archived", "load_id": load_id}), 200
 
-            
+
             file_bytes = file.read()
+            file_buffer = io.BytesIO(file_bytes)
             print(f"DEBUG: File read successfully. Size: {len(file_bytes)} bytes", flush=True)
 
             with engine.connect() as conn:
@@ -485,7 +487,10 @@ def upload_excel():
 
                     # 4. PROCESS EXCEL FROM BYTES
                     # We pass file_bytes directly here
-                    xls = pd.ExcelFile(file_bytes, engine='openpyxl')
+                    # xls = pd.ExcelFile(file_bytes, engine='openpyxl')
+                    # print(f"DEBUG: Sheets found: {xls.sheet_names}", flush=True)
+                    # Pass the buffer to ExcelFile
+                    xls = pd.ExcelFile(file_buffer, engine='openpyxl')
                     print(f"DEBUG: Sheets found: {xls.sheet_names}", flush=True)
 
                     results = []
