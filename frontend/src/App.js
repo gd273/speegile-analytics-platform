@@ -136,7 +136,7 @@ function App() {
         
         <div className="flex items-center gap-8">
           <div className="flex-shrink-0">
-             <img src="/Shinde_Shoes_logo.jpg" alt="Speegile Logo" className="w-32 h-auto object-contain" />
+             <img src="/SpeegileLogo.jpg" alt="Speegile Logo" className="w-32 h-auto object-contain" />
           </div>
           
           <div className="flex items-center gap-4">
@@ -200,7 +200,7 @@ function App() {
         {/* Center Title */}
         <div className="absolute left-1/2 transform -translate-x-1/2 pointer-events-none">
            <span className="text-xl font-bold text-gray-800 tracking-tight">
-             Shinde Shoes
+              Speegile Analytics
              {/* In Future We Will Make This Dynamic*/}
            </span>
         </div>
