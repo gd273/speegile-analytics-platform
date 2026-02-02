@@ -374,7 +374,7 @@ def upload_excel():
     # Get Context
     tenant_schema = session.get('tenant_schema')
     tenant_id = session.get('tenant_id') # We need to make sure login stores this!
-    user_id = 1 # Fallback, or fetch from session.get('user_id')
+    user_id = session.get('user_id', 1) # Fallback, or fetch from session.get('user_id')
 
     # Quick patch if you haven't updated login to store tenant_id yet:
     # You might need to query it here or add it to session in the /login route.
@@ -391,11 +391,73 @@ def upload_excel():
             clean_filename = secure_filename(file.filename)
             timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
             
+            # with engine.connect() as conn:
+            #     trans = conn.begin()
+            #     try:
+            #         # 1. CREATE LOAD MASTER ENTRY (Public Schema)
+            #         # Status starts as 'Processing'
+            #         insert_master = text("""
+            #             INSERT INTO public.load_master (tenant_id, user_id, filename, status)
+            #             VALUES (:tid, :uid, :fname, 'Processing')
+            #             RETURNING id
+            #         """)
+            #         load_id = conn.execute(insert_master, {
+            #             "tid": tenant_id, "uid": user_id, "fname": clean_filename
+            #         }).scalar()
+                    
+            #         # 2. PROCESS FILE (Using Pandas)
+            #         xls = pd.ExcelFile(file.stream, engine='openpyxl')
+                    
+            #         # --- VALIDATION SIMULATION ---
+            #         # Here you would check for errors. 
+            #         # For MVP, let's assume if it reads, it passes.
+            #         # If you find errors, you would:
+            #         #   a) Insert into public.load_errors
+            #         #   b) Update load_master status = 'Fail'
+            #         #   c) trans.commit(), return jsonify({"error": "Validation Failed"})
+                    
+            #         # 3. IF SUCCESS: ARCHIVE TO S3
+            #         # Format: {tenant_id}_{load_id}_{datetime}.xlsx
+            #         # new_s3_name = f"{tenant_id}_{load_id}_{timestamp_str}.xlsx"
+            #         # s3_key = f"{tenant_schema}/{new_s3_name}"
+                    
+            #         # Reset file stream to 0 to read bytes for S3
+            #         # file.stream.seek(0)
+            #         # s3_client.upload_fileobj(file.stream, S3_BUCKET, s3_key)
+                    
+            #         # 4. SAVE TO PRIVATE DB
+            #         # Reset stream again for Pandas
+            #         file.stream.seek(0)
+                    
+            #         base_name = clean_filename.rsplit('.', 1)[0].lower().replace(' ', '_')
+            #         results = []
+
+            #         for sheet in xls.sheet_names:
+            #             df = xls.parse(sheet)
+            #             if df.empty: continue
+                        
+            #             df.columns = [c.replace(' ', '_').lower() for c in df.columns]
+            #             df['load_id'] = load_id  # Traceability
+                        
+            #             # Naming logic
+            #             if len(xls.sheet_names) == 1:
+            #                 table_name = base_name
+            #             else:
+            #                 clean_sheet = sheet.lower().replace(' ', '_')
+            #                 table_name = f"{base_name}_{clean_sheet}"
+
+            #             df.to_sql(table_name, con=conn, schema=tenant_schema, if_exists='append', index=False)
+            #             results.append(table_name)
+                    
+            #         # 5. UPDATE STATUS TO PASS
+            #         conn.execute(text("UPDATE public.load_master SET status='Pass' WHERE id=:lid"), {"lid": load_id})
+                    
+            #         trans.commit()
+            #         return jsonify({"success": True, "message": "Processed & Archived", "load_id": load_id}), 200
             with engine.connect() as conn:
                 trans = conn.begin()
                 try:
-                    # 1. CREATE LOAD MASTER ENTRY (Public Schema)
-                    # Status starts as 'Processing'
+                    # 1. CREATE LOAD MASTER ENTRY
                     insert_master = text("""
                         INSERT INTO public.load_master (tenant_id, user_id, filename, status)
                         VALUES (:tid, :uid, :fname, 'Processing')
@@ -404,57 +466,48 @@ def upload_excel():
                     load_id = conn.execute(insert_master, {
                         "tid": tenant_id, "uid": user_id, "fname": clean_filename
                     }).scalar()
-                    
-                    # 2. PROCESS FILE (Using Pandas)
+
+                    # --- NEW LOGIC: FETCH CONFIGURED TABLE NAME ---
+                    # We look up the 'table_name' assigned to this tenant in the public.tenants table
+                    get_table_query = text("SELECT table_name FROM public.tenants WHERE id = :tid")
+                    target_table_name = conn.execute(get_table_query, {"tid": tenant_id}).scalar()
+
+                    if not target_table_name:
+                        trans.rollback()
+                        return jsonify({"success": False, "error": "No target table configured for this tenant"}), 400
+                    # ----------------------------------------------
+
+                    # 2. PROCESS FILE
                     xls = pd.ExcelFile(file.stream, engine='openpyxl')
                     
-                    # --- VALIDATION SIMULATION ---
-                    # Here you would check for errors. 
-                    # For MVP, let's assume if it reads, it passes.
-                    # If you find errors, you would:
-                    #   a) Insert into public.load_errors
-                    #   b) Update load_master status = 'Fail'
-                    #   c) trans.commit(), return jsonify({"error": "Validation Failed"})
-                    
-                    # 3. IF SUCCESS: ARCHIVE TO S3
-                    # Format: {tenant_id}_{load_id}_{datetime}.xlsx
-                    # new_s3_name = f"{tenant_id}_{load_id}_{timestamp_str}.xlsx"
-                    # s3_key = f"{tenant_schema}/{new_s3_name}"
-                    
-                    # Reset file stream to 0 to read bytes for S3
-                    # file.stream.seek(0)
-                    # s3_client.upload_fileobj(file.stream, S3_BUCKET, s3_key)
-                    
                     # 4. SAVE TO PRIVATE DB
-                    # Reset stream again for Pandas
                     file.stream.seek(0)
-                    
-                    base_name = clean_filename.rsplit('.', 1)[0].lower().replace(' ', '_')
                     results = []
 
                     for sheet in xls.sheet_names:
                         df = xls.parse(sheet)
                         if df.empty: continue
                         
+                        # Clean columns to match DB standards
                         df.columns = [c.replace(' ', '_').lower() for c in df.columns]
-                        df['load_id'] = load_id  # Traceability
+                        df['load_id'] = load_id  
                         
-                        # Naming logic
-                        if len(xls.sheet_names) == 1:
-                            table_name = base_name
-                        else:
-                            clean_sheet = sheet.lower().replace(' ', '_')
-                            table_name = f"{base_name}_{clean_sheet}"
-
-                        df.to_sql(table_name, con=conn, schema=tenant_schema, if_exists='replace', index=False)
-                        results.append(table_name)
+                        # 3. INSERT INTO THE FETCHED TABLE NAME
+                        # We use 'append' because you want to keep adding data to this fixed table.
+                        df.to_sql(
+                            target_table_name, 
+                            con=conn, 
+                            schema=tenant_schema, 
+                            if_exists='append', 
+                            index=False
+                        )
+                        results.append(target_table_name)
                     
                     # 5. UPDATE STATUS TO PASS
                     conn.execute(text("UPDATE public.load_master SET status='Pass' WHERE id=:lid"), {"lid": load_id})
                     
                     trans.commit()
-                    return jsonify({"success": True, "message": "Processed & Archived", "load_id": load_id}), 200
-                    
+                    return jsonify({"success": True, "message": f"Data appended to {target_table_name}", "load_id": load_id}), 200        
                 except Exception as inner_e:
                     trans.rollback()
                     # Optional: Log the crash as a 'Fail' status if connection is still alive
