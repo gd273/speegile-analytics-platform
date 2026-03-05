@@ -5,8 +5,8 @@ import Login from "./Login";
 import UploadExcel from "./UploadExcel";
 import { LogOut, Home, UploadCloud, Loader2, ChevronDown, Download } from "lucide-react"; 
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+//import html2canvas from 'html2canvas';
+//import { jsPDF } from 'jspdf';
 // const [isDownloading, setIsDownloading] = useState(false);
 
 console.log("DEBUG: REACT_APP_API_BASE_URL =", process.env.REACT_APP_API_BASE_URL);
