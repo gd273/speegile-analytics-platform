@@ -70,37 +70,37 @@ app.config.update(
 # applies the app config for our sessions
 Session(app)
 
-raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000","https://frontend-ao4w.onrender.com")
+raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000,https://frontend-ao4w.onrender.com")
 CORS_ORIGINS = [o.strip() for o in raw_origins.split(",") if o.strip()]
 # allow selected websites to connect to, https methods, headers
-# CORS(app,
-#      resources={r"/*": {
-#          "origins": CORS_ORIGINS,
-#          "supports_credentials": True,
-#          "allow_headers": ["Content-Type", "Authorization"],
-#          "expose_headers": ["Set-Cookie"],
-#          "methods": ["GET", "POST", "OPTIONS"],
-#          "allow_credentials": True
-#      }},
-#      supports_credentials=True
-# )
-
-CORS(
-    app,
-    supports_credentials=True,
-    resources={
-        r"/api/*": {
-            "origins": [
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "https://frontend-ao4w.onrender.com"
-            ],
-            "methods": ["GET", "POST", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"],
-            "expose_headers": ["Set-Cookie"],
-        }
-    }
+CORS(app,
+     resources={r"/*": {
+         "origins": CORS_ORIGINS,
+         "supports_credentials": True,
+         "allow_headers": ["Content-Type", "Authorization"],
+         "expose_headers": ["Set-Cookie"],
+         "methods": ["GET", "POST", "OPTIONS"],
+         "allow_credentials": True
+     }},
+     supports_credentials=True
 )
+
+# CORS(
+#     app,
+#     supports_credentials=True,
+#     resources={
+#         r"/api/*": {
+#             "origins": [
+#                 "http://localhost:3000",
+#                 "http://127.0.0.1:3000",
+#                 "https://frontend-ao4w.onrender.com"
+#             ],
+#             "methods": ["GET", "POST", "OPTIONS"],
+#             "allow_headers": ["Content-Type", "Authorization"],
+#             "expose_headers": ["Set-Cookie"],
+#         }
+#     }
+# )
 
 S3_BUCKET = os.getenv("S3_BUCKET_NAME", "client-analytics-data-storage")
 # s3 client object
