@@ -379,9 +379,193 @@ def generate_guest_token():
 # ---------------------------------------------------------
 # UPLOAD EXCEL (Schema Aware)
 # ---------------------------------------------------------
-@app.route('/api/upload-excel', methods=['POST'])
+# @app.route('/api/upload-excel', methods=['POST'])
+# @login_required
+# def upload_excel():
+#     if 'excel_file' not in request.files:
+#         return jsonify({"success": False, "error": "No file part"}), 400
+
+#     file = request.files['excel_file']
+#     if file.filename == '':
+#         return jsonify({"success": False, "error": "No selected file"}), 400
+
+#     if engine is None:
+#         return jsonify({"success": False, "error": "Database unavailable"}), 503
+    
+#     # Get Context
+#     tenant_schema = session.get('tenant_schema')
+#     tenant_id = session.get('tenant_id') # We need to make sure login stores this!
+#     user_id = session.get('user_id', 1) # Fallback, or fetch from session.get('user_id')
+
+#     # Quick patch if you haven't updated login to store tenant_id yet:
+#     # You might need to query it here or add it to session in the /login route.
+#     if not tenant_id: 
+#          # temporary lookup for safety
+#          with engine.connect() as conn:
+#              tenant_id = conn.execute(text(f"SELECT id FROM public.tenant WHERE schema_name=:s"), {"s":tenant_schema}).scalar()
+
+#     if not tenant_schema:
+#         return jsonify({"success": False, "error": "No tenant context found"}), 403
+
+#     if file and allowed_file(file.filename):
+#         try:
+#             clean_filename = secure_filename(file.filename)
+#             timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+#             # with engine.connect() as conn:
+#             #     trans = conn.begin()
+#             #     try:
+#             #         # 1. CREATE LOAD MASTER ENTRY (Public Schema)
+#             #         # Status starts as 'Processing'
+#             #         insert_master = text("""
+#             #             INSERT INTO public.load_master (tenant_id, user_id, filename, status)
+#             #             VALUES (:tid, :uid, :fname, 'Processing')
+#             #             RETURNING id
+#             #         """)
+#             #         load_id = conn.execute(insert_master, {
+#             #             "tid": tenant_id, "uid": user_id, "fname": clean_filename
+#             #         }).scalar()
+                    
+#             #         # 2. PROCESS FILE (Using Pandas)
+#             #         xls = pd.ExcelFile(file.stream, engine='openpyxl')
+                    
+#             #         # --- VALIDATION SIMULATION ---
+#             #         # Here you would check for errors. 
+#             #         # For MVP, let's assume if it reads, it passes.
+#             #         # If you find errors, you would:
+#             #         #   a) Insert into public.load_errors
+#             #         #   b) Update load_master status = 'Fail'
+#             #         #   c) trans.commit(), return jsonify({"error": "Validation Failed"})
+                    
+#             #         # 3. IF SUCCESS: ARCHIVE TO S3
+#             #         # Format: {tenant_id}_{load_id}_{datetime}.xlsx
+#             #         # new_s3_name = f"{tenant_id}_{load_id}_{timestamp_str}.xlsx"
+#             #         # s3_key = f"{tenant_schema}/{new_s3_name}"
+                    
+#             #         # Reset file stream to 0 to read bytes for S3
+#             #         # file.stream.seek(0)
+#             #         # s3_client.upload_fileobj(file.stream, S3_BUCKET, s3_key)
+                    
+#             #         # 4. SAVE TO PRIVATE DB
+#             #         # Reset stream again for Pandas
+#             #         file.stream.seek(0)
+                    
+#             #         base_name = clean_filename.rsplit('.', 1)[0].lower().replace(' ', '_')
+#             #         results = []
+
+#             #         for sheet in xls.sheet_names:
+#             #             df = xls.parse(sheet)
+#             #             if df.empty: continue
+                        
+#             #             df.columns = [c.replace(' ', '_').lower() for c in df.columns]
+#             #             df['load_id'] = load_id  # Traceability
+                        
+#             #             # Naming logic
+#             #             if len(xls.sheet_names) == 1:
+#             #                 table_name = base_name
+#             #             else:
+#             #                 clean_sheet = sheet.lower().replace(' ', '_')
+#             #                 table_name = f"{base_name}_{clean_sheet}"
+
+#             #             df.to_sql(table_name, con=conn, schema=tenant_schema, if_exists='append', index=False)
+#             #             results.append(table_name)
+                    
+#             #         # 5. UPDATE STATUS TO PASS
+#             #         conn.execute(text("UPDATE public.load_master SET status='Pass' WHERE id=:lid"), {"lid": load_id})
+                    
+#             #         trans.commit()
+#             #         return jsonify({"success": True, "message": "Processed & Archived", "load_id": load_id}), 200
+
+
+#             file_bytes = file.read()
+#             file_buffer = io.BytesIO(file_bytes)
+#             print(f"DEBUG: File read successfully. Size: {len(file_bytes)} bytes", flush=True)
+
+#             with engine.connect() as conn:
+#                 trans = conn.begin()
+#                 try:
+#                     # 2. CREATE LOAD MASTER ENTRY
+#                     insert_master = text("""
+#                         INSERT INTO public.load_master (tenant_id, user_id, filename, status)
+#                         VALUES (:tid, :uid, :fname, 'Processing')
+#                         RETURNING id
+#                     """)
+#                     load_id = conn.execute(insert_master, {
+#                         "tid": tenant_id, "uid": user_id, "fname": clean_filename
+#                     }).scalar()
+#                     print(f"DEBUG: Created Load ID: {load_id}", flush=True)
+
+#                     # 3. FETCH TARGET TABLE
+#                     get_table_query = text("SELECT table_name FROM public.tenant WHERE id = :tid")
+#                     target_table_name = conn.execute(get_table_query, {"tid": tenant_id}).scalar()
+#                     print(f"DEBUG: Target Table found in DB: {target_table_name}", flush=True)
+
+#                     if not target_table_name:
+#                         print("DEBUG: ERROR - No table_name found for this tenant!", flush=True)
+#                         trans.rollback()
+#                         return jsonify({"success": False, "error": "No target table configured"}), 400
+
+#                     # 4. PROCESS EXCEL FROM BYTES
+#                     # We pass file_bytes directly here
+#                     # xls = pd.ExcelFile(file_bytes, engine='openpyxl')
+#                     # print(f"DEBUG: Sheets found: {xls.sheet_names}", flush=True)
+#                     # Pass the buffer to ExcelFile
+#                     xls = pd.ExcelFile(file_buffer, engine='openpyxl')
+#                     print(f"DEBUG: Sheets found: {xls.sheet_names}", flush=True)
+
+#                     results = []
+#                     for sheet in xls.sheet_names:
+#                         df = xls.parse(sheet)
+#                         print(f"DEBUG: Processing sheet '{sheet}' with {len(df)} rows", flush=True)
+                        
+#                         if df.empty:
+#                             print(f"DEBUG: Skipping empty sheet: {sheet}", flush=True)
+#                             continue
+                        
+#                         df.columns = [c.replace(' ', '_').lower() for c in df.columns]
+#                         df['load_id'] = load_id  
+                        
+#                         # 5. ACTUAL INSERT
+#                         df.to_sql(
+#                             target_table_name, 
+#                             con=conn, 
+#                             schema=tenant_schema, 
+#                             if_exists='append', 
+#                             index=False
+#                         )
+#                         results.append(target_table_name)
+                    
+#                     # 6. FINAL COMMIT
+#                     conn.execute(text("UPDATE public.load_master SET status='Pass' WHERE id=:lid"), {"lid": load_id})
+#                     trans.commit()
+                    
+#                     print(f"DEBUG: Transaction Committed. Successfully uploaded to {target_table_name}", flush=True)
+#                     return jsonify({"success": True, "message": f"Data appended to {target_table_name}", "load_id": load_id}), 200        
+                
+#                 except Exception as inner_e:
+#                     trans.rollback()
+#                     print(f"DEBUG: CRITICAL ERROR: {str(inner_e)}", flush=True)
+#                     raise inner_e
+
+#         except Exception as e:
+#             print(f"DEBUG: OUTER ERROR: {str(e)}", flush=True)
+#             return jsonify({"success": False, "error": str(e)}), 500
+            
+#     return jsonify({"success": False, "error": "Invalid file"}), 400
+
+
+@app.route('/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
+
+    tenant_schema = session.get('tenant_schema')
+    tenant_id = session.get('tenant_id')
+    user_id = session.get('user_id', 1)
+
+    print(f"DEBUG: Tenant Schema: {tenant_schema}", flush=True)
+    print(f"DEBUG: Tenant ID: {tenant_id}", flush=True)
+    print(f"DEBUG: User ID: {user_id}", flush=True)
+
     if 'excel_file' not in request.files:
         return jsonify({"success": False, "error": "No file part"}), 400
 
@@ -391,167 +575,245 @@ def upload_excel():
 
     if engine is None:
         return jsonify({"success": False, "error": "Database unavailable"}), 503
-    
-    # Get Context
-    tenant_schema = session.get('tenant_schema')
-    tenant_id = session.get('tenant_id') # We need to make sure login stores this!
-    user_id = session.get('user_id', 1) # Fallback, or fetch from session.get('user_id')
-
-    # Quick patch if you haven't updated login to store tenant_id yet:
-    # You might need to query it here or add it to session in the /login route.
-    if not tenant_id: 
-         # temporary lookup for safety
-         with engine.connect() as conn:
-             tenant_id = conn.execute(text(f"SELECT id FROM public.tenant WHERE schema_name=:s"), {"s":tenant_schema}).scalar()
 
     if not tenant_schema:
         return jsonify({"success": False, "error": "No tenant context found"}), 403
 
-    if file and allowed_file(file.filename):
+    if not file or not allowed_file(file.filename):
+        return jsonify({"success": False, "error": "Invalid file type. Only xlsx and csv allowed"}), 400
+
+    # Read file before opening DB connection
+    clean_filename = secure_filename(file.filename)
+    lower_filename = clean_filename.lower()
+    file_ext = clean_filename.rsplit('.', 1)[1].lower()
+    file_bytes = file.read()
+    file_buffer = io.BytesIO(file_bytes)
+
+    # ─────────────────────────────────────────
+    # Use ONE connection for everything
+    # ─────────────────────────────────────────
+    with engine.connect() as conn:
+        trans = conn.begin()
         try:
-            clean_filename = secure_filename(file.filename)
-            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
-            # with engine.connect() as conn:
-            #     trans = conn.begin()
-            #     try:
-            #         # 1. CREATE LOAD MASTER ENTRY (Public Schema)
-            #         # Status starts as 'Processing'
-            #         insert_master = text("""
-            #             INSERT INTO public.load_master (tenant_id, user_id, filename, status)
-            #             VALUES (:tid, :uid, :fname, 'Processing')
-            #             RETURNING id
-            #         """)
-            #         load_id = conn.execute(insert_master, {
-            #             "tid": tenant_id, "uid": user_id, "fname": clean_filename
-            #         }).scalar()
-                    
-            #         # 2. PROCESS FILE (Using Pandas)
-            #         xls = pd.ExcelFile(file.stream, engine='openpyxl')
-                    
-            #         # --- VALIDATION SIMULATION ---
-            #         # Here you would check for errors. 
-            #         # For MVP, let's assume if it reads, it passes.
-            #         # If you find errors, you would:
-            #         #   a) Insert into public.load_errors
-            #         #   b) Update load_master status = 'Fail'
-            #         #   c) trans.commit(), return jsonify({"error": "Validation Failed"})
-                    
-            #         # 3. IF SUCCESS: ARCHIVE TO S3
-            #         # Format: {tenant_id}_{load_id}_{datetime}.xlsx
-            #         # new_s3_name = f"{tenant_id}_{load_id}_{timestamp_str}.xlsx"
-            #         # s3_key = f"{tenant_schema}/{new_s3_name}"
-                    
-            #         # Reset file stream to 0 to read bytes for S3
-            #         # file.stream.seek(0)
-            #         # s3_client.upload_fileobj(file.stream, S3_BUCKET, s3_key)
-                    
-            #         # 4. SAVE TO PRIVATE DB
-            #         # Reset stream again for Pandas
-            #         file.stream.seek(0)
-                    
-            #         base_name = clean_filename.rsplit('.', 1)[0].lower().replace(' ', '_')
-            #         results = []
+            # Step 1 - Get tenant data
+            tenant_data = conn.execute(text("""
+                SELECT 
+                    id,
+                    "tenant_name",
+                    "schema_name",
+                    "table_name",
+                    "fileprefix",
+                    "DomainId"
+                FROM public.tenant
+                WHERE schema_name = :schema
+            """), {"schema": tenant_schema}).mappings().first()
 
-            #         for sheet in xls.sheet_names:
-            #             df = xls.parse(sheet)
-            #             if df.empty: continue
-                        
-            #             df.columns = [c.replace(' ', '_').lower() for c in df.columns]
-            #             df['load_id'] = load_id  # Traceability
-                        
-            #             # Naming logic
-            #             if len(xls.sheet_names) == 1:
-            #                 table_name = base_name
-            #             else:
-            #                 clean_sheet = sheet.lower().replace(' ', '_')
-            #                 table_name = f"{base_name}_{clean_sheet}"
+            if not tenant_data:
+                trans.rollback()
+                return jsonify({"success": False, "error": "Invalid tenant configuration"}), 400
 
-            #             df.to_sql(table_name, con=conn, schema=tenant_schema, if_exists='append', index=False)
-            #             results.append(table_name)
-                    
-            #         # 5. UPDATE STATUS TO PASS
-            #         conn.execute(text("UPDATE public.load_master SET status='Pass' WHERE id=:lid"), {"lid": load_id})
-                    
-            #         trans.commit()
-            #         return jsonify({"success": True, "message": "Processed & Archived", "load_id": load_id}), 200
+            tenant_id = tenant_data["id"]
+            target_table_name = tenant_data["table_name"]
+            file_prefix = tenant_data["fileprefix"]
 
+            print(f"DEBUG: File prefix expected: {file_prefix}", flush=True)
+            print(f"DEBUG: File name received: {clean_filename}", flush=True)
 
-            file_bytes = file.read()
-            file_buffer = io.BytesIO(file_bytes)
-            print(f"DEBUG: File read successfully. Size: {len(file_bytes)} bytes", flush=True)
+            # Step 2 - Validate file prefix
+            if not lower_filename.startswith(file_prefix.lower()):
+                trans.rollback()
+                return jsonify({
+                    "success": False,
+                    "error": f"Invalid file name. File must start with prefix '{file_prefix}'.",
+                    "example": f"{file_prefix}_2026_01.xlsx"
+                }), 400
 
-            with engine.connect() as conn:
-                trans = conn.begin()
-                try:
-                    # 2. CREATE LOAD MASTER ENTRY
-                    insert_master = text("""
-                        INSERT INTO public.load_master (tenant_id, user_id, filename, status)
-                        VALUES (:tid, :uid, :fname, 'Processing')
-                        RETURNING id
-                    """)
-                    load_id = conn.execute(insert_master, {
-                        "tid": tenant_id, "uid": user_id, "fname": clean_filename
-                    }).scalar()
-                    print(f"DEBUG: Created Load ID: {load_id}", flush=True)
+            # Step 3 - Create load master entry
+            load_id = conn.execute(text("""
+                INSERT INTO public.load_master (tenant_id, user_id, filename, status)
+                VALUES (:tid, :uid, :fname, 'Processing')
+                RETURNING id
+            """), {
+                "tid": tenant_id,
+                "uid": user_id,
+                "fname": clean_filename
+            }).scalar()
 
-                    # 3. FETCH TARGET TABLE
-                    get_table_query = text("SELECT table_name FROM public.tenant WHERE id = :tid")
-                    target_table_name = conn.execute(get_table_query, {"tid": tenant_id}).scalar()
-                    print(f"DEBUG: Target Table found in DB: {target_table_name}", flush=True)
+            print(f"DEBUG: Load ID created: {load_id}", flush=True)
 
-                    if not target_table_name:
-                        print("DEBUG: ERROR - No table_name found for this tenant!", flush=True)
+            # Step 4 - Read file into dataframes
+            if file_ext == 'xlsx':
+                xls = pd.ExcelFile(file_buffer, engine='openpyxl')
+                dataframes = [xls.parse(sheet, dtype=str) for sheet in xls.sheet_names]
+            elif file_ext == 'csv':
+                file_buffer.seek(0)
+                dataframes = [pd.read_csv(file_buffer, dtype=str)]
+            else:
+                trans.rollback()
+                return jsonify({"success": False, "error": "Unsupported file format"}), 400
+
+            # Step 5 - Process each dataframe
+            excel_max_date = None
+            for df in dataframes:
+                if df.empty:
+                    continue
+
+                df.columns = [c.strip() for c in df.columns]
+                print(f"DEBUG: Columns in file: {list(df.columns)}", flush=True)
+
+                # Get DB columns
+                table_columns = conn.execute(text("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = :schema
+                    AND table_name = :table
+                """), {
+                    "schema": tenant_schema,
+                    "table": target_table_name
+                }).scalars().all()
+
+                print(f"DEBUG: DB columns: {table_columns}", flush=True)
+
+                # Filter to matching columns only
+                df = df[[col for col in df.columns if col in table_columns]].copy()
+
+                if 'load_id' in table_columns:
+                    df['load_id'] = load_id
+
+                # Date handling
+                if 'BillDate' in df.columns:
+                    df['BillDate'] = pd.to_datetime(
+                        df['BillDate'], errors='coerce'
+                    ).dt.strftime('%d-%m-%Y')
+
+                    if df['BillDate'].isna().any():
                         trans.rollback()
-                        return jsonify({"success": False, "error": "No target table configured"}), 400
+                        return jsonify({
+                            "success": False,
+                            "error": "Invalid BillDate detected in uploaded file."
+                        }), 400
 
-                    # 4. PROCESS EXCEL FROM BYTES
-                    # We pass file_bytes directly here
-                    # xls = pd.ExcelFile(file_bytes, engine='openpyxl')
-                    # print(f"DEBUG: Sheets found: {xls.sheet_names}", flush=True)
-                    # Pass the buffer to ExcelFile
-                    xls = pd.ExcelFile(file_buffer, engine='openpyxl')
-                    print(f"DEBUG: Sheets found: {xls.sheet_names}", flush=True)
+                    excel_max_date = pd.to_datetime(
+                        df['BillDate'], format='%d-%m-%Y'
+                    ).max().date()
 
-                    results = []
-                    for sheet in xls.sheet_names:
-                        df = xls.parse(sheet)
-                        print(f"DEBUG: Processing sheet '{sheet}' with {len(df)} rows", flush=True)
-                        
-                        if df.empty:
-                            print(f"DEBUG: Skipping empty sheet: {sheet}", flush=True)
-                            continue
-                        
-                        df.columns = [c.replace(' ', '_').lower() for c in df.columns]
-                        df['load_id'] = load_id  
-                        
-                        # 5. ACTUAL INSERT
-                        df.to_sql(
-                            target_table_name, 
-                            con=conn, 
-                            schema=tenant_schema, 
-                            if_exists='append', 
-                            index=False
-                        )
-                        results.append(target_table_name)
-                    
-                    # 6. FINAL COMMIT
-                    conn.execute(text("UPDATE public.load_master SET status='Pass' WHERE id=:lid"), {"lid": load_id})
-                    trans.commit()
-                    
-                    print(f"DEBUG: Transaction Committed. Successfully uploaded to {target_table_name}", flush=True)
-                    return jsonify({"success": True, "message": f"Data appended to {target_table_name}", "load_id": load_id}), 200        
-                
-                except Exception as inner_e:
-                    trans.rollback()
-                    print(f"DEBUG: CRITICAL ERROR: {str(inner_e)}", flush=True)
-                    raise inner_e
+                    print(f"DEBUG: Excel max date: {excel_max_date}", flush=True)
+
+                    # Check against DB max date
+                    db_max_date = conn.execute(text(f"""
+                        SELECT MAX(dd."Fulldate")
+                        FROM "{tenant_schema}"."DimDate" dd
+                        JOIN "{tenant_schema}"."FactSalesMaster" fsd
+                        ON fsd."DateFrKey" = dd."DateKey"
+                    """)).scalar()
+
+                    print(f"DEBUG: DB max date: {db_max_date}", flush=True)
+
+                    if db_max_date is not None and excel_max_date <= db_max_date:
+                        trans.rollback()
+                        return jsonify({
+                            "success": False,
+                            "error": f"Data for date {excel_max_date} already exists. Upload data after {db_max_date}."
+                        }), 400
+
+                if 'LastPurDate' in df.columns:
+                    df['LastPurDate'] = pd.to_datetime(
+                        df['LastPurDate'], errors='coerce'
+                    ).dt.strftime('%d-%m-%Y')
+
+                # Truncate and insert
+                conn.execute(text(
+                    f'TRUNCATE TABLE "{tenant_schema}"."{target_table_name}" RESTART IDENTITY'
+                ))
+
+                df.to_sql(
+                    target_table_name,
+                    con=conn,
+                    schema=tenant_schema,
+                    if_exists='append',
+                    index=False
+                )
+
+                print(f"DEBUG: Data inserted into {target_table_name}", flush=True)
+
+            # Step 6 - Run stored procedures
+            print("DEBUG: Running procedures...", flush=True)
+
+            conn.execute(text(f"""
+                CALL "{tenant_schema}".sp_batch_insert_dummy_to_stagging_to_dim(200000, 1, 0)
+            """))
+
+            if excel_max_date:
+                conn.execute(text(f"""
+                    CALL "{tenant_schema}".refresh_dimdate_offsets(:max_date)
+                """), {"max_date": excel_max_date})
+
+            conn.execute(text(f"""
+                CALL "{tenant_schema}".refresh_all_mvs()
+            """))
+
+            # Step 7 - Update load master and commit
+            conn.execute(text("""
+                UPDATE public.load_master SET status='Pass' WHERE id=:lid
+            """), {"lid": load_id})
+
+            trans.commit()
+            print("DEBUG: Transaction committed successfully ✅", flush=True)
+
+            # Clear Superset cache
+            try:
+                r = redis.from_url(os.getenv("REDIS_URL"))
+                for key in r.scan_iter("superset*"):
+                    r.delete(key)
+                print("DEBUG: Superset cache cleared ✅", flush=True)
+            except Exception as cache_err:
+                print(f"DEBUG: Cache clear failed (non-critical): {cache_err}", flush=True)
+
+            return jsonify({
+                "success": True,
+                # "message": f"Data uploaded successfully to {target_table_name}",
+                "message": f"Data uploaded successfully. Please Go To The Dashboard",
+                "load_id": load_id
+            }), 200
 
         except Exception as e:
-            print(f"DEBUG: OUTER ERROR: {str(e)}", flush=True)
+            try:
+                trans.rollback()
+            except:
+                pass
+            print(f"DEBUG: ERROR during upload: {str(e)}", flush=True)
+            import traceback
+            traceback.print_exc()
             return jsonify({"success": False, "error": str(e)}), 500
-            
-    return jsonify({"success": False, "error": "Invalid file"}), 400
+
+
+@app.route("/branding", methods=["GET"])
+@login_required
+def get_branding():
+    try:
+        tenant_id = session.get("tenant_id")
+
+        if not tenant_id:
+            return jsonify({"error": "No tenant context"}), 400
+
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT logo_url, branding_name
+                FROM public.tenant_templates
+                WHERE id = :tid
+            """), {"tid": tenant_id}).mappings().first()
+
+        if not result:
+            return jsonify({"error": "Branding not found"}), 404
+
+        return jsonify({
+            "logo_url": result["logo_url"],
+            "branding_name": result["branding_name"]
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+#-----------------------------------------------------------------------------------------    
 
 
 ## This Is The External API To Truncate A Table (Hardcoded)
