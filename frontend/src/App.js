@@ -65,7 +65,7 @@ function App() {
 
 const loadBranding = async () => {
   try {
-    const response = await api.get("/api/branding");
+    const response = await api.get("/branding");
     const { logo_url, branding_name } = response.data;
     console.log("Calling branding API...", response.data);
     setLogoUrl(logo_url);
