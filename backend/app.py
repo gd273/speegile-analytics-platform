@@ -57,12 +57,14 @@ print("======================================================================")
 #configures how Flask sessions are stored, secured, scoped, and expired.
 # server side configuration using redis
 app.config.update(
-    SESSION_TYPE='filesystem',
+    SESSION_TYPE='redis',
     SESSION_REDIS=redis.from_url(REDIS_URL),
     SESSION_COOKIE_NAME='flask_session',
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='LAX',
-    SESSION_COOKIE_SECURE=False,
+    # SESSION_COOKIE_SAMESITE='LAX',
+    SESSION_COOKIE_SAMESITE='None',
+    # SESSION_COOKIE_SECURE=False,
+    SESSION_COOKIE_SECURE=True,
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
     SESSION_PERMANENT=False,
     SESSION_COOKIE_DOMAIN=None
