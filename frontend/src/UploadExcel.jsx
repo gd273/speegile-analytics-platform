@@ -36,7 +36,7 @@ const UploadExcel = ({ navigate }) => {
 
     try {
       // Use axios directly with full config
-      const response = await api.post("/api/upload-excel", formData, {
+      const response = await api.post("/upload-excel", formData, {
         withCredentials: true,  // Explicitly set
         headers: {
           'Content-Type': 'multipart/form-data',
