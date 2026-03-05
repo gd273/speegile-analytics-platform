@@ -554,7 +554,7 @@ def generate_guest_token():
 #     return jsonify({"success": False, "error": "Invalid file"}), 400
 
 
-@app.route('/upload-excel', methods=['POST'])
+@app.route('/api/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
 
@@ -787,7 +787,7 @@ def upload_excel():
             return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route("/branding", methods=["GET"])
+@app.route("/api/branding", methods=["GET"])
 @login_required
 def get_branding():
     try:
