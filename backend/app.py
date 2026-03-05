@@ -57,12 +57,12 @@ print("======================================================================")
 #configures how Flask sessions are stored, secured, scoped, and expired.
 # server side configuration using redis
 app.config.update(
-    SESSION_TYPE='redis',
+    SESSION_TYPE='filesystem',
     SESSION_REDIS=redis.from_url(REDIS_URL),
     SESSION_COOKIE_NAME='flask_session',
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='None',
-    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SAMESITE='LAX',
+    SESSION_COOKIE_SECURE=False,
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
     SESSION_PERMANENT=False,
     SESSION_COOKIE_DOMAIN=None
@@ -73,17 +73,34 @@ Session(app)
 raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")
 CORS_ORIGINS = [o.strip() for o in raw_origins.split(",") if o.strip()]
 # allow selected websites to connect to, https methods, headers
-CORS(app,
-     resources={r"/*": {
-         "origins": CORS_ORIGINS,
-         "supports_credentials": True,
-         "allow_headers": ["Content-Type", "Authorization"],
-         "expose_headers": ["Set-Cookie"],
-         "methods": ["GET", "POST", "OPTIONS"],
-         "allow_credentials": True
-     }},
-     supports_credentials=True
+# CORS(app,
+#      resources={r"/*": {
+#          "origins": CORS_ORIGINS,
+#          "supports_credentials": True,
+#          "allow_headers": ["Content-Type", "Authorization"],
+#          "expose_headers": ["Set-Cookie"],
+#          "methods": ["GET", "POST", "OPTIONS"],
+#          "allow_credentials": True
+#      }},
+#      supports_credentials=True
+# )
+
+CORS(
+    app,
+    supports_credentials=True,
+    resources={
+        r"/api/*": {
+            "origins": [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000"
+            ],
+            "methods": ["GET", "POST", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "expose_headers": ["Set-Cookie"],
+        }
+    }
 )
+
 S3_BUCKET = os.getenv("S3_BUCKET_NAME", "client-analytics-data-storage")
 # s3 client object
 s3_client = boto3.client(
@@ -212,7 +229,7 @@ def login_required(f):
 # ---------------------------------------------------------
 # NEW: DB-BASED LOGIN
 # ---------------------------------------------------------
-@app.route("/login", methods=["POST"])
+@app.route("/api/login", methods=["POST"])
 def login():
     data = request.get_json()
     username = data.get("username")
@@ -233,8 +250,8 @@ def login():
                     t.schema_name, 
                     t.id as tenant_pk,  -- <--- VITAL CHANGE
                     tpl.logo_url
-                FROM public.users u
-                JOIN public.tenants t ON u.tenant_id = t.id
+                FROM public.user u
+                JOIN public.tenant t ON u.tenant_id = t.id
                 LEFT JOIN public.tenant_templates tpl ON t.id = tpl.tenant_id
                 WHERE u.email = :u
             """)
@@ -271,12 +288,12 @@ def login():
         print(f"Login Error: {e}")
         return jsonify({"error": "Server error during login"}), 500
 
-@app.route("/logout", methods=["POST"])
+@app.route("/api/logout", methods=["POST"])
 def logout():
     session.clear()
     return jsonify({"success": True}), 200
 
-@app.route("/check-auth", methods=["GET"])
+@app.route("/api/check-auth", methods=["GET"])
 def check_auth():
     if 'user' in session:
         return jsonify({
@@ -294,7 +311,7 @@ def check_auth():
 # ---------------------------------------------------------
 # DASHBOARDS ENDPOINT
 # ---------------------------------------------------------
-@app.route("/dashboards", methods=["GET"])
+@app.route("/api/dashboards", methods=["GET"])
 @login_required
 def get_filtered_dashboards():
     user_roles = session.get('roles', [])
@@ -326,7 +343,7 @@ def get_filtered_dashboards():
 # ---------------------------------------------------------
 # GUEST TOKEN ENDPOINT
 # ---------------------------------------------------------
-@app.route("/guest-token", methods=["GET"])
+@app.route("/api/guest-token", methods=["GET"])
 @login_required
 def generate_guest_token():
     dashboard_id_str = request.args.get("dashboardId")
@@ -359,7 +376,7 @@ def generate_guest_token():
 # ---------------------------------------------------------
 # UPLOAD EXCEL (Schema Aware)
 # ---------------------------------------------------------
-@app.route('/upload-excel', methods=['POST'])
+@app.route('/api/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
     if 'excel_file' not in request.files:
@@ -382,7 +399,7 @@ def upload_excel():
     if not tenant_id: 
          # temporary lookup for safety
          with engine.connect() as conn:
-             tenant_id = conn.execute(text(f"SELECT id FROM public.tenants WHERE schema_name=:s"), {"s":tenant_schema}).scalar()
+             tenant_id = conn.execute(text(f"SELECT id FROM public.tenant WHERE schema_name=:s"), {"s":tenant_schema}).scalar()
 
     if not tenant_schema:
         return jsonify({"success": False, "error": "No tenant context found"}), 403
@@ -476,7 +493,7 @@ def upload_excel():
                     print(f"DEBUG: Created Load ID: {load_id}", flush=True)
 
                     # 3. FETCH TARGET TABLE
-                    get_table_query = text("SELECT table_name FROM public.tenants WHERE id = :tid")
+                    get_table_query = text("SELECT table_name FROM public.tenant WHERE id = :tid")
                     target_table_name = conn.execute(get_table_query, {"tid": tenant_id}).scalar()
                     print(f"DEBUG: Target Table found in DB: {target_table_name}", flush=True)
 

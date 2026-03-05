@@ -27,26 +27,7 @@ function App() {
   const location = useLocation();
 
   // Check Auth on Load
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  // --- NEW: CLICK OUTSIDE LISTENER ---
-  // If user clicks anywhere on the screen that is NOT the dropdown, close it.
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-  // -----------------------------------
-
-  const checkAuth = async () => {
+  const checkAuth = React.useCallback(async () => {
     try {
       const response = await api.get('/check-auth');
       if (response.data.authenticated) {
@@ -64,7 +45,26 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  // --- NEW: CLICK OUTSIDE LISTENER ---
+  // If user clicks anywhere on the screen that is NOT the dropdown, close it.
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+  // -----------------------------------
 
   const fetchDashboards = async () => {
     try {
