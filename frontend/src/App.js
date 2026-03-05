@@ -3,10 +3,15 @@ import api from "./api";
 import SupersetChart from "./SupersetChart";
 import Login from "./Login";
 import UploadExcel from "./UploadExcel";
-import { LogOut, Home, UploadCloud, Loader2, ChevronDown } from "lucide-react"; 
+import { LogOut, Home, UploadCloud, Loader2, ChevronDown, Download } from "lucide-react"; 
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+// const [isDownloading, setIsDownloading] = useState(false);
 
 console.log("DEBUG: REACT_APP_API_BASE_URL =", process.env.REACT_APP_API_BASE_URL);
+console.log("DEBUG: REACT_APP_SUPERSET_BASE_URL =", process.env.REACT_APP_SUPERSET_BASE_URL);
+
 
 // --- Main App Wrapper ---
 function App() {
@@ -21,36 +26,28 @@ function App() {
   // --- NEW: DROPDOWN STATE ---
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null); // Used to detect clicks outside the menu
+
+  // --- Logo's And Branding_Name ---
+  const [logoUrl, setLogoUrl] = useState("");
+  const [brandingName, setBrandingName] = useState("");
+  const [defaultLogoUrl, setDefaultLogoUrl] = useState("https://speegile-tenants.s3.ap-south-1.amazonaws.com/tenant-logo/SpeegileLogo.jpeg"); // Fallback logo
+  const [defaultBrandingName, setDefaultBrandingName] = useState("Speegile Analytics"); // Fallback branding name 
+
   // ---------------------------
 
   const navigate = useNavigate();
   const location = useLocation();
 
   // Check Auth on Load
-  const checkAuth = React.useCallback(async () => {
-    try {
-      const response = await api.get('/check-auth');
-      if (response.data.authenticated) {
-        setIsAuthenticated(true);
-        setUser(response.data.user);
-        fetchDashboards(); 
-      } else {
-        setIsAuthenticated(false);
-        setUser(null);
-      }
-    } catch (err) {
-      console.error("Auth check failed:", err);
-      setIsAuthenticated(false);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    checkAuth();
   }, []);
 
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
-
+  if (isAuthenticated) {
+    loadBranding();
+  }
+}, [isAuthenticated]);
   // --- NEW: CLICK OUTSIDE LISTENER ---
   // If user clicks anywhere on the screen that is NOT the dropdown, close it.
   useEffect(() => {
@@ -66,12 +63,47 @@ function App() {
   }, []);
   // -----------------------------------
 
+const loadBranding = async () => {
+  try {
+    const response = await api.get("/api/branding");
+    const { logo_url, branding_name } = response.data;
+    console.log("Calling branding API...", response.data);
+    setLogoUrl(logo_url);
+    setBrandingName(branding_name);
+  } catch (error) {
+    console.error("Failed to load branding:", error);
+  }
+};
+
+
+  const checkAuth = async () => {
+  try {
+    const response = await api.get('/check-auth');
+    if (response.data.authenticated) {
+      setIsAuthenticated(true);
+      setUser(response.data.user);
+      fetchDashboards();
+      await loadBranding();   // 🔥 Load branding after auth
+    } else {
+      setIsAuthenticated(false);
+      setUser(null);
+    }
+  } catch (err) {
+    console.error("Auth check failed:", err);
+    setIsAuthenticated(false);
+    setUser(null);
+  } finally {
+    setLoading(false);
+  }
+};
+
   const fetchDashboards = async () => {
     try {
       const response = await api.get('/dashboards');
       if (response.data.success) {
         const dashboardList = response.data.dashboards.map(dash => ({
           id: dash.embedded_uuid,
+          numericId: dash.id,
           title: dash.dashboard_title,
           url: dash.url,
           roles: dash.roles
@@ -87,12 +119,15 @@ function App() {
     }
   };
 
-  const handleLoginSuccess = (userData) => {
-    setIsAuthenticated(true);
-    setUser(userData);
-    fetchDashboards(); 
-    navigate('/dashboards');
-  };
+  
+
+  const handleLoginSuccess = async (userData) => {
+  setIsAuthenticated(true);
+  setUser(userData);
+  fetchDashboards();
+  await loadBranding();  // 👈 ADD THIS
+  navigate('/dashboards');
+};
 
   const handleLogout = async () => {
     try {
@@ -136,7 +171,15 @@ function App() {
         
         <div className="flex items-center gap-8">
           <div className="flex-shrink-0">
-             <img src="/SpeegileLogo.jpeg" alt="Speegile Logo" className="w-32 h-auto object-contain" />
+             {/* <img src="/SpeegileLogo.jpeg" alt="Speegile Logo" className="w-32 h-auto object-contain" /> */}
+             <img
+                  src={logoUrl || defaultLogoUrl}
+                  alt="Company Logo"
+                  className="w-32 h-auto object-contain"
+                  onError={(e) => {
+                    e.target.onerror = null; // prevent infinite loop
+                    e.target.src = defaultLogoUrl;}}/>
+
           </div>
           
           <div className="flex items-center gap-4">
@@ -150,7 +193,7 @@ function App() {
                   }`}
                 >
                   <Home className="w-4 h-4" />
-                  Dashboards
+                  Dashboard's
                   <ChevronDown 
                     className={`w-4 h-4 ml-1 opacity-70 transition-transform duration-200 ${isDropdownOpen ? 'transform rotate-180' : ''}`} 
                   />
@@ -181,8 +224,8 @@ function App() {
                   </div>
                 )}
             </div>
-            
-                {/* Pending To Add New Code */}
+            {/* -------------------------------------- */}
+
             <Link
               to="/upload"
               className={`flex items-center gap-3 p-3 rounded-lg transition ${
@@ -192,17 +235,20 @@ function App() {
               <UploadCloud className="w-4 h-4" />
               Upload Data
             </Link>
-
-            
           </div>
         </div>
 
         {/* Center Title */}
         <div className="absolute left-1/2 transform -translate-x-1/2 pointer-events-none">
+           {/* <span className="text-xl font-bold text-gray-800 tracking-tight">
+             Brizz Enterprise
+           </span> */}
+
            <span className="text-xl font-bold text-gray-800 tracking-tight">
-              Speegile Analytics
-             {/* In Future We Will Make This Dynamic*/}
-           </span>
+              {brandingName && brandingName.trim() !== ""
+                ? brandingName
+                : defaultBrandingName}
+          </span>
         </div>
         
         {/* Right Side: Logout */}
@@ -242,8 +288,49 @@ function App() {
 
 // --- Simplified Dashboard View ---
 function DashboardView({ dashboards, selectedId }) {
+  const [isDownloading, setIsDownloading] = useState(false);
   const activeDashboard = dashboards.find(d => d.id === selectedId);
+  const dashboardRef = useRef(null); // Reference to the dashboard container
+// const demo = ()=>{
+//   alert("Download PDF functionality coming soon!");
+// }
 
+const handleDownloadPDF = async () => {
+  if (!activeDashboard) return;
+  
+  setIsDownloading(true); // add this state
+  
+  try {
+    const response = await api.get('/download-dashboard-pdf', {
+      params: { 
+        dashboardId: activeDashboard.numericId,  // numeric ID from fetchDashboards
+        title: activeDashboard.title 
+      },
+      responseType: 'blob',  // important — tells axios to expect binary data
+      timeout: 60000         // 60s timeout for screenshot generation
+    });
+
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${activeDashboard.title || 'Dashboard'}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+  } catch (error) {
+    console.error("PDF download failed:", error);
+    alert("Failed to generate PDF. Please try again.");
+  } finally {
+    setIsDownloading(false);
+  }
+};
+
+
+
+// DownloadPDF functionality coming soon!
   return (
     <div className="w-full">
       {dashboards.length === 0 && (
@@ -252,17 +339,42 @@ function DashboardView({ dashboards, selectedId }) {
         </div>
       )}
 
+
       {activeDashboard ? (
         <div key={activeDashboard.id} className="mb-8">
            {/* Title above the chart */}
-           <div className="mb-4">
+           <div className="mb-4 flex items-center justify-between">
               <h2 className="text-2xl font-semibold text-gray-800">{activeDashboard.title}</h2>
+              {/* <button 
+                onClick={handleDownloadPDF}
+                disabled={isDownloading}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating PDF...
+                  </>
+                ) : (
+                  'Download Dashboard PDF'  
+                )}
+              </button> */}
+              
+
+           </div>
+
+           {/* THE CAPTURE AREA */}
+           <div ref={dashboardRef} className="bg-white p-4 rounded-xl shadow-sm">
+             <SupersetChart 
+               dashboardId={activeDashboard.id} 
+               chartTitle={activeDashboard.title} 
+             />
            </div>
            
-           <SupersetChart 
+           {/* <SupersetChart 
              dashboardId={activeDashboard.id} 
              chartTitle={activeDashboard.title} 
-           />
+           /> */}
         </div>
       ) : (
         dashboards.length > 0 && (
