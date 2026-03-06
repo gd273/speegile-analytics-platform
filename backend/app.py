@@ -731,7 +731,9 @@ def upload_excel():
                     con=conn,
                     schema=tenant_schema,
                     if_exists='append',
-                    index=False
+                    index=False,
+                    chunksize=1000, # Process 1000 rows at a time
+                    method='multi'
                 )
 
                 print(f"DEBUG: Data inserted into {target_table_name}", flush=True)
