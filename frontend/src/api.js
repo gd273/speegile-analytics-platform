@@ -3,7 +3,7 @@ const API_BASE = "https://backend-zr5v.onrender.com/api";
 const api = axios.create({
   withCredentials: true,
   baseURL: API_BASE,
-  timeout: 100000,
+  timeout: 600000,
   headers: {
     'Content-Type': 'application/json'
   }
