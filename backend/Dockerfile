@@ -27,4 +27,5 @@ EXPOSE 5000
 # CMD ["sh", "-c", "/app/wait-for-db.sh db 5432 30 && python app.py"]
 # CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
 # Do NOT use "flask run"
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "3", "--timeout", "120", "backend.app:app"]
+# CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "3", "--timeout", "120", "backend.app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--timeout", "600", "backend.app:app"]
