@@ -612,7 +612,7 @@ def generate_guest_token():
 #             traceback.print_exc()
 #             return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/upload-excel', methods=['POST'])
+@app.route('/api/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
 
