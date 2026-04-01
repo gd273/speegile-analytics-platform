@@ -11,7 +11,20 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
 
   const SUPERSET_DOMAIN = process.env.REACT_APP_SUPERSET_BASE_URL;
 
+  // ✅ FIX 2: Separate function that ALWAYS fetches a FRESH token from backend
+  const fetchFreshGuestToken = async () => {
+    const response = await api.get("/guest-token", {
+      params: { dashboardId },
+      timeout: 10000,
+    });
+    const { guestToken } = response.data;
+    if (!guestToken) {
+      throw new Error("No guest token returned from backend");
+    }
+    return guestToken; // ← Returns fresh token every time SDK calls this
+  };
 
+  
   // 🔹 Validate JWT expiration + log details
   const validateToken = (token) => {
     try {
@@ -58,7 +71,11 @@ const SupersetChart = ({ dashboardId, chartTitle }) => {
           id: dashboardId.toString(),
           supersetDomain: SUPERSET_DOMAIN,
           mountPoint: containerRef.current,
-          fetchGuestToken: async () => guestToken,
+          // fetchGuestToken: async () => guestToken,
+          // ✅ FIX 2: Pass the function reference, NOT a cached token
+          // SDK will auto-call this whenever token expires → gets fresh token!
+          fetchGuestToken: fetchFreshGuestToken,
+          
           dashboardUiConfig: {
             hideTitle: true,
             hideTab: true,
