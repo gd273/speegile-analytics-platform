@@ -411,7 +411,7 @@ CORS_OPTIONS = {
 
 OVERRIDE_HTTP_HEADERS = {
     "X-Frame-Options": "ALLOWALL",
-    # This tells the browser "It is okay to show this in an iframe on my frontend"
+    # This tells the browser, "It is okay to show this in an iframe on my frontend"
     "Content-Security-Policy": f"frame-ancestors 'self' {FRONTEND_URL} http://localhost:3000"
 }
 
@@ -458,12 +458,18 @@ CELERY_CONFIG = CeleryConfig
 if REDIS_URL:
     CACHE_CONFIG = {
         "CACHE_TYPE": "RedisCache",
-        "CACHE_DEFAULT_TIMEOUT": 300,
+        "CACHE_DEFAULT_TIMEOUT": 86400, #increasing the time from 5 minutes to 24-hours
         "CACHE_KEY_PREFIX": "superset_",
         "CACHE_REDIS_URL": REDIS_URL,
     }
     DATA_CACHE_CONFIG = CACHE_CONFIG
-    FILTER_STATE_CACHE_CONFIG = CACHE_CONFIG
+    FILTER_STATE_CACHE_CONFIG = {       #increase the timeout for filtering
+        "CACHE_TYPE": "RedisCache",
+        "CACHE_DEFAULT_TIMEOUT": 86400, # ✅ Change 300 → 86400
+        "CACHE_KEY_PREFIX": "superset_filter_",
+        "CACHE_REDIS_URL": REDIS_URL,
+    }
+    
     EXPLORE_FORM_DATA_CACHE_CONFIG = CACHE_CONFIG
 
 
