@@ -354,8 +354,9 @@ def generate_guest_token():
     
     if not dashboard_id_str:
         return jsonify({"error": "dashboardId is required"}), 400
-    
-    expiration_time = int(time.time()) + 300 
+
+    # ✅ FIX 1: Increased from 300 → 3600 (1 hour)
+    expiration_time = int(time.time()) + 3600 
     
     payload = {
         "user": {
