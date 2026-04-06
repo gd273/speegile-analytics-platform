@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import api from "./api";
 import SupersetChart from "./SupersetChart";
 import Login from "./Login";
@@ -26,6 +26,8 @@ function App() {
   // --- NEW: DROPDOWN STATE ---
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null); // Used to detect clicks outside the menu
+  const [hoveredCategory, setHoveredCategory] = useState(null);
+  const flyoutTimeoutRef = useRef(null);
 
   // --- Logo's And Branding_Name ---
   const [logoUrl, setLogoUrl] = useState("");
@@ -50,6 +52,18 @@ function App() {
 }, [isAuthenticated]);
   // --- NEW: CLICK OUTSIDE LISTENER ---
   // If user clicks anywhere on the screen that is NOT the dropdown, close it.
+
+const groupedDashboards = useMemo(() => {
+    return dashboards.reduce((acc, dash) => {
+        const cat = dash.category || "General";
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(dash);
+        return acc;
+    }, {});
+}, [dashboards]);
+
+
+  
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -106,7 +120,8 @@ const loadBranding = async () => {
           numericId: dash.id,
           title: dash.dashboard_title,
           url: dash.url,
-          roles: dash.roles
+          roles: dash.roles,
+          category: dash.category || "General"  // 👈 new ( Fetch the Category also )
         }));
         setDashboards(dashboardList);
 
@@ -185,6 +200,9 @@ const loadBranding = async () => {
           <div className="flex items-center gap-4">
             
             {/* --- DROPDOWN BUTTON (CLICK) --- */}
+            {/* Old Dropdown Code */}        
+
+            {/*
             <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)} // Toggle on click
@@ -199,7 +217,7 @@ const loadBranding = async () => {
                   />
                 </button>
 
-                {/* THE DROPDOWN MENU */}
+             
                 {isDropdownOpen && (
                   <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-50 transform origin-top-left animate-in fade-in zoom-in-95 duration-100">
                       <div className="py-2 max-h-96 overflow-y-auto">
@@ -224,6 +242,110 @@ const loadBranding = async () => {
                   </div>
                 )}
             </div>
+          */}
+            {/* New Drop Down Code */}            
+            <div className="relative" ref={dropdownRef}>
+
+                  {/* MAIN BUTTON */}
+                  <button
+                      onClick={() => {
+                          setIsDropdownOpen(!isDropdownOpen);
+                          setHoveredCategory(null);
+                      }}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition select-none ${
+                          isActive('/dashboards') || isDropdownOpen
+                              ? 'bg-blue-100 text-blue-700 font-semibold'
+                              : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                  >
+                      <Home className="w-4 h-4" />
+                      Dashboards
+                      <ChevronDown
+                          className={`w-4 h-4 ml-1 opacity-70 transition-transform duration-200 ${
+                              isDropdownOpen ? 'rotate-180' : ''
+                          }`}
+                      />
+                  </button>
+
+                  {/* DROPDOWN */}
+                  {isDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-1 flex z-50 shadow-xl rounded-lg">
+              
+                          {/* LEFT — Category List */}
+                          <div className="w-52 bg-white border border-gray-200 rounded-l-lg overflow-hidden">
+                              {Object.keys(groupedDashboards).length === 0 ? (
+                                  <p className="px-4 py-3 text-sm text-gray-500">
+                                      No dashboards available
+                                  </p>
+                              ) : (
+                                  Object.keys(groupedDashboards).map((category) => (
+                                      <div
+                                          key={category}
+                                          onMouseEnter={() => {
+                                              clearTimeout(flyoutTimeoutRef.current);
+                                              setHoveredCategory(category);
+                                          }}
+                                          onMouseLeave={() => {
+                                              flyoutTimeoutRef.current = setTimeout(() => {
+                                                  setHoveredCategory(null);
+                                              }, 150);
+                                          }}
+                                          className={`flex items-center justify-between px-4 py-3 cursor-pointer text-sm transition border-l-4 ${
+                                              hoveredCategory === category
+                                                  ? 'bg-blue-50 text-blue-700 border-blue-600 font-medium'
+                                                  : 'text-gray-700 border-transparent hover:bg-gray-50'
+                                          }`}
+                                      >
+                                          <span>{category}</span>
+                                          <span className="flex items-center gap-1">
+                                              <span className="text-xs text-gray-400">
+                                                  {groupedDashboards[category].length}
+                                              </span>
+                                              <ChevronDown className="w-3 h-3 -rotate-90 opacity-40" />
+                                          </span>
+                                      </div>
+                                  ))
+                              )}
+                          </div>
+              
+                          {/* RIGHT — Flyout Dashboard List */}
+                          {hoveredCategory && groupedDashboards[hoveredCategory] && (
+                              <div
+                                  onMouseEnter={() => clearTimeout(flyoutTimeoutRef.current)}
+                                  onMouseLeave={() => {
+                                      flyoutTimeoutRef.current = setTimeout(() => {
+                                          setHoveredCategory(null);
+                                      }, 150);
+                                  }}
+                                  className="w-64 bg-white border border-l-0 border-gray-200 rounded-r-lg overflow-hidden max-h-80 overflow-y-auto"
+                              >
+                                  {/* Flyout Header */}
+                                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 sticky top-0">
+                                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                          {hoveredCategory}
+                                      </p>
+                                  </div>
+              
+                                  {/* Dashboard Buttons */}
+                                  {groupedDashboards[hoveredCategory].map((dash) => (
+                                      <button
+                                          key={dash.id}
+                                          onClick={() => handleDashboardSelect(dash.id)}
+                                          className={`block w-full text-left px-4 py-3 text-sm transition border-l-4 hover:bg-gray-50 ${
+                                              selectedDashboardId === dash.id
+                                                  ? 'border-blue-600 text-blue-700 bg-blue-50 font-medium'
+                                                  : 'border-transparent text-gray-700'
+                                          }`}
+                                      >
+                                          {dash.title}
+                                      </button>
+                                  ))}
+                              </div>
+                          )}
+                      </div>
+                  )}
+              </div>
+            
             {/* -------------------------------------- */}
 
             <Link
