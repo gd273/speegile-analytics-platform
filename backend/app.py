@@ -335,6 +335,22 @@ def get_filtered_dashboards():
         } for d in filtered]
         
         embedded_dashboards = get_embedded_dashboard_uuid(dashboard_list, access_token)
+
+        # --- Fetch categories from DB ---
+        category_map = {}
+        if engine and embedded_dashboards:
+            dashboard_ids = [d.get('id') for d in embedded_dashboards if d.get('id')]
+            with engine.connect() as conn:
+                rows = conn.execute(text("""
+                    SELECT dashboard_id, category
+                    FROM public.dashboard_category_map
+                    WHERE dashboard_id = ANY(:ids)
+                """), {"ids": dashboard_ids}).fetchall()
+                category_map = {row.dashboard_id: row.category for row in rows}
+
+        # Attach category to each dashboard
+        for d in embedded_dashboards:
+            d['category'] = category_map.get(d.get('id'), 'General')
         
         return jsonify({
             "success": True,
