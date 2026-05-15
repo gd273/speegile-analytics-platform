@@ -1,12 +1,14 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
-    // ✅ Must include the path to all your component and script files
-    "./src/**/*.{js,jsx,ts,tsx}",
+  content: ["./src/**/*.{js,jsx,ts,tsx}"],
+  safelist: [
+    "translate-x-0",
+    "-translate-x-full",
+    "bg-opacity-50",
+    "rotate-180",
   ],
   theme: {
     extend: {},
   },
   plugins: [],
-}
-
+};

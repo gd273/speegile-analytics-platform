@@ -425,19 +425,32 @@ function App() {
         {/* ── MOBILE SLIDE-IN DRAWER (left side) ─────────────── */}
 
         {/* Overlay — dark background behind drawer */}
-        {isMobileMenuOpen && (
+        {/* {isMobileMenuOpen && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
             onClick={() => setIsMobileMenuOpen(false)} // click outside to close
           />
-        )}
+        )} */}
+
+        {isMobileMenuOpen && (
+              <div
+                className="fixed inset-0 z-40 md:hidden"
+                style={{ background: "rgba(0,0,0,0.5)" }}
+                onClick={() => setIsMobileMenuOpen(false)}
+              />
+            )}
 
         {/* Drawer */}
-        <div
+        {/* <div
           className={`fixed top-0 left-0 h-full w-72 bg-white z-50 shadow-2xl flex flex-col
               transform transition-transform duration-300 ease-in-out md:hidden
               ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
-        >
+        > */}
+
+        <div
+              className="fixed top-0 left-0 h-full w-72 bg-white z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out md:hidden"
+              style={{ transform: isMobileMenuOpen ? "translateX(0)" : "translateX(-100%)" }}
+          >
           {/* Drawer Header — Logo + Close button */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <img
