@@ -23,6 +23,9 @@ COPY . /app
 # Make the wait script executable
 RUN chmod +x /app/backend/wait-for-db.sh
 RUN pip install gunicorn
+
+ENV PYTHONPATH=/app/backend
+
 EXPOSE 5000
 # CMD ["sh", "-c", "/app/wait-for-db.sh db 5432 30 && python app.py"]
 # CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
