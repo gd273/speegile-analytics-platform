@@ -1,6 +1,6 @@
 import axios from 'axios';
-// const API_BASE = "https://backend-zr5v.onrender.com/api";
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = process.env.REACT_APP_API_BASE_URL || "https://backend-zr5v.onrender.com/api";
+// const API_BASE = "http://localhost:5000/api";
 const api = axios.create({
   withCredentials: true,
   baseURL: API_BASE,
