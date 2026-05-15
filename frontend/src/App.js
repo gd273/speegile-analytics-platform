@@ -234,7 +234,7 @@ function App() {
       {/* --- NAV BAR --- */}
       <nav className="w-full bg-white shadow-md border-b border-gray-200 relative z-50">
         {/* ── DESKTOP NAV (md and above) ─────────────────────── */}
-        <div className="hidden md:flex items-center justify-between p-4">
+        <div className="hidden lg:flex items-center justify-between p-4">
           {/* Left: Logo + Dropdowns */}
           <div className="flex items-center gap-8">
             <div className="flex-shrink-0">
@@ -389,7 +389,7 @@ function App() {
         </div>
 
         {/* ── MOBILE NAV (below md) ──────────────────────────── */}
-        <div className="flex md:hidden items-center justify-between px-4 py-3">
+        <div className="flex lg:hidden items-center justify-between px-4 py-3">
           {/* Hamburger Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -446,9 +446,9 @@ function App() {
               transform transition-transform duration-300 ease-in-out md:hidden
               ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
         > */}
-
+        {/* New Drawer */}
         <div
-              className="fixed top-0 left-0 h-full w-72 bg-white z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out md:hidden"
+              className="fixed top-0 left-0 h-full w-72 bg-white z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out lg:hidden"
               style={{ transform: isMobileMenuOpen ? "translateX(0)" : "translateX(-100%)" }}
           >
           {/* Drawer Header — Logo + Close button */}
