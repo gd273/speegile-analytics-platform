@@ -429,7 +429,7 @@ function TabGroup({ tabs, chartMap, cardProps, isMobile, renderRows,onTabChange 
 
 // ── Filter panel ────────────────────────────────────────────
 function FilterPanel({ filterDefs, activeFilters, dateFrom, dateTo, onFilterChange, onDateFromChange, onDateToChange, onReset }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   if (!filterDefs?.length) return null;
 
   const hasActive = Object.values(activeFilters).some(Boolean) || !!dateFrom;
