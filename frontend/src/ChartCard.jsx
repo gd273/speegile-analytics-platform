@@ -53,20 +53,7 @@ function buildFilterPayload(crossFilters, ownSliceId, isTable = false) {
     }));
 }
 
-// function buildFilterPayload(crossFilters, ownSliceId, knownCols = []) {
-//   return Object.entries(crossFilters)
-//     .filter(([, f]) => f.sourceChartId !== ownSliceId && f.value != null && f.value !== "")
-//     .filter(([col]) => {
-//       // ← NEW: only apply filter if column exists in this chart's dataset
-//       if (!knownCols.length) return true;  // if unknown, let it through
-//       return knownCols.some(c => c.toLowerCase() === col.toLowerCase());
-//     })
-//     .map(([col, f]) => ({
-//       col,
-//       op:  "IN",
-//       val: [f.value],
-//     }));
-// }
+
 
 // ─────────────────────────────────────────────────────────────
 //  Chart-type helper
@@ -889,8 +876,8 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
       sliceId,
       ...(dateFrom && dateTo ? { dateFrom, dateTo } : {}),
       activeFilters: Object.entries(activeFilters)
-        .filter(([, v]) => v != null && v !== "")
-        .map(([col, val]) => ({ col, op: "IN", val: [val] })),
+      .filter(([, v]) => Array.isArray(v) ? v.length > 0 : (v != null && v !== ""))
+      .map(([col, val]) => ({ col, op: "IN", val: Array.isArray(val) ? val : [val] })),
       crossFilters: crossFilterPayload,
     };
 
@@ -899,18 +886,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
         console.log(`Chart ${sliceId} received filters:`, body.crossFilters);
         console.log(`Chart ${sliceId} rows returned:`, res.data.data?.length);
         if (cancelRef.current) return;
-        // if (res.data.success && res.data.data?.length > 0) {
-        //   const rows         = res.data.data;
-        //   const metricLabels = extractMetricLabels(metricsProp);
-        //   const xk           = detectXKey(rows, xAxis, metricLabels, groupbyProp);
-        //   const sk           = detectSeriesKeys(rows, xk, metricLabels);
-        //   setData(rows);
-        //   setColnames(res.data.colnames || []);
-        //   setComputedXKey(xk);
-        //   setKeys(sk.length ? sk : Object.keys(rows[0]).filter(k => k !== xk && k !== "__seq__").slice(0, 8));
-        // } else {
-        //   setData([]); setKeys([]);
-        // }
+       
         if (res.data.success && res.data.data?.length > 0) {
             const rows         = res.data.data;
             const metricLabels = extractMetricLabels(metricsProp);
@@ -947,18 +923,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
   const type = getChartType(vizType);
   const xKey = computedXKey || "__seq__";
 
-  // const handleChartClick = (params) => {
-  //   if (!onCrossFilter) return;
-  //   let clickedName = "";
-  //   if (type === "pie" || type === "treemap" || type === "funnel") {
-  //     clickedName = params.name;
-  //   } else {
-  //     clickedName = params.name || params.data?.name || params.axisValue || "";
-  //   }
-  //   if (!clickedName) return;
-  //   const isSameValue = myFilter?.value === clickedName;
-  //   onCrossFilter(xKey, isSameValue ? null : clickedName, sliceId, title);
-  // };
+ 
 
   const handleChartClick = (params) => {
       console.log("CLICK →", { sliceId, type, name: params.name, col: xKey });
@@ -1133,31 +1098,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
 
 
 
-    // if (type === "bignum") {
-    //   const metricLabels = extractMetricLabels(metricsProp);
-    //   const allCols      = Object.keys(data[0]);
-    //   const numericCols  = allCols.filter(k => !isNaN(Number(data[0][k])) && !isTimestampMs(Number(data[0][k])));
-    //   const valueKey     = metricLabels.find(m => allCols.includes(m)) || numericCols[0] || allCols[0] || "";
-    //   const rawVal       = data[0]?.[valueKey] ?? 0;
-    //   const n            = Number(rawVal);
-    //   const displayVal   = fmtBigNum(rawVal, valueKey);
-    //   const subtitle     = cleanMetricLabel(String(valueKey || ""));
-    //   const isDate       = isTimestampMs(n);
-    //   const isPct        = isRatioValue(n, valueKey);
-    //   const fontSize     = isDate
-    //     ? Math.max(20, Math.min(32, height / 8))
-    //     : Math.max(32, Math.min(60, height / 5.5));
-    //   return (
-    //     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height, gap: 10, padding: "0 16px" }}>
-    //       <div style={{ fontSize, fontWeight: 800, color: isPct && n < 0 ? "#f87171" : "#1FA8C9", letterSpacing: isDate ? 0 : -2, lineHeight: 1, textAlign: "center" }}>
-    //         {displayVal}
-    //       </div>
-    //       <div style={{ fontSize: 11, color: "#64748b", fontWeight: 500, textAlign: "center", maxWidth: "90%", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-    //         {subtitle}
-    //       </div>
-    //     </div>
-    //   );
-    // }
+    
     if (type === "bignum") {
   const metricLabels = extractMetricLabels(metricsProp);
   const allCols      = Object.keys(data[0]);
@@ -1252,17 +1193,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
       );
     }
 
-    // return (
-    //   <ReactECharts
-    //     ref={echartsRef}
-    //     option={buildOption({ type, data, keys, xKey, selectedValue, initialKeys })}
-    //     style={{ height, width: "100%", cursor: onCrossFilter ? "pointer" : "default" }}
-    //     opts={{ renderer: "canvas" }}
-    //     onEvents={{ click: handleChartClick }}
-    //     notMerge
-    //     lazyUpdate={false}
-    //   />
-    // );
+    
 
 
 // // ── All / Inv buttons for line and area charts only ──────────────────────────────

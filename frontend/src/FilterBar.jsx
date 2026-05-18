@@ -13,7 +13,7 @@ export default function FilterBar({
   onReset,
 }) {
   const [filterDefs, setFilterDefs] = useState([]);
-  const [open,       setOpen]       = useState(true);
+  const [open,       setOpen]       = useState(false);
 
   useEffect(() => {
     if (!dashboardId) return;

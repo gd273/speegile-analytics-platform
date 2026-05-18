@@ -574,6 +574,7 @@ function App() {
 // --- Simplified Dashboard View ---
 function DashboardView({ dashboards, selectedId }) {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [pdfFn, setPdfFn] = useState(null);
   const activeDashboard = dashboards.find((d) => d.id === selectedId);
   const dashboardRef = useRef(null); // Reference to the dashboard container
   // const demo = ()=>{
@@ -627,7 +628,7 @@ function DashboardView({ dashboards, selectedId }) {
       {activeDashboard ? (
         <div key={activeDashboard.id} className="mb-8">
           {/* Title above the chart */}
-          <div className="mb-4 flex items-center justify-between">
+          {/* <div className="mb-4 flex items-center justify-between">
             <h2 className="text-2xl font-semibold text-gray-800">
               {activeDashboard.title}
             </h2>
@@ -645,7 +646,29 @@ function DashboardView({ dashboards, selectedId }) {
                   'Download Dashboard PDF'  
                 )}
               </button> */}
-          </div>
+          {/* </div> */} 
+
+          <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-2xl font-semibold text-gray-800">
+                {activeDashboard.title}
+              </h2>
+
+              {/* {pdfFn && (
+                <button
+                  onClick={pdfFn}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition"
+                  style={{
+                    border: "1px solid rgba(31,168,201,0.4)",
+                    background: "rgba(31,168,201,0.08)",
+                    color: "#1FA8C9",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Download className="w-4 h-4" />
+                  Download PDF
+                </button>
+              )} */}
+              </div>
 
           {/* THE CAPTURE AREA */}
           <div ref={dashboardRef} className="bg-white p-4 rounded-xl shadow-sm">
@@ -656,6 +679,7 @@ function DashboardView({ dashboards, selectedId }) {
             <DashboardChartsPage
               dashboardNumericId={activeDashboard.numericId}
               dashboardTitle={activeDashboard.title}
+              onPdfReady={setPdfFn}
             />
           </div>
 

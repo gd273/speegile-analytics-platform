@@ -69,11 +69,11 @@ CORS_ORIGINS = [o.strip() for o in raw_origins.split(",") if o.strip()]
 CORS(app,
      resources={r"/*": {
          "origins": CORS_ORIGINS,
-         "supports_credentials": True,
+        #  "supports_credentials": True,
          "allow_headers": ["Content-Type", "Authorization"],
          "expose_headers": ["Set-Cookie"],
          "methods": ["GET", "POST", "OPTIONS"],
-         "allow_credentials": True
+        #  "allow_credentials": True
      }},
      supports_credentials=True
 )
@@ -930,6 +930,17 @@ def get_chart_data():
         "LIKE", "ILIKE", "IS NULL", "IS NOT NULL", "TEMPORAL_RANGE",
     }
 
+    # def normalise_filter(f):
+    #     col = str(f.get("col", "")).strip()
+    #     op  = str(f.get("op", "IN")).upper().strip()
+    #     val = f.get("val")
+    #     if not col: return None
+    #     if op not in VALID_OPS: op = "IN"
+    #     if not isinstance(val, list): val = [val]
+    #     val = [v for v in val if v is not None and v != ""]
+    #     if not val and op not in ("IS NULL", "IS NOT NULL"): return None
+    #     return {"col": col, "op": op, "val": val}
+
     def normalise_filter(f):
         col = str(f.get("col", "")).strip()
         op  = str(f.get("op", "IN")).upper().strip()
@@ -937,6 +948,16 @@ def get_chart_data():
         if not col: return None
         if op not in VALID_OPS: op = "IN"
         if not isinstance(val, list): val = [val]
+
+        # ── Fix double-wrapped arrays: [['GORAI BRANCH']] → ['GORAI BRANCH'] ──
+        flat = []
+        for v in val:
+            if isinstance(v, list):
+                flat.extend(v)   # unwrap inner list
+            else:
+                flat.append(v)
+        val = flat
+
         val = [v for v in val if v is not None and v != ""]
         if not val and op not in ("IS NULL", "IS NOT NULL"): return None
         return {"col": col, "op": op, "val": val}
