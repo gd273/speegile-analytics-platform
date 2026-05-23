@@ -1,3 +1,4 @@
+from datetime import timedelta
 import pandas as pd
 from sqlalchemy import text
 
@@ -7,12 +8,178 @@ from db_utils import log_load_error
 # ---------------------------------------------------------
 # TENANT: shinde_shoes
 # ---------------------------------------------------------
-def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, excel_max_date, log_load_error, engine):
+# def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, excel_max_date, log_load_error, engine):
+
+#     # ─────────────────────────────────────────────────────────────
+#     # STEP 1: Location + Date Validation
+#     # Queries BASE TABLES directly — never the MV
+#     # MV refresh holds AccessExclusiveLock, base tables do not
+#     # ─────────────────────────────────────────────────────────────
+#     if 'LocationName' not in df.columns:
+#         raise ValueError("Column 'LocationName' not found in uploaded file.")
+
+#     file_locations = (
+#         df['LocationName']
+#         .dropna()
+#         .str.strip()
+#         .unique()
+#         .tolist()
+#     )
+#     file_locations = [loc for loc in file_locations if loc != '']
+
+#     if not file_locations:
+#         raise ValueError("No valid 'LocationName' found in uploaded file.")
+
+#     print(f"DEBUG [{tenant_schema}]: File locations: {file_locations}", flush=True)
+#     print(f"DEBUG [{tenant_schema}]: File max BillDate: {excel_max_date}", flush=True)
+
+#     validation_errors = []
+
+#     # ── Separate connection + base tables = zero lock conflict
+#     with engine.connect() as val_conn:
+#         for location in file_locations:
+#             print(f"DEBUG [{tenant_schema}]: Querying base tables for location '{location}'...", flush=True)
+
+#             db_max_date = val_conn.execute(text(f"""
+#                 SELECT MAX(dd."Fulldate")
+#                 FROM "{tenant_schema}"."FactSalesMaster" fsm
+#                 JOIN "{tenant_schema}"."DimDate" dd
+#                     ON fsm."DateFrKey" = dd."DateKey"
+#                 JOIN "{tenant_schema}"."DimLocation" dl
+#                     ON fsm."LocationFrKey" = dl."LocationKey"
+#                 WHERE TRIM(dl."locationName") = :loc
+#             """), {"loc": location}).scalar()
+
+#             print(f"DEBUG [{tenant_schema}]: DB max date for '{location}': {db_max_date}", flush=True)
+
+#             if db_max_date is None:
+#                 print(f"DEBUG [{tenant_schema}]: '{location}' is a new location, first upload allowed.", flush=True)
+#                 continue
+
+#             if hasattr(db_max_date, 'date'):
+#                 db_max_date = db_max_date.date()
+
+#             if excel_max_date <= db_max_date:
+#                 validation_errors.append(
+#                     f"Location '{location}': file max date "
+#                     f"({excel_max_date.strftime('%d-%m-%Y')}) must be after "
+#                     f"DB max date ({db_max_date.strftime('%d-%m-%Y')})."
+#                 )
+
+#     if validation_errors:
+#         error_msg = "Upload blocked — " + " | ".join(validation_errors)
+#         print(f"DEBUG [{tenant_schema}]: Validation FAILED → {error_msg}", flush=True)
+#         log_load_error(
+#             conn=conn, load_id=load_id,
+#             error_message=error_msg, row_number=None, column_name='BillDate'
+#         )
+#         raise ValueError(error_msg)
+
+#     print(f"DEBUG [{tenant_schema}]: Validation PASSED for all locations.", flush=True)
+
+#     # ─────────────────────────────────────────────────────────────
+#     # STEP 2: Truncate staging table
+#     # ─────────────────────────────────────────────────────────────
+#     print(f"DEBUG [{tenant_schema}]: Truncating staging table...", flush=True)
+#     conn.execute(text(
+#         f'TRUNCATE TABLE "{tenant_schema}"."{target_table_name}" RESTART IDENTITY'
+#     ))
+#     print(f"DEBUG [{tenant_schema}]: Truncate done.", flush=True)
+
+#     # ─────────────────────────────────────────────────────────────
+#     # STEP 3: Bulk insert
+#     # ─────────────────────────────────────────────────────────────
+#     print(f"DEBUG [{tenant_schema}]: Starting bulk insert ({len(df)} rows)...", flush=True)
+#     df.to_sql(
+#         target_table_name,
+#         con=conn,
+#         schema=tenant_schema,
+#         if_exists='append',
+#         index=False
+#     )
+#     print(f"DEBUG [{tenant_schema}]: Bulk insert done.", flush=True)
+
+#     # ─────────────────────────────────────────────────────────────
+#     # STEP 4: staging -> dimension tables
+#     # ─────────────────────────────────────────────────────────────
+#     print(f"DEBUG [{tenant_schema}]: Calling sp_batch_insert_dummy_to_stagging_to_dim...", flush=True)
+#     conn.execute(text(
+#         f'CALL "{tenant_schema}".sp_batch_insert_dummy_to_stagging_to_dim(200000, 1, 0)'
+#     ))
+#     print(f"DEBUG [{tenant_schema}]: sp_batch_insert done.", flush=True)
+
+#     # ─────────────────────────────────────────────────────────────
+#     # STEP 5: Refresh date dimension
+#     # ─────────────────────────────────────────────────────────────
+#     if excel_max_date:
+#         print(f"DEBUG [{tenant_schema}]: Calling refresh_dimdate_offsets({excel_max_date})...", flush=True)
+#         conn.execute(
+#             text(f'CALL "{tenant_schema}".refresh_dimdate_offsets(:max_date)'),
+#             {"max_date": excel_max_date}
+#         )
+#         print(f"DEBUG [{tenant_schema}]: refresh_dimdate done.", flush=True)
+
+#     # ─────────────────────────────────────────────────────────────
+#     # STEP 6: Rebuild materialized views
+#     # ─────────────────────────────────────────────────────────────
+#     print(f"DEBUG [{tenant_schema}]: Calling refresh_all_mvs()...", flush=True)
+#     conn.execute(text(
+#         f'CALL "{tenant_schema}".refresh_all_mvs()'
+#     ))
+#     print(f"DEBUG [{tenant_schema}]: refresh_all_mvs done.", flush=True)
+
+#     print(f"DEBUG [{tenant_schema}]: All steps completed successfully.", flush=True)
+
+def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, log_load_error, engine):
+    """
+    excel_max_date is now computed internally from BillDate column.
+    No longer passed as a parameter from upload_excel.
+    """
+
+    # ─────────────────────────────────────────────────────────────
+    # STEP 0: BillDate processing (moved from upload_excel)
+    # ─────────────────────────────────────────────────────────────
+    if 'BillDate' not in df.columns:
+        raise ValueError("Column 'BillDate' not found in uploaded file.")
+
+    print(f"DEBUG [{tenant_schema}]: Processing BillDate column...", flush=True)
+
+    # Remove rows with empty/null BillDate
+    df = df[
+        df['BillDate'].notna() &
+        (df['BillDate'].astype(str).str.strip() != '')
+    ].copy()
+
+    # Convert to standard DD-MM-YYYY format
+    df['BillDate'] = pd.to_datetime(
+        df['BillDate'], dayfirst=True, errors='coerce'
+    ).dt.strftime('%d-%m-%Y')
+
+    # Validate — block upload if any dates are unrecognizable
+    if df['BillDate'].isna().any():
+        bad_rows  = df[df['BillDate'].isna()].index.tolist()
+        error_msg = f"Invalid BillDate in rows: {bad_rows}. Expected format: DD-MM-YYYY."
+        log_load_error(
+            conn=conn, load_id=load_id,
+            error_message=error_msg, row_number=None, column_name='BillDate'
+        )
+        raise ValueError(error_msg)
+
+    # Compute excel_max_date from the processed BillDate column
+    excel_max_date = pd.to_datetime(
+        df['BillDate'], format='%d-%m-%Y'
+    ).max().date()
+
+    print(f"DEBUG [{tenant_schema}]: Excel max date: {excel_max_date}", flush=True)
+
+    # ── Process LastPurDate if present (also moved from upload_excel)
+    if 'LastPurDate' in df.columns:
+        df['LastPurDate'] = pd.to_datetime(
+            df['LastPurDate'], dayfirst=True, errors='coerce'
+        ).dt.strftime('%d-%m-%Y')
 
     # ─────────────────────────────────────────────────────────────
     # STEP 1: Location + Date Validation
-    # Queries BASE TABLES directly — never the MV
-    # MV refresh holds AccessExclusiveLock, base tables do not
     # ─────────────────────────────────────────────────────────────
     if 'LocationName' not in df.columns:
         raise ValueError("Column 'LocationName' not found in uploaded file.")
@@ -34,7 +201,6 @@ def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, exc
 
     validation_errors = []
 
-    # ── Separate connection + base tables = zero lock conflict
     with engine.connect() as val_conn:
         for location in file_locations:
             print(f"DEBUG [{tenant_schema}]: Querying base tables for location '{location}'...", flush=True)
@@ -110,13 +276,12 @@ def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, exc
     # ─────────────────────────────────────────────────────────────
     # STEP 5: Refresh date dimension
     # ─────────────────────────────────────────────────────────────
-    if excel_max_date:
-        print(f"DEBUG [{tenant_schema}]: Calling refresh_dimdate_offsets({excel_max_date})...", flush=True)
-        conn.execute(
-            text(f'CALL "{tenant_schema}".refresh_dimdate_offsets(:max_date)'),
-            {"max_date": excel_max_date}
-        )
-        print(f"DEBUG [{tenant_schema}]: refresh_dimdate done.", flush=True)
+    print(f"DEBUG [{tenant_schema}]: Calling refresh_dimdate_offsets({excel_max_date})...", flush=True)
+    conn.execute(
+        text(f'CALL "{tenant_schema}".refresh_dimdate_offsets(:max_date)'),
+        {"max_date": excel_max_date}
+    )
+    print(f"DEBUG [{tenant_schema}]: refresh_dimdate done.", flush=True)
 
     # ─────────────────────────────────────────────────────────────
     # STEP 6: Rebuild materialized views
@@ -128,6 +293,201 @@ def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, exc
     print(f"DEBUG [{tenant_schema}]: refresh_all_mvs done.", flush=True)
 
     print(f"DEBUG [{tenant_schema}]: All steps completed successfully.", flush=True)
+
+
+
+# ---------------------------------------------------------
+# TENANT: shinde_shoes — STOCK file
+# ---------------------------------------------------------
+
+
+def handle_shinde_shoes_stock(conn, df, tenant_schema, target_table_name,
+                               load_id, log_load_error, filename=None):
+    """
+    Handler for Shinde Shoes STOCK files.
+    - Date extracted from filename (must be DD-MM-YYYY format)
+    - Each column converted to its correct data type explicitly
+    """
+    import re                        # ← move imports here
+    from datetime import datetime    # ← move imports here
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 1: Extract and validate date from filename
+    # ─────────────────────────────────────────────────────────────
+    def extract_date_from_filename(fname):
+        """
+        Looks for DD-MM-YYYY or DD_MM_YYYY inside the filename.
+        Valid examples:
+            shindeshoes_stock_19-05-2026.xlsx
+            shindeshoes_stock_19_05_2026.xlsx
+        Returns 'DD-MM-YYYY' string or raises ValueError.
+        """
+        
+
+        name = (fname or "").rsplit('.', 1)[0]
+
+        m = re.search(r'(\d{2})[_\-](\d{2})[_\-](\d{4})', name)
+        if not m:
+            raise ValueError(
+                f"Date not found in filename '{fname}'. "
+                f"Please rename the file to include the date in DD-MM-YYYY format. "
+                f"Example: shindeshoes_stock_19-05-2026.xlsx"
+            )
+
+        day, month, year = m.group(1), m.group(2), m.group(3)
+        date_str = f"{day}-{month}-{year}"
+
+        try:
+            datetime.strptime(date_str, "%d-%m-%Y")
+        except ValueError:
+            raise ValueError(
+                f"'{date_str}' extracted from '{fname}' is not a valid date. "
+                f"Please use a valid date in DD-MM-YYYY format. "
+                f"Example: shindeshoes_stock_19-05-2026.xlsx"
+            )
+
+        return date_str  # 'DD-MM-YYYY' — no conversion
+
+    StockAsOn = extract_date_from_filename(filename)
+    print(f"DEBUG [{tenant_schema}]: StockAsOn = {StockAsOn}", flush=True)
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 2: Validate required column
+    # ─────────────────────────────────────────────────────────────
+    if 'BranchName' not in df.columns:
+        raise ValueError("Column 'BranchName' not found in uploaded stock file.")
+
+    print(f"DEBUG [{tenant_schema}]: Stock file — {len(df)} rows, "
+          f"BranchName values: {df['BranchName'].dropna().unique().tolist()}",
+          flush=True)
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 3: Explicit column → type mapping
+    # ─────────────────────────────────────────────────────────────
+    COLUMN_TYPE_MAP = {
+        "SKU":             "text",
+        "Source":          "text",
+        "AlternateCode":   "text",
+        "Expiry":          "date",
+        "SalesManPoints":  "int",
+        "CostChar":        "text",
+        "ProductGroup":    "text",
+        "CollectionName":  "text",
+        "FitName":         "text",
+        "WashName":        "text",
+        "MRP":             "numeric",
+        "SellPrice":       "numeric",
+        "PurchaseNo":      "int",
+        "BillNo":          "text",
+        "StockAsOn":       "date",
+        "BillDate":        "date",
+        "PeriodDays":      "int",
+        "StockDays":       "int",
+        "ExpiryDays":      "int",
+        "Qty":             "int",
+        "Product":         "text",
+        "ProductDesc":     "text",
+        "Composite":       "bool",
+        "ColorCode":       "text",
+        "ColorDesc":       "text",
+        "SizeCode":        "text",
+        "SizeDesc":        "text",
+        "Size":            "text",
+        "OptionalCategory":"text",
+        "Category":        "int",
+        "CategoryDesc":    "text",
+        "Subcategory":     "int",
+        "SubcategoryDesc": "text",
+        "Supplier":        "text",
+        "Brand":           "text",
+        "Unit":            "text",
+        "Cost":            "numeric",
+        "CostAmount":      "numeric",
+        "BaseCost":        "numeric",
+        "BaseCostAmount":  "numeric",
+        "StockType":       "text",
+        "HSN":             "text",
+        "BranchName":      "text",
+    }
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 4: Apply type conversions
+    # ─────────────────────────────────────────────────────────────
+    result = df.copy()
+
+    for col, dtype in COLUMN_TYPE_MAP.items():
+        if col not in result.columns:
+            continue  # skip columns not present in this file
+
+        # Normalise empty/null strings to None first
+        series = result[col].replace(
+            {'': None, 'nan': None, 'NaT': None, 'None': None, '<NA>': None}
+        )
+
+        if dtype == "text":
+            result[col] = series.where(series.notna(), None)
+
+        elif dtype == "int":
+            result[col] = pd.to_numeric(series, errors='coerce').astype('Int64')
+
+        elif dtype == "numeric":
+            result[col] = pd.to_numeric(series, errors='coerce').astype(float)
+
+        elif dtype == "date":
+            result[col] = pd.to_datetime(
+                series, dayfirst=True, errors='coerce'
+            ).dt.date
+
+        elif dtype == "bool":
+            result[col] = series.map({
+                'True': True, 'False': False,
+                'true': True, 'false': False,
+                '1':    True, '0':    False,
+            })
+
+    df = result
+    print(f"DEBUG [{tenant_schema}]: Type conversion done. "
+          f"Columns: { {c: str(df[c].dtype) for c in df.columns} }",
+          flush=True)
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 5: Add system columns
+    # ─────────────────────────────────────────────────────────────
+    df['load_id']     = load_id
+    df['row_no']      = range(1, len(df) + 1)
+    # df['StockAsOn'] = StockAsOn   # 'DD-MM-YYYY' string from filename
+    df['StockAsOn'] = datetime.strptime(StockAsOn, "%d-%m-%Y").date() 
+
+    def calc_new_bill_date(stock_as_on, stock_days):
+        if stock_as_on is None or pd.isna(stock_days):
+            return None
+        return stock_as_on - timedelta(days=int(stock_days))
+    df['NewBillDate'] = df['StockDays'].apply(
+    lambda days: calc_new_bill_date(df['StockAsOn'].iloc[0], days)
+    )
+
+    print(f"DEBUG [{tenant_schema}]: NewBillDate sample → {df['NewBillDate'].head(3).tolist()}", flush=True)
+    
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 6: Truncate staging table
+    # ─────────────────────────────────────────────────────────────
+    print(f"DEBUG [{tenant_schema}]: Truncating '{target_table_name}'...", flush=True)
+    conn.execute(text(
+        f'TRUNCATE TABLE "{tenant_schema}"."{target_table_name}" RESTART IDENTITY'
+    ))
+    print(f"DEBUG [{tenant_schema}]: Truncate done.", flush=True)
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 7: Bulk insert
+    # ─────────────────────────────────────────────────────────────
+    print(f"DEBUG [{tenant_schema}]: Inserting {len(df)} rows...", flush=True)
+    df.to_sql(
+        target_table_name,
+        con=conn,
+        schema=tenant_schema,
+        if_exists='append',
+        index=False
+    )
+    print(f"DEBUG [{tenant_schema}]: Stock insert done. StockAsOn={StockAsOn}", flush=True)
 
 
 # ---------------------------------------------------------
