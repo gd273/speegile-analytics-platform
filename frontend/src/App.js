@@ -653,7 +653,7 @@ function DashboardView({ dashboards, selectedId }) {
                 {activeDashboard.title}
               </h2>
 
-              {/* {pdfFn && (
+              {pdfFn && (
                 <button
                   onClick={pdfFn}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition"
@@ -667,7 +667,7 @@ function DashboardView({ dashboards, selectedId }) {
                   <Download className="w-4 h-4" />
                   Download PDF
                 </button>
-              )} */}
+              )}
               </div>
 
           {/* THE CAPTURE AREA */}
