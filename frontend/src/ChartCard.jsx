@@ -70,6 +70,7 @@ const getChartType = (vt = "") => {
   if (v.includes("treemap"))                       return "treemap";
   if (v.includes("scatter"))                       return "scatter";
   if (v.includes("funnel"))                        return "funnel";
+  if (v.includes("heatmap"))                       return "heatmap";
   return "bar";
 };
 
@@ -313,7 +314,7 @@ const Skeleton = ({ height }) => (
           animation: `skbar 0.9s ${i * 0.07}s ease-in-out infinite alternate`, opacity: 0.45 }} />
       ))}
     </div>
-    <span style={{ fontSize: 11, color: "#4a5568", letterSpacing: "0.06em" }}>Fetching from Superset…</span>
+    <span style={{ fontSize: 11, color: "#4a5568", letterSpacing: "0.06em" }}>Loading analytics...</span>
     <style>{`@keyframes skbar{from{opacity:.12;transform:scaleY(.3)}to{opacity:.7;transform:scaleY(1)}}`}</style>
   </div>
 );
@@ -407,6 +408,130 @@ function buildOption({ type, data, keys, xKey, selectedValue, initialKeys = [], 
     if (!selectedValue) return baseColor;
     return catLabel === selectedValue ? baseColor : baseColor + "44";
   };
+
+    if (type === "heatmap") {
+        const cols    = Object.keys(data[0]);
+        const numCols = cols.filter(k =>
+          data.some(r => r[k] !== null && r[k] !== undefined && !isNaN(Number(r[k])))
+        );
+        const dimCols = cols.filter(k => !numCols.includes(k));
+
+        // X = first dim col, Y = second dim col, Value = first numeric col
+        const xCol   = dimCols[0] || cols[0];
+        const yCol   = dimCols[1] || cols[1];
+        const valCol = numCols[0] || cols[2];
+
+        // Unique axis values
+        const xVals = [...new Set(data.map(r => String(r[xCol] ?? "")))];
+        const yVals = [...new Set(data.map(r => String(r[yCol] ?? "")))];
+
+        // Build [xIdx, yIdx, value] format ECharts needs
+        const heatData = data.map(r => [
+          xVals.indexOf(String(r[xCol] ?? "")),
+          yVals.indexOf(String(r[yCol] ?? "")),
+          Number(r[valCol]) || 0,
+        ]);
+
+        const allValues = heatData.map(d => d[2]);
+        const minVal    = Math.min(...allValues);
+        const maxVal    = Math.max(...allValues);
+
+        return {
+          backgroundColor: "transparent",
+          animation: true,
+          tooltip: {
+            ...darkTooltip,
+            formatter: (p) =>
+              `<div style="color:#64748b;font-size:10px;margin-bottom:4px">
+                ${xVals[p.data[0]]} · ${yVals[p.data[1]]}
+              </div>
+              <span style="color:#e2e8f0;font-weight:700;font-size:14px">
+                ${fmtNum(p.data[2])}
+              </span>`,
+          },
+          grid: { left: 80, right: 60, top: 70, bottom: 70, containLabel: false },
+          xAxis: {
+              type: "category",
+              data: xVals,
+              axisLine:  { lineStyle: { color: "#2d3748" } },
+              axisTick:  { show: false },
+              axisLabel: {
+                color:      "#e2e8f0",   // ← brighter white
+                fontSize:   14,          // ← increase size
+                fontWeight: "bold",      // ← make bold
+                fontFamily: "inherit",
+              },
+              splitArea: { show: true, areaStyle: {
+                color: ["rgba(255,255,255,0.02)", "rgba(255,255,255,0.0)"]
+              }},
+            },
+          yAxis: {
+              type: "category",
+              data: yVals,
+              axisLine:  { lineStyle: { color: "#2d3748" } },
+              axisTick:  { show: false },
+              axisLabel: {
+                color:      "#e2e8f0",   // ← brighter white
+                fontSize:   14,          // ← increase size
+                fontWeight: "bold",      // ← make bold
+                fontFamily: "inherit",
+              },
+              splitArea: { show: true, areaStyle: {
+                color: ["rgba(255,255,255,0.02)", "rgba(255,255,255,0.0)"]
+              }},
+            },
+            
+          visualMap: {
+            min:          minVal,
+            max:          maxVal,
+            calculable:   true,
+            orient:       "horizontal",
+            left:         "center",
+            top:          8,
+            // padding:    [0, 0, 20, 0],
+            textGap:    20,
+            inRange: {
+              color: [
+                "#7f0000",   // very dark red   → lowest
+                "#c62828",   // dark red
+                "#e53935",   // medium red
+                "#ef6c00",   // dark orange
+                "#f9a825",   // dark amber
+                "#f9f000",   // bright yellow   → highest
+              ],
+            },
+            textStyle:    { color: "#8b9ab0", fontSize: 25, fontFamily: "inherit", fontWeight: "600", padding:  [6, 0, 0, 0], },
+            itemWidth:    14,
+            itemHeight:   120,
+          },
+          series: [{
+            type:       "heatmap",
+            data:       heatData,
+            label: {
+                show:       true,
+                fontSize:   14,
+                fontWeight: "bold",
+                color:      "#ffffff",
+                textShadowColor:   "#000000",
+                textShadowBlur:    8,
+                textShadowOffsetX: 0,
+                textShadowOffsetY: 0,
+                formatter: function(params) {
+                  var v = params.data[2];
+                  if (v === null || v === undefined) return "";
+                  return String(v);
+                },
+              },
+            emphasis: {
+              itemStyle: {
+                shadowBlur:  10,
+                shadowColor: "rgba(0, 0, 0, 0.5)",
+              },
+            },
+          }],
+        };
+      }
+
 
   if (type === "pie") {
     const numKey = keys.find(k => data.some(r => !isNaN(Number(r[k])) && r[k] != null)) || keys[0];
@@ -777,15 +902,40 @@ if (type === "line") {
       ...base,
       tooltip: { trigger: "item", ...darkTooltip, formatter: p => `<div style="color:#94a3b8;font-size:11px">${p.name}</div><span style="color:${p.color};font-weight:600">${fmtNum(p.value)}</span>` },
       series: [{
-        type: "treemap", roam: false, nodeClick: false, breadcrumb: { show: false },
-        itemStyle: { gapWidth: 2, borderRadius: 3 },
-        label: { show: true, color: "#fff", fontSize: 11, fontFamily: "inherit", fontWeight: "600", formatter: p => `${p.name}\n${fmtNum(p.value)}` },
-        data: data.map((r, i) => {
-          const name  = String(r[xKey] ?? "");
-          const color = COLORS[i % COLORS.length];
-          return { name, value: Number(r[numKey]) || 0, itemStyle: { color: selectedValue && name !== selectedValue ? color + "44" : color } };
-        }),
-      }],
+            type:       "treemap",
+            roam:       false,
+            nodeClick:  false,
+            visibleMin: 300,             // ← hide label if cell is too small to show text
+            breadcrumb: { show: false },
+            itemStyle:  { gapWidth: 2, borderRadius: 3 },
+            label: {
+              show:       true,
+              color:      "#ffffff",
+              fontSize:   17,
+              fontFamily: "inherit",
+              fontWeight: "bold",
+              textShadowColor:   "#000000",
+              textShadowBlur:    6,
+              textShadowOffsetX: 0,
+              textShadowOffsetY: 0,
+              formatter: function(p) {
+                return p.name + "\n" + fmtNum(p.value);
+              },
+            },
+            data: data.map((r, i) => {
+              const name  = String(r[xKey] ?? "");
+              const color = COLORS[i % COLORS.length];
+              return {
+                name,
+                value: Number(r[numKey]) || 0,
+                itemStyle: {
+                  color: selectedValue && name !== selectedValue
+                    ? color + "44"
+                    : color
+                },
+              };
+            }),
+          }],
     };
   }
 
@@ -811,7 +961,15 @@ if (type === "line") {
       })),
     })),
   };
+
+
+      
 }
+
+
+
+
+
 
 // ══════════════════════════════════════════════════════════════
 //  ChartCard
@@ -825,6 +983,8 @@ export default function ChartCard({
   groupbyRows:    groupbyRowsProp = [],
   groupbyColumns: groupbyColsProp = [],
   zoomable = false,    // ← ADD THIS
+  fontColor = null,
+  conditionalColors  = [],    // ← ADD
 }) {
   const [data,         setData]         = useState([]);
   const [keys,         setKeys]         = useState([]);
@@ -874,7 +1034,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
 
     const body = {
       sliceId,
-      ...(dateFrom && dateTo ? { dateFrom, dateTo } : {}),
+      ...(dateFrom || dateTo ? { dateFrom, dateTo } : {}),
       activeFilters: Object.entries(activeFilters)
       .filter(([, v]) => Array.isArray(v) ? v.length > 0 : (v != null && v !== ""))
       .map(([col, val]) => ({ col, op: "IN", val: Array.isArray(val) ? val : [val] })),
@@ -1032,7 +1192,15 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
       filterCol   = xKey;
     }
 
-  } else {
+  } else if (type === "heatmap") {
+  // Click on a cell — filter by both x and y value
+  clickedName = params.data?.[1] !== undefined
+    ? String(Object.values(data[0])[1] ?? "")
+    : params.name;
+  filterCol   = Object.keys(data[0])[1] || xKey;
+}
+  
+  else {
     // ── Bar / column / scatter / default ───────────────────────
     clickedName = params.name || params.data?.name || params.axisValue || "";
     filterCol   = xKey;
@@ -1108,7 +1276,9 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
   const valueKey   = metricLabels.find(m => allCols.includes(m)) || numericCols[0] || allCols[0] || "";
   const rawVal     = data[0]?.[valueKey] ?? 0;
   const n          = Number(rawVal);
+  // const displayVal = fmtBigNum(rawVal, valueKey);
   const displayVal = fmtBigNum(rawVal, valueKey);
+  // const trendArrow = n > 0 ? " ▲" : n < 0 ? " ▼" : "";
   const subtitle   = cleanMetricLabel(String(valueKey || ""));
   const isDate     = isTimestampMs(n);
   const isPct      = isRatioValue(n, valueKey);
@@ -1144,7 +1314,22 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
         <div style={{
         fontSize:      valueFontSize,
         fontWeight:    800,
-        color:         isPct && n < 0 ? "#f87171" : "#1FA8C9",
+        // color: fontColor ? fontColor : "#1FA8C9",         // ← use Superset color if set, otherwise default to blue   
+        color: (() => {
+          // Apply conditional color rules based on actual value
+          if (conditionalColors.length > 0) {
+            for (const rule of conditionalColors) {
+              const target = Number(rule.targetValue ?? 0);
+              if (rule.operator === ">"  && n >  target) return rule.color;
+              if (rule.operator === ">=" && n >= target) return rule.color;
+              if (rule.operator === "<"  && n <  target) return rule.color;
+              if (rule.operator === "<=" && n <= target) return rule.color;
+              if (rule.operator === "==" && n === target) return rule.color;
+            }
+          }
+          // Fallback to font_color or default
+          return fontColor || "#1FA8C9";
+        })(),
         letterSpacing: isDate ? 0 : -0.5,
         lineHeight:    1.1,
         textAlign:     "center",
@@ -1153,6 +1338,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
         // ← NO overflow:hidden, NO textOverflow — don't clip characters
       }}>
           {displayVal}
+          
         </div>
 
         {/* ── Subtitle ── */}
@@ -1185,10 +1371,13 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
           metricKeys={metricLabels}
           colnames={colnames}
           crossFilterValue={selectedValue}
+          title={title} 
           onRowClick={(col, val) => {
             if (!onCrossFilter) return;
             onCrossFilter(col, val, sliceId, title, true);  // ← true = fromTable
-          }}
+          }
+            
+          }
         />
       );
     }
@@ -1258,9 +1447,9 @@ return (
               Filtered
             </span>
           )}
-          <span style={{ fontSize: 9, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", padding: "2px 7px", borderRadius: 6, color: "#4a5568", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          {/* <span style={{ fontSize: 9, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", padding: "2px 7px", borderRadius: 6, color: "#4a5568", letterSpacing: "0.08em", textTransform: "uppercase" }}>
             #{sliceId} · {type}
-          </span>
+          </span> */}
         </div>
       </div>
 

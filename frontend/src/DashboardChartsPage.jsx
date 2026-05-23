@@ -17,61 +17,61 @@ function useWindowWidth() {
 }
 
 // ── PDF progress overlay ────────────────────────────────────
-// function PdfProgressOverlay({ progress }) {
-//   if (!progress) return null;
-//   const pct = progress.total > 0
-//     ? Math.round((progress.current / progress.total) * 100)
-//     : 0;
+function PdfProgressOverlay({ progress }) {
+  if (!progress) return null;
+  const pct = progress.total > 0
+    ? Math.round((progress.current / progress.total) * 100)
+    : 0;
 
-//   return (
-//     <div style={{
-//       position: "fixed", inset: 0, zIndex: 9999,
-//       background: "rgba(0,0,0,0.82)",
-//       display: "flex", alignItems: "center", justifyContent: "center",
-//     }}>
-//       <style>{`
-//         @keyframes pdf-spin    { to { transform: rotate(360deg); } }
-//         @keyframes pdf-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-//       `}</style>
-//       <div style={{
-//         background: "#1a1d26",
-//         border: "1px solid rgba(31,168,201,0.25)",
-//         borderRadius: 16, padding: "36px 44px",
-//         width: 400, display: "flex",
-//         flexDirection: "column", alignItems: "center", gap: 22,
-//         boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
-//       }}>
-//         <div style={{ position: "relative", width: 56, height: 56 }}>
-//           <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px solid rgba(31,168,201,0.12)" }} />
-//           <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px solid transparent", borderTopColor: "#1FA8C9", animation: "pdf-spin 1s linear infinite" }} />
-//           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>📄</div>
-//         </div>
-//         <div style={{ textAlign: "center" }}>
-//           <div style={{ fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 8 }}>Generating PDF</div>
-//           <div style={{ fontSize: 12, color: "#64748b" }}>
-//             Processing: <span style={{ color: "#1FA8C9", fontWeight: 600 }}>{progress.tabName}</span>
-//           </div>
-//         </div>
-//         <div style={{ width: "100%" }}>
-//           <div style={{ width: "100%", height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 99, overflow: "hidden" }}>
-//             <div style={{
-//               width: `${pct}%`, height: "100%", borderRadius: 99,
-//               background: "linear-gradient(90deg,#1FA8C9 0%,#A868B7 60%,#1FA8C9 100%)",
-//               backgroundSize: "200% 100%",
-//               animation: "pdf-shimmer 1.5s linear infinite",
-//               transition: "width 0.6s ease",
-//             }} />
-//           </div>
-//           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-//             <span style={{ fontSize: 11, color: "#374151" }}>Page {progress.current} of {progress.total}</span>
-//             <span style={{ fontSize: 11, color: "#1FA8C9", fontWeight: 700 }}>{pct}%</span>
-//           </div>
-//         </div>
-//         <div style={{ fontSize: 11, color: "#374151", letterSpacing: "0.03em" }}>Please keep this window open</div>
-//       </div>
-//     </div>
-//   );
-// }
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9999,
+      background: "rgba(0,0,0,0.82)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <style>{`
+        @keyframes pdf-spin    { to { transform: rotate(360deg); } }
+        @keyframes pdf-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+      `}</style>
+      <div style={{
+        background: "#1a1d26",
+        border: "1px solid rgba(31,168,201,0.25)",
+        borderRadius: 16, padding: "36px 44px",
+        width: 400, display: "flex",
+        flexDirection: "column", alignItems: "center", gap: 22,
+        boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+      }}>
+        <div style={{ position: "relative", width: 56, height: 56 }}>
+          <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px solid rgba(31,168,201,0.12)" }} />
+          <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px solid transparent", borderTopColor: "#1FA8C9", animation: "pdf-spin 1s linear infinite" }} />
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>📄</div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 8 }}>Generating PDF</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>
+            Processing: <span style={{ color: "#1FA8C9", fontWeight: 600 }}>{progress.tabName}</span>
+          </div>
+        </div>
+        <div style={{ width: "100%" }}>
+          <div style={{ width: "100%", height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 99, overflow: "hidden" }}>
+            <div style={{
+              width: `${pct}%`, height: "100%", borderRadius: 99,
+              background: "linear-gradient(90deg,#1FA8C9 0%,#A868B7 60%,#1FA8C9 100%)",
+              backgroundSize: "200% 100%",
+              animation: "pdf-shimmer 1.5s linear infinite",
+              transition: "width 0.6s ease",
+            }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+            <span style={{ fontSize: 11, color: "#374151" }}>Page {progress.current} of {progress.total}</span>
+            <span style={{ fontSize: 11, color: "#1FA8C9", fontWeight: 700 }}>{pct}%</span>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: "#374151", letterSpacing: "0.03em" }}>Please keep this window open</div>
+      </div>
+    </div>
+  );
+}
 
 // ── Simple markdown renderer ────────────────────────────────
 function MarkdownBlock({ code }) {
@@ -285,42 +285,129 @@ function CrossFilterPills({ crossFilters, onClear, onClearAll }) {
 }
 
 // ── Tab group ───────────────────────────────────────────────
-function TabGroup({ tabs, chartMap, cardProps, isMobile, renderRows, onTabChange, pdfTabIdx, pdfNestedTabIdx }) {
+function TabGroup({
+  tabs = [],
+  chartMap,
+  cardProps,
+  isMobile,
+  renderRows,
+  onTabChange,
+  pdfTabIdx,
+  pdfNestedTabIdx,
+  dateFrom,
+  dateTo,
+  setDateFrom,
+  setDateTo,
+}) {
   const [activeIdx, setActiveIdx] = useState(0);
+
+  useEffect(() => {
+    if (tabs.length > 0 && onTabChange) onTabChange(tabs[0].id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const displayIdx = (pdfTabIdx !== null && pdfTabIdx !== undefined)
     ? Math.min(pdfTabIdx, tabs.length - 1)
     : activeIdx;
-  const activeTab  = tabs[displayIdx];
+
+  const activeTab = tabs[displayIdx];
   const hasContent = activeTab?.rows?.length > 0 || activeTab?.nestedTabsSection != null;
 
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{ display: "flex", borderBottom: "2px solid rgba(255,255,255,0.07)", marginBottom: 14, overflowX: "auto", scrollbarWidth: "none" }}>
-        {tabs.map((tab, i) => {
-          const active = i === displayIdx;
-          return (
-            <button key={tab.id || i}
-              onClick={() => { setActiveIdx(i); if (onTabChange) onTabChange(); }}
-              style={{ padding: "10px 20px", fontSize: 13, fontWeight: active ? 700 : 500, color: active ? "#1FA8C9" : "#64748b", background: "none", border: "none", borderBottom: `2px solid ${active ? "#1FA8C9" : "transparent"}`, cursor: "pointer", transition: "color .15s, border-color .15s", whiteSpace: "nowrap", outline: "none", marginBottom: "-2px", flexShrink: 0 }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.color = "#94a3b8"; }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.color = "#64748b"; }}>
-              {tab.name}
-            </button>
-          );
-        })}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        borderBottom: "1px solid rgba(255,255,255,0.07)",
+        background: "#12151f",
+        minHeight: 42,
+      }}>
+        {tabs.length > 0 && (
+          <div style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            overflowX: "auto",
+            overflowY: "hidden",
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+            gap: 2,
+            padding: "0 8px",
+            minWidth: 0,
+          }}>
+            {tabs.map((tab, i) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveIdx(i);
+                  if (onTabChange) onTabChange(tab.id);
+                }}
+                style={{
+                  flexShrink: 0,
+                  padding: "10px 18px",
+                  fontSize: 13,
+                  fontWeight: displayIdx === i ? 600 : 400,
+                  color: displayIdx === i ? "#1FA8C9" : "#64748b",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: displayIdx === i
+                    ? "2px solid #1FA8C9"
+                    : "2px solid transparent",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: "color 0.15s, border-color 0.15s",
+                }}
+              >
+                {tab.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={{
+          marginLeft: "auto",
+          flexShrink: 0,
+          borderLeft: "1px solid rgba(255,255,255,0.07)",
+          padding: "0 12px",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          height: "100%",
+          minHeight: 42,
+        }}>
+          <DateRangePicker
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onFromChange={setDateFrom}
+            onToChange={setDateTo}
+            onClear={() => { setDateFrom(null); setDateTo(null); }}
+          />
+        </div>
       </div>
+
       {activeTab?.rows?.length > 0 && renderRows(activeTab.rows)}
+
       {activeTab?.nestedTabsSection && (
         <TabGroup
           tabs={activeTab.nestedTabsSection.tabs}
-          chartMap={chartMap} cardProps={cardProps}
-          isMobile={isMobile} renderRows={renderRows}
+          chartMap={chartMap}
+          cardProps={cardProps}
+          isMobile={isMobile}
+          renderRows={renderRows}
           onTabChange={onTabChange}
           pdfTabIdx={pdfNestedTabIdx}
           pdfNestedTabIdx={null}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          setDateFrom={setDateFrom}
+          setDateTo={setDateTo}
         />
       )}
-      {!hasContent && <div style={{ padding: "40px 0", textAlign: "center", color: "#374151", fontSize: 13 }}>No charts in this tab</div>}
+
+      {tabs.length > 0 && !hasContent && (
+        <div style={{ padding: "40px 0", textAlign: "center", color: "#374151", fontSize: 13 }}>
+          No charts in this tab
+        </div>
+      )}
     </div>
   );
 }
@@ -781,37 +868,194 @@ function ActivePills({ activeFilters, dateFrom, dateTo, onRemove, onRemoveDate }
   );
 }
 
+// ----------------------------------------------------------------
+// ── Date Range Picker ─────────────────────────────────────────
+// ----------------------------------------------------------------
+
+function DateRangePicker({ dateFrom, dateTo, onFromChange, onToChange, onClear }) {
+
+  // ── Local draft state — doesn't trigger filter until Search clicked ──
+  const [draftFrom, setDraftFrom] = useState(dateFrom || "");
+  const [draftTo,   setDraftTo]   = useState(dateTo   || "");
+
+  // Sync draft if parent clears the dates (e.g. ✕ Clear clicked)
+  useEffect(() => {
+    setDraftFrom(dateFrom || "");
+    setDraftTo(dateTo     || "");
+  }, [dateFrom, dateTo]);
+
+  const hasDate    = dateFrom || dateTo;
+  const hasDraft   = draftFrom || draftTo;
+  const isDirty    = draftFrom !== (dateFrom || "")
+                  || draftTo   !== (dateTo   || "");
+
+  // ── Apply filter — called only when Search is clicked ────────────
+  const handleSearch = () => {
+    onFromChange(draftFrom || null);
+    onToChange(draftTo     || null);
+  };
+
+  // ── Clear both draft and applied filter ──────────────────────────
+  const handleClear = () => {
+    setDraftFrom("");
+    setDraftTo("");
+    onClear();
+  };
+
+  return (
+    <div style={{
+      display:    "flex",
+      alignItems: "center",
+      gap:        8,
+    }}>
+
+      {/* Label */}
+      <span style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
+        📅 Date
+      </span>
+
+      {/* Start Date */}
+      <input
+        type="date"
+        value={draftFrom}
+        max={draftTo || undefined}
+        onChange={e => setDraftFrom(e.target.value)}
+        style={{
+          background:  "#12151f",
+          border:      `1px solid ${draftFrom ? "#1FA8C9" : "rgba(255,255,255,0.1)"}`,
+          borderRadius: 6,
+          padding:     "4px 8px",
+          color:       draftFrom ? "#e2e8f0" : "#64748b",
+          fontSize:    11,
+          cursor:      "pointer",
+          outline:     "none",
+          colorScheme: "dark",
+        }}
+      />
+
+      <span style={{ color: "#64748b", fontSize: 11 }}>→</span>
+
+      {/* End Date */}
+      <input
+        type="date"
+        value={draftTo}
+        min={draftFrom || undefined}
+        onChange={e => setDraftTo(e.target.value)}
+        style={{
+          background:  "#12151f",
+          border:      `1px solid ${draftTo ? "#1FA8C9" : "rgba(255,255,255,0.1)"}`,
+          borderRadius: 6,
+          padding:     "4px 8px",
+          color:       draftTo ? "#e2e8f0" : "#64748b",
+          fontSize:    11,
+          cursor:      "pointer",
+          outline:     "none",
+          colorScheme: "dark",
+        }}
+      />
+
+      {/* Search button — active only when both dates selected */}
+      <button
+        onClick={handleSearch}
+        disabled={!draftFrom || !draftTo}
+        title={!draftFrom || !draftTo ? "Select both dates first" : "Apply date filter"}
+        style={{
+          display:      "flex",
+          alignItems:   "center",
+          gap:          4,
+          background:   (draftFrom && draftTo)
+                          ? "rgba(31,168,201,0.15)"
+                          : "rgba(255,255,255,0.03)",
+          border:       `1px solid ${(draftFrom && draftTo)
+                          ? "rgba(31,168,201,0.4)"
+                          : "rgba(255,255,255,0.08)"}`,
+          borderRadius: 6,
+          padding:      "4px 12px",
+          color:        (draftFrom && draftTo) ? "#1FA8C9" : "#374151",
+          fontSize:     11,
+          fontWeight:   600,
+          cursor:       (draftFrom && draftTo) ? "pointer" : "not-allowed",
+          whiteSpace:   "nowrap",
+          transition:   "all 0.15s",
+        }}
+        onMouseEnter={e => {
+          if (draftFrom && draftTo)
+            e.currentTarget.style.background = "rgba(31,168,201,0.25)";
+        }}
+        onMouseLeave={e => {
+          if (draftFrom && draftTo)
+            e.currentTarget.style.background = "rgba(31,168,201,0.15)";
+        }}
+      >
+        🔍 Search
+      </button>
+
+      {/* Clear button — only when filter is actively applied */}
+      {hasDate && (
+        <button
+          onClick={handleClear}
+          title="Clear date filter"
+          style={{
+            background:   "rgba(248,113,113,0.1)",
+            border:       "1px solid rgba(248,113,113,0.3)",
+            borderRadius: 6,
+            padding:      "4px 8px",
+            color:        "#f87171",
+            fontSize:     11,
+            cursor:       "pointer",
+            whiteSpace:   "nowrap",
+          }}
+        >
+          ✕
+        </button>
+      )}
+
+    </div>
+  );
+}
+
+
+
+
+
 // ══════════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ══════════════════════════════════════════════════════════════
-export default function DashboardChartsPage({ dashboardNumericId }) {
+export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) {
   const [charts,        setCharts]        = useState([]);
   const [sections,      setSections]      = useState(null);
   const [filterDefs,    setFilterDefs]    = useState([]);
   const [activeFilters, setActiveFilters] = useState({});
-  const [dateFrom,      setDateFrom]      = useState("");
-  const [dateTo,        setDateTo]        = useState("");
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState(null);
   const [crossFilters,  setCrossFilters]  = useState({});
 
-  // ── PDF state ─────────────────────────────────────────────
-  // const [isPdfLoading,    setIsPdfLoading]    = useState(false);
-  // const [pdfTabIdx,       setPdfTabIdx]       = useState(null);
-  // const [pdfNestedTabIdx, setPdfNestedTabIdx] = useState(null);
-  // const [pdfProgress,     setPdfProgress]     = useState(null);
+  // Date filter state
+  const [dateFrom, setDateFrom] = useState(null);
+  const [dateTo,   setDateTo]   = useState(null);
 
-  // const dashboardContentRef = useRef(null);
-  // const pdfResolveRef       = useRef(null);
-  // const isPdfLoadingRef     = useRef(false);  // guard — no re-renders on change
-  // const sectionsRef         = useRef(null);   // always-current sections without deps
-  // const downloadRef         = useRef(null);   // stable wrapper ref for parent
+  // scoping for active tab and its charts — reset on tab change to avoid showing wrong pills/charts during loading
+  const [activeTabId, setActiveTabId] = useState(null);
+  // const [activeTabChartIds, setActiveTabChartIds] = useState(new Set());
+
+
+  // ── PDF state ─────────────────────────────────────────────
+  const [isPdfLoading,    setIsPdfLoading]    = useState(false);
+  const [pdfTabIdx,       setPdfTabIdx]       = useState(null);
+  const [pdfNestedTabIdx, setPdfNestedTabIdx] = useState(null);
+  const [pdfProgress,     setPdfProgress]     = useState(null);
+
+  const dashboardContentRef = useRef(null);
+  const pdfResolveRef       = useRef(null);
+  const isPdfLoadingRef     = useRef(false);  // guard — no re-renders on change
+  const sectionsRef         = useRef(null);   // always-current sections without deps
+  const downloadRef         = useRef(null);   // stable wrapper ref for parent
 
   const windowWidth = useWindowWidth();
   const isMobile    = windowWidth < 768;
 
   // Keep sectionsRef in sync
-  // useEffect(() => { sectionsRef.current = sections; }, [sections]);
+  useEffect(() => { sectionsRef.current = sections; }, [sections]);
 
   // const handleFilterChange = useCallback((col, val) => setActiveFilters(prev => ({ ...prev, [col]: prev[col] === val ? null : val })), []);
   const handleFilterChange = useCallback((col, val) => {
@@ -837,125 +1081,125 @@ export default function DashboardChartsPage({ dashboardNumericId }) {
   const clearAllCrossFilters = useCallback(() => setCrossFilters({}), []);
 
   // ── After React renders new tab state → wait 3s → resolve ──
-  // useEffect(() => {
-  //   if (pdfResolveRef.current) {
-  //     const resolve = pdfResolveRef.current;
-  //     pdfResolveRef.current = null;
-  //     setTimeout(resolve, 3000);
-  //   }
-  // }, [pdfTabIdx, pdfNestedTabIdx]);
+  useEffect(() => {
+    if (pdfResolveRef.current) {
+      const resolve = pdfResolveRef.current;
+      pdfResolveRef.current = null;
+      setTimeout(resolve, 3000);
+    }
+  }, [pdfTabIdx, pdfNestedTabIdx]);
 
-  // ── PDF download — EMPTY deps, created once, never recreated ──
-  // const downloadDashboardPDF = useCallback(async () => {
-  //   if (isPdfLoadingRef.current || !dashboardContentRef.current) return;
-  //   isPdfLoadingRef.current = true;
-  //   setIsPdfLoading(true);
+  //  PDF download — EMPTY deps, created once, never recreated
+  const downloadDashboardPDF = useCallback(async () => {
+    if (isPdfLoadingRef.current || !dashboardContentRef.current) return;
+    isPdfLoadingRef.current = true;
+    setIsPdfLoading(true);
 
-  //   try {
-  //     const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
-  //       import("jspdf"),
-  //       import("html2canvas"),
-  //     ]);
+    try {
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import("jspdf"),
+        import("html2canvas"),
+      ]);
 
-  //     const pdf   = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  //     const pageW = pdf.internal.pageSize.getWidth();
-  //     const pageH = pdf.internal.pageSize.getHeight();
-  //     const HDR   = 16;
+      const pdf   = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const HDR   = 16;
 
-  //     const drawPage = (tabName) => {
-  //       pdf.setFillColor(13, 17, 23);  pdf.rect(0, 0, pageW, pageH, "F");
-  //       pdf.setFillColor(18, 21, 31);  pdf.rect(0, 0, pageW, HDR, "F");
-  //       pdf.setDrawColor(45, 55, 72);  pdf.setLineWidth(0.4);  pdf.line(0, HDR, pageW, HDR);
-  //       pdf.setFont("helvetica", "bold");  pdf.setFontSize(13);
-  //       pdf.setTextColor(255, 255, 255);   pdf.text("Speegile", 8, 10.5);
-  //       const sw = pdf.getStringUnitWidth("Speegile") * 13 * 0.352778;
-  //       pdf.setTextColor(31, 168, 201);    pdf.text(" Analytics", 8 + sw, 10.5);
-  //       if (tabName) {
-  //         pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
-  //         pdf.setTextColor(203, 213, 225);
-  //         pdf.text(tabName, pageW - 8, 10.5, { align: "right" });
-  //       }
-  //     };
+      const drawPage = (tabName) => {
+        pdf.setFillColor(13, 17, 23);  pdf.rect(0, 0, pageW, pageH, "F");
+        pdf.setFillColor(18, 21, 31);  pdf.rect(0, 0, pageW, HDR, "F");
+        pdf.setDrawColor(45, 55, 72);  pdf.setLineWidth(0.4);  pdf.line(0, HDR, pageW, HDR);
+        pdf.setFont("helvetica", "bold");  pdf.setFontSize(13);
+        pdf.setTextColor(255, 255, 255);   pdf.text("Speegile", 8, 10.5);
+        const sw = pdf.getStringUnitWidth("Speegile") * 13 * 0.352778;
+        pdf.setTextColor(31, 168, 201);    pdf.text(" Analytics", 8 + sw, 10.5);
+        if (tabName) {
+          pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
+          pdf.setTextColor(203, 213, 225);
+          pdf.text(tabName, pageW - 8, 10.5, { align: "right" });
+        }
+      };
 
-  //     const capture = () => html2canvas(dashboardContentRef.current, {
-  //       scale: 1.5, useCORS: true, allowTaint: true,
-  //       backgroundColor: "#0d1117", logging: false, imageTimeout: 0,
-  //       onclone: (doc) => { doc.querySelectorAll("svg").forEach(s => { s.style.overflow = "visible"; }); },
-  //     });
+      const capture = () => html2canvas(dashboardContentRef.current, {
+        scale: 1.5, useCORS: true, allowTaint: true,
+        backgroundColor: "#0d1117", logging: false, imageTimeout: 0,
+        onclone: (doc) => { doc.querySelectorAll("svg").forEach(s => { s.style.overflow = "visible"; }); },
+      });
 
-  //     const addPage = (canvas, tabName, isFirst) => {
-  //       if (!isFirst) pdf.addPage();
-  //       drawPage(tabName);
-  //       const margin = 3, availW = pageW - margin * 2, availH = pageH - HDR - margin * 2;
-  //       const aspect = canvas.width / canvas.height;
-  //       const img    = canvas.toDataURL("image/jpeg", 0.9);
-  //       let w, h, x, y;
-  //       if (aspect > availW / availH) { w = availW; h = availW / aspect; x = margin; y = HDR + margin + (availH - h) / 2; }
-  //       else                           { h = availH; w = availH * aspect; x = margin + (availW - w) / 2; y = HDR + margin; }
-  //       pdf.addImage(img, "JPEG", x, y, w, h);
-  //     };
+      const addPage = (canvas, tabName, isFirst) => {
+        if (!isFirst) pdf.addPage();
+        drawPage(tabName);
+        const margin = 3, availW = pageW - margin * 2, availH = pageH - HDR - margin * 2;
+        const aspect = canvas.width / canvas.height;
+        const img    = canvas.toDataURL("image/jpeg", 0.9);
+        let w, h, x, y;
+        if (aspect > availW / availH) { w = availW; h = availW / aspect; x = margin; y = HDR + margin + (availH - h) / 2; }
+        else                           { h = availH; w = availH * aspect; x = margin + (availW - w) / 2; y = HDR + margin; }
+        pdf.addImage(img, "JPEG", x, y, w, h);
+      };
 
-  //     // Read from ref — no stale closure issues
-  //     const currentSections = sectionsRef.current;
-  //     const tabSection   = currentSections?.find(s => s.type === "tabs");
-  //     const topLevelTabs = tabSection?.tabs || [];
-  //     const totalPages   = topLevelTabs.length === 0 ? 1 :
-  //       topLevelTabs.reduce((acc, tab) => acc + ((tab.nestedTabsSection?.tabs?.length || 0) > 1 ? tab.nestedTabsSection.tabs.length : 1), 0);
+      // Read from ref — no stale closure issues
+      const currentSections = sectionsRef.current;
+      const tabSection   = currentSections?.find(s => s.type === "tabs");
+      const topLevelTabs = tabSection?.tabs || [];
+      const totalPages   = topLevelTabs.length === 0 ? 1 :
+        topLevelTabs.reduce((acc, tab) => acc + ((tab.nestedTabsSection?.tabs?.length || 0) > 1 ? tab.nestedTabsSection.tabs.length : 1), 0);
 
-  //     const switchAndWait = (ti, ni, tabName, pageNum) => new Promise(resolve => {
-  //       setPdfProgress({ current: pageNum, total: totalPages, tabName });
-  //       pdfResolveRef.current = resolve;
-  //       setPdfTabIdx(ti);
-  //       setPdfNestedTabIdx(ni);
-  //     });
+      const switchAndWait = (ti, ni, tabName, pageNum) => new Promise(resolve => {
+        setPdfProgress({ current: pageNum, total: totalPages, tabName });
+        pdfResolveRef.current = resolve;
+        setPdfTabIdx(ti);
+        setPdfNestedTabIdx(ni);
+      });
 
-  //     let isFirst = true, pagesDone = 0;
+      let isFirst = true, pagesDone = 0;
 
-  //     if (topLevelTabs.length === 0) {
-  //       setPdfProgress({ current: 0, total: 1, tabName: "Dashboard" });
-  //       await new Promise(r => setTimeout(r, 3000));
-  //       addPage(await capture(), "Dashboard", true);
-  //     } else {
-  //       for (let ti = 0; ti < topLevelTabs.length; ti++) {
-  //         const topTab     = topLevelTabs[ti];
-  //         const nestedTabs = topTab.nestedTabsSection?.tabs || [];
-  //         if (nestedTabs.length <= 1) {
-  //           const label = nestedTabs.length === 1 ? `${topTab.name}  ›  ${nestedTabs[0].name}` : topTab.name;
-  //           await switchAndWait(ti, null, label, pagesDone + 1);
-  //           addPage(await capture(), label, isFirst);
-  //           isFirst = false; pagesDone++;
-  //         } else {
-  //           for (let ni = 0; ni < nestedTabs.length; ni++) {
-  //             const label = `${topTab.name}  ›  ${nestedTabs[ni].name}`;
-  //             await switchAndWait(ti, ni, label, pagesDone + 1);
-  //             addPage(await capture(), label, isFirst);
-  //             isFirst = false; pagesDone++;
-  //           }
-  //         }
-  //       }
-  //     }
+      if (topLevelTabs.length === 0) {
+        setPdfProgress({ current: 0, total: 1, tabName: "Dashboard" });
+        await new Promise(r => setTimeout(r, 3000));
+        addPage(await capture(), "Dashboard", true);
+      } else {
+        for (let ti = 0; ti < topLevelTabs.length; ti++) {
+          const topTab     = topLevelTabs[ti];
+          const nestedTabs = topTab.nestedTabsSection?.tabs || [];
+          if (nestedTabs.length <= 1) {
+            const label = nestedTabs.length === 1 ? `${topTab.name}  ›  ${nestedTabs[0].name}` : topTab.name;
+            await switchAndWait(ti, null, label, pagesDone + 1);
+            addPage(await capture(), label, isFirst);
+            isFirst = false; pagesDone++;
+          } else {
+            for (let ni = 0; ni < nestedTabs.length; ni++) {
+              const label = `${topTab.name}  ›  ${nestedTabs[ni].name}`;
+              await switchAndWait(ti, ni, label, pagesDone + 1);
+              addPage(await capture(), label, isFirst);
+              isFirst = false; pagesDone++;
+            }
+          }
+        }
+      }
 
-  //     setPdfTabIdx(null); setPdfNestedTabIdx(null); setPdfProgress(null);
-  //     pdf.save("speegile_dashboard.pdf");
+      setPdfTabIdx(null); setPdfNestedTabIdx(null); setPdfProgress(null);
+      pdf.save("speegile_dashboard.pdf");
 
-  //   } catch (err) {
-  //     console.error("PDF generation failed:", err);
-  //   } finally {
-  //     isPdfLoadingRef.current = false;
-  //     setIsPdfLoading(false);
-  //     setPdfTabIdx(null); setPdfNestedTabIdx(null); setPdfProgress(null);
-  //   }
-  // }, []); // ← EMPTY — function created once, never recreated, no loop possible
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+    } finally {
+      isPdfLoadingRef.current = false;
+      setIsPdfLoading(false);
+      setPdfTabIdx(null); setPdfNestedTabIdx(null); setPdfProgress(null);
+    }
+  }, []); // ← EMPTY — function created once, never recreated, no loop possible
 
   // Always keep ref current
-  // downloadRef.current = downloadDashboardPDF;
+  downloadRef.current = downloadDashboardPDF;
 
   // ── Register with parent ONCE on mount — stable wrapper via ref ──
-// useEffect(() => {
-//   if (onPdfReady) {
-//     onPdfReady(() => () => downloadRef.current?.());  // ← double-wrap
-//   }
-// }, []); // eslint-disable-line react-hooks/exhaustive-deps
+useEffect(() => {
+  if (onPdfReady) {
+    onPdfReady(() => () => downloadRef.current?.());  // ← double-wrap
+  }
+}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load dashboard data ───────────────────────────────────
   useEffect(() => {
@@ -990,18 +1234,20 @@ export default function DashboardChartsPage({ dashboardNumericId }) {
   const chartMap = Object.fromEntries(charts.map(c => [c.slice_id, c]));
 
   const cardProps = (chart, chartHeightPx = 320) => ({
-    sliceId:        chart.slice_id,
-    title:          chart.slice_name,
-    vizType:        chart.viz_type,
-    xAxis:          chart.x_axis,
+    sliceId:           chart.slice_id,
+    title:             chart.slice_name,
+    vizType:           chart.viz_type,
+    xAxis:             chart.x_axis,
     height: (chart.viz_type || "").toLowerCase().includes("big_number") ? BIGNUM_HEIGHT : chartHeightPx,
     activeFilters, dateFrom: dateFrom || null, dateTo: dateTo || null,
     crossFilters,  onCrossFilter: handleCrossFilter, onDrillDown: handleFilterChange,
-    metrics:        chart.metrics       || [],
-    groupby:        chart.groupby       || [],
-    groupbyRows:    chart.groupby_rows  || [],
-    groupbyColumns: chart.groupby_cols  || [],
-    zoomable:       chart.zoomable      || false,
+    metrics:           chart.metrics            || [],
+    groupby:           chart.groupby            || [],
+    groupbyRows:       chart.groupby_rows       || [],
+    groupbyColumns:    chart.groupby_cols       || [],
+    zoomable:          chart.zoomable           || false,
+    fontColor:         chart.font_color         || null,
+    conditionalColors: chart.conditional_colors || [],  // ← ADD
   });
 
   const renderRows = (rows) => rows.map((row, rIdx) => {
@@ -1034,20 +1280,87 @@ export default function DashboardChartsPage({ dashboardNumericId }) {
     );
   });
 
+
+
+  // Helper to extract chart IDs from a tab's rows:
+// const getChartIdsFromRows = (rows = []) => {
+//   const ids = new Set();
+//   rows.forEach(row => row.forEach(item => {
+//     if (item.chartId) ids.add(item.chartId);
+//   }));
+//   return ids;
+// };
+
   const renderWithLayout = () => sections.map((section, sIdx) => {
     if (section.type === "rows")
       return <React.Fragment key={sIdx}>{renderRows(section.rows)}</React.Fragment>;
     if (section.type === "tabs")
       return (
+        // <TabGroup
+        //   key={sIdx}
+        //   tabs={section.tabs}
+        //   chartMap={chartMap} cardProps={cardProps}
+        //   isMobile={isMobile} renderRows={renderRows}
+        //   // onTabChange={() => setCrossFilters({})}
+
+        //   onTabChange={(tabId, tabRows) => {
+        //     setCrossFilters({});
+        //     setActiveTabId(tabId);
+        //     // setActiveTabChartIds(getChartIdsFromRows(tabRows));
+        //     setActiveFilters(prev => {
+        //       const inScope = new Set(
+        //         filterDefs
+        //           .filter(fd => !fd.tabsInScope?.length || fd.tabsInScope.includes(tabId))
+        //           .map(fd => fd.column)
+        //       );
+        //       return Object.fromEntries(Object.entries(prev).filter(([col]) => inScope.has(col)));
+        //     });
+        //   }}
+          
+        //             // onTabChange={(tabId) => {
+        //   //   setCrossFilters({});
+        //   //   setActiveTabId(tabId);
+        //   //   // Also clear filters that go out of scope
+        //   //   setActiveFilters(prev => {
+        //   //     const inScope = new Set(
+        //   //       filterDefs
+        //   //         .filter(fd => !fd.tabsInScope?.length || fd.tabsInScope.includes(tabId))
+        //   //         .map(fd => fd.column)
+        //   //     );
+        //   //     return Object.fromEntries(Object.entries(prev).filter(([col]) => inScope.has(col)));
+        //   //   });
+        //   // }}
+
+        //   pdfTabIdx={pdfTabIdx}
+        //   pdfNestedTabIdx={pdfNestedTabIdx}
+        // />
+
         <TabGroup
-          key={sIdx}
-          tabs={section.tabs}
-          chartMap={chartMap} cardProps={cardProps}
-          isMobile={isMobile} renderRows={renderRows}
-          onTabChange={() => setCrossFilters({})}
-          // pdfTabIdx={pdfTabIdx}
-          // pdfNestedTabIdx={pdfNestedTabIdx}
-        />
+            key={sIdx}
+            tabs={section.tabs}
+            chartMap={chartMap}
+            cardProps={cardProps}
+            isMobile={isMobile}
+            renderRows={renderRows}
+            onTabChange={(tabId, tabRows) => {
+              setCrossFilters({});
+              setActiveTabId(tabId);
+              setActiveFilters(prev => {
+                const inScope = new Set(
+                  filterDefs
+                    .filter(fd => !fd.tabsInScope?.length || fd.tabsInScope.includes(tabId))
+                    .map(fd => fd.column)
+                );
+                return Object.fromEntries(Object.entries(prev).filter(([col]) => inScope.has(col)));
+              });
+            }}
+            pdfTabIdx={pdfTabIdx}
+            pdfNestedTabIdx={pdfNestedTabIdx}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            setDateFrom={setDateFrom}
+            setDateTo={setDateTo}
+          />
       );
     return null;
   });
@@ -1062,16 +1375,24 @@ export default function DashboardChartsPage({ dashboardNumericId }) {
     <div style={{ background: "#0d1117", minHeight: "100vh", padding: isMobile ? "10px" : "16px", position: "relative" }}>
 
       {/* PDF progress overlay */}
-      {/* <PdfProgressOverlay progress={pdfProgress} /> */}
+      <PdfProgressOverlay progress={pdfProgress} />
 
       <CrossFilterPills crossFilters={crossFilters} onClear={clearCrossFilter} onClearAll={clearAllCrossFilters} />
+
       <FilterPanel
-        filterDefs={filterDefs} activeFilters={activeFilters}
-        dateFrom={dateFrom} dateTo={dateTo}
-        onFilterChange={handleFilterChange}
-        onDateFromChange={setDateFrom} onDateToChange={setDateTo}
-        onReset={handleReset}
-      />
+          filterDefs={filterDefs.filter(fd => {
+            if (!fd.tabsInScope || fd.tabsInScope.length === 0) return true;
+            if (!activeTabId) return true;
+            return fd.tabsInScope.includes(activeTabId);
+          })}
+          activeFilters={activeFilters}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onFilterChange={handleFilterChange}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
+          onReset={handleReset}
+        />
       <ActivePills
         activeFilters={activeFilters} dateFrom={dateFrom} dateTo={dateTo}
         // onRemove={col => setActiveFilters(p => ({ ...p, [col]: null }))}
@@ -1080,14 +1401,14 @@ export default function DashboardChartsPage({ dashboardNumericId }) {
       />
 
       {/* Charts — captured for PDF */}
-      {/* <div ref={dashboardContentRef}>
-        {sections ? renderWithLayout() : renderFallback()}
-      </div> */}
-
-      {/* Charts */}
-      <div>
+      <div ref={dashboardContentRef}>
         {sections ? renderWithLayout() : renderFallback()}
       </div>
+
+      {/* Charts */}
+      {/* <div >
+        {sections ? renderWithLayout() : renderFallback()}
+      </div> */}
 
     </div>
   );

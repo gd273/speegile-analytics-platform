@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 
 // ─────────────────────────────────────────────────────────────
 //  Formatters (mirrors ChartCard)
@@ -23,7 +23,7 @@ const si3 = (n, div, sfx) => {
   return s.replace(/\.?0+$/, "") + sfx;
 };
 
-const ID_COL_PATTERN = /pincode|zip|postal|pin_code|pin|order_id|invoice|phone|mobile|(_id|id)$/i;
+const ID_COL_PATTERN = /pincode|zip|postal|pin_code|pin|order_id|invoice|phone|mobile|contact|tel|fax|#|(_id|id)$/i;
 
 const fmtNum = (v, colName = "") => {
   const n = Number(v);
@@ -43,7 +43,7 @@ const fmtNum = (v, colName = "") => {
 const fmtCell = (v, colName = "") => {
   if (v === null || v === undefined) return "—";
   const n = Number(v);
-  if (!isNaN(n) && v !== "") return fmtNum(v, colName);
+  if (!isNaN(n) && v !== "") return fmtTableNum(v, colName);
   const s = String(v);
   if (s.match(/^\d{4}-\d{2}-\d{2}/) || s.includes("T00:00:00")) {
     try {
@@ -57,6 +57,41 @@ const fmtCell = (v, colName = "") => {
 
 const isNumericKey = (rows, key) =>
   rows.some(r => r[key] !== null && r[key] !== undefined && !isNaN(Number(r[key])) && !isTimestampMs(Number(r[key])));
+
+// ── Table number formatter — full value, no K/M abbreviation ──
+const CURRENCY_COL_PATTERN = /amount|revenue|cost|price|mrp|earning|income|profit|loss|(^|\s|_)(net|value|sell)(\s|_|$)/i;
+const QTY_COL_PATTERN      = /qty|quantity|count|units|pieces|pcs|no\.|nos|phone|mobile|contact|whatsapp|tel|fax|#/i;
+
+function isCurrencyCol(colName) {
+  if (!colName) return false;
+  if (QTY_COL_PATTERN.test(colName)) return false;
+  return CURRENCY_COL_PATTERN.test(colName);
+}
+
+function fmtTableNum(val, colName = "") {
+  if (val === null || val === undefined || val === "") return "—";
+  const n = Number(val);
+  if (isNaN(n)) return String(val);
+  if (isTimestampMs(n)) return fmtDateMs(n);
+
+  // ID / phone columns — show raw, no formatting
+  if (colName && ID_COL_PATTERN.test(colName)) {
+    return Number.isInteger(n) ? String(n) : n.toFixed(2);
+  }
+
+  // Format with Indian locale commas: 89,52,612
+  const formatted = new Intl.NumberFormat("en-IN", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  }).format(n);
+
+  // Add ₹ for currency columns only
+  if (isCurrencyCol(colName)) {
+    return `₹${formatted}`;
+  }
+
+  return formatted;
+}
 
 // ─────────────────────────────────────────────────────────────
 //  useContainerWidth
@@ -120,37 +155,29 @@ function deriveColumns(data, groupbyRows, groupbyColumns, metricKeys, colnames) 
   const dimCols = [...new Set([...rowDims, ...colDims])].filter(k => allKeys.includes(k));
   const metCols = (metricKeys || []).filter(k => allKeys.includes(k));
 
-  // if (dimCols.length || metCols.length) {
-  //   const remaining = allKeys.filter(k =>
-  //     !dimCols.includes(k) && !metCols.includes(k) && isNumericKey(data, k)
-  //   );
-  //   return { dimCols, metCols: metCols.length ? metCols : remaining };
-  // }
   if (dimCols.length || metCols.length) {
-  // ── ID-type columns belong in dimCols, not remaining metrics ──
-  const idDimCols = allKeys.filter(k =>
-    !dimCols.includes(k) &&
-    !metCols.includes(k) &&
-    ID_COL_PATTERN.test(k)
-  );
+    const idDimCols = allKeys.filter(k =>
+      !dimCols.includes(k) &&
+      !metCols.includes(k) &&
+      ID_COL_PATTERN.test(k)
+    );
 
-  const remaining = allKeys.filter(k =>
-    !dimCols.includes(k) &&
-    !metCols.includes(k) &&
-    isNumericKey(data, k) &&
-    !ID_COL_PATTERN.test(k)   // ← exclude ID cols from metrics
-  );
+    const remaining = allKeys.filter(k =>
+      !dimCols.includes(k) &&
+      !metCols.includes(k) &&
+      isNumericKey(data, k) &&
+      !ID_COL_PATTERN.test(k)
+    );
 
-  return {
-    dimCols: [...dimCols, ...idDimCols],   // ← pincode goes here now
-    metCols: metCols.length ? metCols : remaining,
-  };
-}
+    return {
+      dimCols: [...dimCols, ...idDimCols],
+      metCols: metCols.length ? metCols : remaining,
+    };
+  }
 
-  // FIX — ID-type columns always go to autoDim even if numeric
-const ID_DIM_PATTERN = /pincode|zip|postal|pin_code|pin|order_id|invoice|phone|mobile|(_id|id)$/i;
-const autoMet = allKeys.filter(k => isNumericKey(data, k) && !ID_DIM_PATTERN.test(k));
-const autoDim = allKeys.filter(k => !autoMet.includes(k));
+  const ID_DIM_PATTERN = /pincode|zip|postal|pin_code|pin|order_id|invoice|phone|mobile|(_id|id)$/i;
+  const autoMet = allKeys.filter(k => isNumericKey(data, k) && !ID_DIM_PATTERN.test(k));
+  const autoDim = allKeys.filter(k => !autoMet.includes(k));
   return { dimCols: autoDim, metCols: autoMet };
 }
 
@@ -279,8 +306,9 @@ export default function PivotTable({
   groupbyColumns = [],
   metricKeys     = [],
   colnames       = [],
-  onRowClick,        // ← called with (colName, value) on row click
-  crossFilterValue,  // ← currently active filter value — highlights that row
+  onRowClick,
+  crossFilterValue,
+  title          = "export",   // ← ADD
 }) {
   const containerRef        = useRef(null);
   const containerWidth      = useContainerWidth(containerRef);
@@ -297,22 +325,14 @@ export default function PivotTable({
     [data, groupbyRows, groupbyColumns, metricKeys, colnames]
   );
 
-  // const allCols = useMemo(() => {
-  //   const combined = [...dimCols, ...metCols];
-  //   if (combined.length) return combined;
-  //   return data.length ? Object.keys(data[0]) : [];
-  // }, [dimCols, metCols, data]);
-
   const allCols = useMemo(() => {
-  // Always use original data column order from colnames/data
-  // dimCols + metCols are used only for styling, not for deciding which cols to show
-  const allDataKeys = colnames?.length
-    ? colnames
-    : (data.length ? Object.keys(data[0]) : []);
-  if (allDataKeys.length) return allDataKeys;
-  const combined = [...dimCols, ...metCols];
-  return combined.length ? combined : [];
-}, [dimCols, metCols, data, colnames]);
+    const allDataKeys = colnames?.length
+      ? colnames
+      : (data.length ? Object.keys(data[0]) : []);
+    if (allDataKeys.length) return allDataKeys;
+    const combined = [...dimCols, ...metCols];
+    return combined.length ? combined : [];
+  }, [dimCols, metCols, data, colnames]);
 
   const filteredData = useMemo(() => {
     if (!search.trim()) return data;
@@ -326,22 +346,78 @@ export default function PivotTable({
 
   // ── Row click handler ─────────────────────────────────────────
   const handleRowClick = (row) => {
-  if (!onRowClick) return;
-  const dimKey = dimCols[0];
-  if (!dimKey) return;
+    if (!onRowClick) return;
+    const dimKey = dimCols[0];
+    if (!dimKey) return;
 
-  const val = row[dimKey];
-  if (val == null || val === "") return;
+    const val = row[dimKey];
+    if (val == null || val === "") return;
 
-  // ── Skip if dim column is a date/time column ──────────────────
-  // Sending timestamp values as IN filters causes Superset 400 errors.
-  // This prevents Order Details (dimCols[0]='date') from cross-filtering.
-  const isDateCol = /^date$|time|timestamp/i.test(dimKey) || isTimestampMs(Number(val));
-  if (isDateCol) return;
+    const isDateCol = /^date$|time|timestamp/i.test(dimKey) || isTimestampMs(Number(val));
+    if (isDateCol) return;
 
-  const isSameValue = String(val) === String(crossFilterValue);
-  onRowClick(dimKey, isSameValue ? null : String(val));
-};
+    const isSameValue = String(val) === String(crossFilterValue);
+    onRowClick(dimKey, isSameValue ? null : String(val));
+  };
+
+  // ── Export to Excel ───────────────────────────────────────────
+  const exportToExcel = () => {
+    // Use sorted+filtered data so what user sees is what gets exported
+    const rows = sorted;
+    if (!rows.length) return;
+
+    // Build CSV content with BOM for Excel to detect UTF-8 (₹ symbol support)
+    const BOM = "\uFEFF";
+
+    // Header row
+    const header = allCols.map(k => `"${String(k).replace(/"/g, '""')}"`).join(",");
+
+    // Data rows — export raw values (no ₹/commas) so Excel can treat as numbers
+    const body = rows.map(row =>
+          allCols.map(k => {
+            const v = row[k];
+            if (v === null || v === undefined) return "";
+
+            const n = Number(v);
+
+            // ── Timestamp → format as readable date string ──
+            if (!isNaN(n) && isTimestampMs(n)) {
+              try {
+                const d = new Date(n);
+                const dd = String(d.getDate()).padStart(2, "0");
+                const mm = String(d.getMonth() + 1).padStart(2, "0");
+                const yyyy = d.getFullYear();
+                return `"${dd}-${mm}-${yyyy}"`;   // → "22-05-2026"
+              } catch { return `"${v}"`; }
+            }
+
+            // ── ID / phone columns → quoted string, no number formatting ──
+            if (!isNaN(n) && v !== "" && ID_COL_PATTERN.test(k)) {
+              return `"${String(v).replace(/"/g, '""')}"`;
+            }
+
+            // ── Regular numbers → plain number for Excel SUM/calculations ──
+            if (!isNaN(n) && v !== "") return n;
+
+            // ── Text values ──
+            return `"${String(v).replace(/"/g, '""')}"`;
+          }).join(",")
+        ).join("\n");
+
+    const csv     = BOM + header + "\n" + body;
+    const blob    = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url     = URL.createObjectURL(blob);
+    const link    = document.createElement("a");
+    const ts      = new Date().toISOString().slice(0, 10);
+    link.href     = url;
+    // link.download = `export_${ts}.csv`;
+    const safeName = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    link.download  = `${safeName}_${ts}.csv`;    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // ── Empty state ───────────────────────────────────────────────
   if (!data.length) {
@@ -374,7 +450,7 @@ export default function PivotTable({
           <div key={ri} style={S.card(ri % 2 === 0)}>
             {allCols.map((k, ci) => {
               const isNum = metCols.includes(k) ||
-            (isNumericKey(data, k) && !ID_COL_PATTERN.test(k) && !dimCols.includes(k));
+                (isNumericKey(data, k) && !ID_COL_PATTERN.test(k) && !dimCols.includes(k));
               return (
                 <div key={k} style={{
                   ...S.cardRow,
@@ -408,13 +484,13 @@ export default function PivotTable({
     ...S.td(isNum, isEven),
     padding: isCompact ? "5px 8px" : "7px 12px",
     fontSize: isCompact ? 11 : 12,
-    textAlign: "center" ,
+    textAlign: "center",
   });
 
   return (
     <div ref={containerRef} style={{ width: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column" }}>
 
-      {/* Search */}
+      {/* Search + Export */}
       <div style={S.searchWrap}>
         <input
           style={S.searchInput}
@@ -427,6 +503,30 @@ export default function PivotTable({
             {sorted.length} / {data.length}
           </span>
         )}
+        <button
+          onClick={exportToExcel}
+          title="Export to Excel"
+          style={{
+            display:     "flex",
+            alignItems:  "center",
+            gap:         5,
+            background:  "rgba(31,168,201,0.1)",
+            border:      "1px solid rgba(31,168,201,0.3)",
+            borderRadius: 6,
+            padding:     "4px 10px",
+            color:       "#1FA8C9",
+            fontSize:    11,
+            fontWeight:  600,
+            cursor:      "pointer",
+            whiteSpace:  "nowrap",
+            flexShrink:  0,
+            transition:  "background 0.15s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = "rgba(31,168,201,0.2)"}
+          onMouseLeave={e => e.currentTarget.style.background = "rgba(31,168,201,0.1)"}
+        >
+          ⬇ Export
+        </button>
       </div>
 
       {/* Scrollable table */}
@@ -494,13 +594,12 @@ export default function PivotTable({
                   >
                     {allCols.map((k, ki) => {
                       const isNum = metCols.includes(k) ||
-                          (isNumericKey(data, k) && !ID_COL_PATTERN.test(k) && !dimCols.includes(k));
+                        (isNumericKey(data, k) && !ID_COL_PATTERN.test(k) && !dimCols.includes(k));
                       return (
                         <td
                           key={k}
                           style={{
                             ...tdStyle(isNum, ri % 2 === 0),
-                            // cyan left border on first cell of selected row
                             ...(ki === 0 && isSelected
                               ? { borderLeft: "3px solid #1FA8C9", paddingLeft: 9 }
                               : {}),

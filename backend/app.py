@@ -17,7 +17,7 @@ from flask_session import Session
 from dotenv import load_dotenv
 from pathlib import Path
 import io
-from tenants_handler import handle_client_orders, handle_shinde_shoes, handle_apparel_store, handle_tally_sales,handle_tally_sales_v2
+from tenants_handler import handle_client_orders, handle_shinde_shoes, handle_apparel_store, handle_shinde_shoes_stock, handle_tally_sales,handle_tally_sales_v2
 from db_utils import log_load_error
 
 
@@ -89,26 +89,26 @@ s3_client = boto3.client(
     region_name= AWS_REGION
 )
 
-def upload_file_to_s3(file_bytes, tenant_schema, filename):
-    s3_key = f"speegile-tenant-upload-file/{tenant_schema}/{filename}"
-    s3_url = f"https://{S3_BUCKET}.s3.{os.getenv('AWS_REGION', 'ap-south-1')}.amazonaws.com/{s3_key}"
-    try:
-        from io import BytesIO
-        s3_client.upload_fileobj(
-            BytesIO(file_bytes),
-            S3_BUCKET,
-            s3_key,
-            ExtraArgs={'ContentType': 'application/octet-stream'},
-            Config=boto3.s3.transfer.TransferConfig(
-                multipart_threshold=10 * 1024 * 1024,
-                max_concurrency=5
-            )
-        )
-        print(f"DEBUG: File uploaded to S3 → {s3_url}", flush=True)
-        return s3_key, s3_url
-    except Exception as e:
-        print(f"DEBUG: S3 upload failed: {e}", flush=True)
-        return None, None
+# def upload_file_to_s3(file_bytes, tenant_schema, filename):
+#     s3_key = f"speegile-tenant-upload-file/{tenant_schema}/{filename}"
+#     s3_url = f"https://{S3_BUCKET}.s3.{os.getenv('AWS_REGION', 'ap-south-1')}.amazonaws.com/{s3_key}"
+#     try:
+#         from io import BytesIO
+#         s3_client.upload_fileobj(
+#             BytesIO(file_bytes),
+#             S3_BUCKET,
+#             s3_key,
+#             ExtraArgs={'ContentType': 'application/octet-stream'},
+#             Config=boto3.s3.transfer.TransferConfig(
+#                 multipart_threshold=10 * 1024 * 1024,
+#                 max_concurrency=5
+#             )
+#         )
+#         print(f"DEBUG: File uploaded to S3 → {s3_url}", flush=True)
+#         return s3_key, s3_url
+#     except Exception as e:
+#         print(f"DEBUG: S3 upload failed: {e}", flush=True)
+#         return None, None
 
 # ---------------------------------------------------------
 # DATABASE ENGINE
@@ -402,6 +402,279 @@ def generate_guest_token():
         return jsonify({"error": "Failed to encode token"}), 500
 
 # ---------------------------------------------------------
+# @app.route('/api/upload-excel', methods=['POST'])
+# @login_required
+# def upload_excel():
+#     tenant_schema = session.get('tenant_schema')
+#     tenant_id     = session.get('tenant_id')
+#     user_id       = session.get('user_id', 1)
+
+#     print(f"DEBUG: Tenant Schema: {tenant_schema}", flush=True)
+#     print(f"DEBUG: Tenant ID: {tenant_id}", flush=True)
+#     print(f"DEBUG: User ID: {user_id}", flush=True)
+
+#     if 'excel_file' not in request.files:
+#         return jsonify({"success": False, "error": "No file part"}), 400
+
+#     file = request.files['excel_file']
+#     if file.filename == '':
+#         return jsonify({"success": False, "error": "No selected file"}), 400
+
+#     if engine is None:
+#         return jsonify({"success": False, "error": "Database unavailable"}), 503
+
+#     if not tenant_schema:
+#         return jsonify({"success": False, "error": "No tenant context found"}), 403
+
+#     if not file or not allowed_file(file.filename):
+#         return jsonify({"success": False, "error": "Invalid file type. Only xlsx and csv allowed"}), 400
+
+#     clean_filename = secure_filename(file.filename)
+#     lower_filename = clean_filename.lower()
+#     file_ext       = clean_filename.rsplit('.', 1)[1].lower()
+
+#     # ── Read file ONCE only
+#     print(f"DEBUG: Reading file bytes...", flush=True)
+#     file_bytes  = file.read()
+#     file_buffer = io.BytesIO(file_bytes)
+#     print(f"DEBUG: File read done. Size={len(file_bytes)} bytes", flush=True)
+
+#     # ── File size check BEFORE acquiring lock
+#     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+#     if len(file_bytes) > MAX_FILE_SIZE:
+#         return jsonify({"success": False, "error": "File too large. Maximum allowed size is 100MB."}), 400
+
+#     # ── Acquire Redis lock
+#     r        = redis.from_url(os.getenv("REDIS_URL"))
+#     lock_key = f"upload_lock:{tenant_schema}"
+#     lock     = r.set(lock_key, "1", nx=True, ex=120)
+
+#     if not lock:
+#         return jsonify({
+#             "success": False,
+#             "error": "Another upload is already in progress for this tenant. Please wait."
+#         }), 429
+
+#     # ── Everything below is wrapped in try/finally to ALWAYS release the lock
+#     try:
+#         # ── Upload to S3
+#         print(f"DEBUG: Starting S3 upload...", flush=True)
+#         s3_key, s3_url = upload_file_to_s3(file_bytes, tenant_schema, clean_filename)
+#         print(f"DEBUG: S3 upload done. key={s3_key}", flush=True)
+
+#         if s3_key is None:
+#             return jsonify({"success": False, "error": "File storage failed. Please try again."}), 500
+
+#         load_id     = None
+#         tenant_id   = None
+#         tenant_name = None
+
+#         # ── Tenant lookup
+#         print(f"DEBUG: Opening DB connection for tenant lookup...", flush=True)
+#         with engine.connect() as conn:
+#             tenant_data = conn.execute(text("""
+#                 SELECT
+#                     id,
+#                     "tenant_name",
+#                     "schema_name",
+#                     "table_name",
+#                     "fileprefix",
+#                     "DomainId"
+#                 FROM public.tenants
+#                 WHERE schema_name = :schema
+#             """), {"schema": tenant_schema}).mappings().first()
+#         print(f"DEBUG: Tenant lookup done. tenant={tenant_data['tenant_name'] if tenant_data else 'NOT FOUND'}", flush=True)
+
+#         if not tenant_data:
+#             return jsonify({"success": False, "error": "Invalid tenant configuration"}), 400
+
+#         tenant_id         = tenant_data["id"]
+#         target_table_name = tenant_data["table_name"]
+#         file_prefix       = tenant_data["fileprefix"]
+#         tenant_name       = tenant_data["tenant_name"].strip().lower()
+
+#         print(f"DEBUG: File prefix expected: {file_prefix}", flush=True)
+#         print(f"DEBUG: File name received: {clean_filename}", flush=True)
+
+#         if file_prefix and not lower_filename.startswith(file_prefix.lower()):
+#             return jsonify({
+#                 "success": False,
+#                 "error":   f"Invalid file name. File must start with prefix '{file_prefix}'.",
+#                 "example": f"{file_prefix}_2026_01.xlsx or {file_prefix}_2026_01.csv"
+#             }), 400
+
+#         with engine.connect() as load_conn:
+#             load_id = load_conn.execute(text("""
+#                 INSERT INTO public.load_master (tenant_id, user_id, filename, status)
+#                 VALUES (:tid, :uid, :fname, 'Processing')
+#                 RETURNING id
+#             """), {
+#                 "tid":    tenant_id,
+#                 "uid":    user_id,
+#                 "fname":  clean_filename,
+#                 "s3_key": s3_key,
+#                 "s3_url": s3_url
+#             }).scalar()
+#             load_conn.commit()
+
+#         print(f"DEBUG: Load ID created: {load_id}", flush=True)
+
+#         with engine.connect() as conn:
+#             trans = conn.begin()
+#             try:
+#                 if file_ext == 'xlsx':
+#                     xls        = pd.ExcelFile(file_buffer, engine='openpyxl')
+#                     dataframes = [xls.parse(sheet, dtype=str) for sheet in xls.sheet_names]
+#                 elif file_ext == 'csv':
+#                     file_buffer.seek(0)
+#                     dataframes = [pd.read_csv(file_buffer, dtype=str, encoding='utf-8-sig')]
+#                 else:
+#                     trans.rollback()
+#                     return jsonify({"success": False, "error": "Unsupported file format"}), 400
+
+#                 excel_max_date = None
+#                 for df in dataframes:
+#                     if df.empty:
+#                         continue
+
+#                     df.columns = [c.strip() for c in df.columns]
+#                     df = df.dropna(how='all').reset_index(drop=True)
+
+#                     if df.empty:
+#                         error_msg = "Uploaded file contains no data rows."
+#                         try:
+#                             with engine.connect() as error_conn:
+#                                 log_load_error(conn=error_conn, load_id=load_id,
+#                                                error_message=error_msg, row_number=None, column_name=None)
+#                         except Exception as log_err:
+#                             print(f"DEBUG: Could not log to load_errors: {log_err}", flush=True)
+#                         trans.rollback()
+#                         return jsonify({"success": False, "error": error_msg}), 400
+
+#                     df_original = df.copy()
+#                     print(f"DEBUG: Columns in file: {list(df.columns)}", flush=True)
+#                     print(f"DEBUG: Total rows after cleaning: {len(df)}", flush=True)
+
+#                     table_columns = conn.execute(text("""
+#                         SELECT column_name
+#                         FROM information_schema.columns
+#                         WHERE table_schema = :schema
+#                         AND table_name = :table
+#                     """), {
+#                         "schema": tenant_schema,
+#                         "table":  target_table_name
+#                     }).scalars().all()
+
+#                     print(f"DEBUG: DB columns: {table_columns}", flush=True)
+
+#                     df = df[[col for col in df.columns if col in table_columns]].copy()
+
+#                     if 'load_id' in table_columns:
+#                         df['load_id'] = load_id
+
+#                     if 'BillDate' in df.columns:
+#                         df = df[
+#                             df['BillDate'].notna() &
+#                             (df['BillDate'].astype(str).str.strip() != '')
+#                         ].copy()
+
+#                         df['BillDate'] = pd.to_datetime(
+#                             df['BillDate'], dayfirst=True, errors='coerce'
+#                         ).dt.strftime('%d-%m-%Y')
+
+#                         if df['BillDate'].isna().any():
+#                             bad_rows = df[df['BillDate'].isna()].index.tolist()
+#                             error_msg = f"Invalid BillDate detected in rows: {bad_rows}. Expected format: DD-MM-YYYY."
+#                             try:
+#                                 with engine.connect() as error_conn:
+#                                     log_load_error(conn=error_conn, load_id=load_id,
+#                                                    error_message=error_msg, row_number=None, column_name='BillDate')
+#                             except Exception as log_err:
+#                                 print(f"DEBUG: Could not log to load_errors: {log_err}", flush=True)
+#                             trans.rollback()
+#                             return jsonify({"success": False, "error": error_msg}), 400
+
+#                         excel_max_date = pd.to_datetime(
+#                             df['BillDate'], format='%d-%m-%Y'
+#                         ).max().date()
+
+#                         print(f"DEBUG: Excel max date: {excel_max_date}", flush=True)
+
+#                     if 'LastPurDate' in df.columns:
+#                         df['LastPurDate'] = pd.to_datetime(
+#                             df['LastPurDate'], dayfirst=True, errors='coerce'
+#                         ).dt.strftime('%d-%m-%Y')
+
+#                     print(f"DEBUG: Data processed for {target_table_name}", flush=True)
+
+#                 print(f"DEBUG: Tenant name check: {tenant_name}", flush=True)
+
+#                 if tenant_name == "shinde_shoes":
+#                     handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, excel_max_date, log_load_error, engine)
+#                 elif tenant_name == "apparel_sales":
+#                     handle_apparel_store(conn, df_original, tenant_schema, load_id, log_load_error)
+#                 elif tenant_name == "siddhesh":
+#                     handle_client_orders(conn, df, tenant_schema, target_table_name, load_id, log_load_error)
+#                 elif tenant_name == "tally_data":
+#                     handle_tally_sales(conn, df_original, tenant_schema, target_table_name, load_id, log_load_error)
+#                 elif tenant_name == "tally_data2":
+#                     handle_tally_sales_v2(conn, df_original, tenant_schema, target_table_name, load_id, log_load_error)
+#                 else:
+#                     trans.rollback()
+#                     return jsonify({
+#                         "success": False,
+#                         "error":   f"No upload handler configured for tenant '{tenant_name}'."
+#                     }), 400
+
+#                 conn.execute(text("""
+#                     UPDATE public.load_master SET status='Pass' WHERE id=:lid
+#                 """), {"lid": load_id})
+
+#                 trans.commit()
+#                 print("DEBUG: Transaction committed successfully", flush=True)
+
+#                 try:
+#                     r = redis.from_url(os.getenv("REDIS_URL"))
+#                     for key in r.scan_iter("superset*"):
+#                         r.delete(key)
+#                     print("DEBUG: Superset cache cleared", flush=True)
+#                 except Exception as cache_err:
+#                     print(f"DEBUG: Cache clear failed (non-critical): {cache_err}", flush=True)
+
+#                 return jsonify({
+#                     "success": True,
+#                     "message": "Data uploaded successfully. Please Go To The Dashboard",
+#                     "load_id": load_id
+#                 }), 200
+
+#             except Exception as e:
+#                 error_message = str(e)
+#                 try:
+#                     trans.rollback()
+#                 except Exception:
+#                     pass
+
+#                 print(f"DEBUG: ERROR during upload: {error_message}", flush=True)
+#                 import traceback
+#                 traceback.print_exc()
+
+#                 if load_id:
+#                     try:
+#                         with engine.connect() as error_conn:
+#                             log_load_error(conn=error_conn, load_id=load_id,
+#                                            error_message=error_message, row_number=None, column_name=None)
+#                     except Exception as log_err:
+#                         print(f"DEBUG: Could not log to load_errors: {log_err}", flush=True)
+
+#                 return jsonify({"success": False, "error": error_message}), 500
+
+#     finally:
+#         # ✅ ALWAYS release the lock — success, failure, or crash
+#         r.delete(lock_key)
+#         print(f"DEBUG: Upload lock released for {tenant_schema}", flush=True)
+
+
+
 @app.route('/api/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
@@ -439,7 +712,6 @@ def upload_excel():
     file_buffer = io.BytesIO(file_bytes)
     print(f"DEBUG: File read done. Size={len(file_bytes)} bytes", flush=True)
 
-    # ── File size check BEFORE acquiring lock
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
     if len(file_bytes) > MAX_FILE_SIZE:
         return jsonify({"success": False, "error": "File too large. Maximum allowed size is 100MB."}), 400
@@ -455,21 +727,23 @@ def upload_excel():
             "error": "Another upload is already in progress for this tenant. Please wait."
         }), 429
 
-    # ── Everything below is wrapped in try/finally to ALWAYS release the lock
     try:
         # ── Upload to S3
-        print(f"DEBUG: Starting S3 upload...", flush=True)
-        s3_key, s3_url = upload_file_to_s3(file_bytes, tenant_schema, clean_filename)
-        print(f"DEBUG: S3 upload done. key={s3_key}", flush=True)
+        # print(f"DEBUG: Starting S3 upload...", flush=True)
+        # s3_key, s3_url = upload_file_to_s3(file_bytes, tenant_schema, clean_filename)
+        # print(f"DEBUG: S3 upload done. key={s3_key}", flush=True)
 
-        if s3_key is None:
-            return jsonify({"success": False, "error": "File storage failed. Please try again."}), 500
+        # if s3_key is None:
+        #     return jsonify({"success": False, "error": "File storage failed. Please try again."}), 500
 
         load_id     = None
         tenant_id   = None
         tenant_name = None
 
-        # ── Tenant lookup
+        # ── Tenant lookup — matches by schema AND filename prefix ────────
+        # Two rows can exist for same tenant (one for sales, one for stock).
+        # The query picks the row whose fileprefix matches the uploaded filename.
+        # LENGTH(fileprefix) DESC ensures more specific prefix wins if overlap.
         print(f"DEBUG: Opening DB connection for tenant lookup...", flush=True)
         with engine.connect() as conn:
             tenant_data = conn.execute(text("""
@@ -482,27 +756,49 @@ def upload_excel():
                     "DomainId"
                 FROM public.tenants
                 WHERE schema_name = :schema
-            """), {"schema": tenant_schema}).mappings().first()
+                  AND (
+                      fileprefix IS NULL
+                      OR LOWER(:filename) LIKE LOWER(fileprefix) || '%'
+                  )
+                ORDER BY LENGTH(fileprefix) DESC   -- most specific prefix wins
+                LIMIT 1
+            """), {
+                "schema":   tenant_schema,
+                "filename": lower_filename
+            }).mappings().first()
+
         print(f"DEBUG: Tenant lookup done. tenant={tenant_data['tenant_name'] if tenant_data else 'NOT FOUND'}", flush=True)
 
+        # ── If no row matched, the filename doesn't match any known prefix ─
         if not tenant_data:
-            return jsonify({"success": False, "error": "Invalid tenant configuration"}), 400
+            # Fetch all known prefixes for this schema to show a helpful error
+            with engine.connect() as conn:
+                known_prefixes = conn.execute(text("""
+                    SELECT fileprefix FROM public.tenants
+                    WHERE schema_name = :schema AND fileprefix IS NOT NULL
+                """), {"schema": tenant_schema}).scalars().all()
+
+            prefix_list = ", ".join(f"'{p}'" for p in known_prefixes) or "none configured"
+            return jsonify({
+                "success": False,
+                "error":   f"Invalid file name. No configuration found for '{clean_filename}'. "
+                           f"Expected prefixes: {prefix_list}."
+            }), 400
 
         tenant_id         = tenant_data["id"]
         target_table_name = tenant_data["table_name"]
-        file_prefix       = tenant_data["fileprefix"]
+        file_prefix       = tenant_data["fileprefix"] or ""
         tenant_name       = tenant_data["tenant_name"].strip().lower()
 
-        print(f"DEBUG: File prefix expected: {file_prefix}", flush=True)
-        print(f"DEBUG: File name received: {clean_filename}", flush=True)
+        # ── Detect file type from the matched fileprefix ──────────────────
+        file_type = "stock" if "stock" in file_prefix.lower() else "sales"
 
-        if file_prefix and not lower_filename.startswith(file_prefix.lower()):
-            return jsonify({
-                "success": False,
-                "error":   f"Invalid file name. File must start with prefix '{file_prefix}'.",
-                "example": f"{file_prefix}_2026_01.xlsx or {file_prefix}_2026_01.csv"
-            }), 400
+        print(f"DEBUG: Matched prefix  : {file_prefix}", flush=True)
+        print(f"DEBUG: Target table    : {target_table_name}", flush=True)
+        print(f"DEBUG: Detected type   : {file_type}", flush=True)
+        print(f"DEBUG: Tenant name     : {tenant_name}", flush=True)
 
+        # ── Create load master record
         with engine.connect() as load_conn:
             load_id = load_conn.execute(text("""
                 INSERT INTO public.load_master (tenant_id, user_id, filename, status)
@@ -511,9 +807,7 @@ def upload_excel():
             """), {
                 "tid":    tenant_id,
                 "uid":    user_id,
-                "fname":  clean_filename,
-                "s3_key": s3_key,
-                "s3_url": s3_url
+                "fname":  clean_filename
             }).scalar()
             load_conn.commit()
 
@@ -572,58 +866,39 @@ def upload_excel():
                     if 'load_id' in table_columns:
                         df['load_id'] = load_id
 
-                    if 'BillDate' in df.columns:
-                        df = df[
-                            df['BillDate'].notna() &
-                            (df['BillDate'].astype(str).str.strip() != '')
-                        ].copy()
-
-                        df['BillDate'] = pd.to_datetime(
-                            df['BillDate'], dayfirst=True, errors='coerce'
-                        ).dt.strftime('%d-%m-%Y')
-
-                        if df['BillDate'].isna().any():
-                            bad_rows = df[df['BillDate'].isna()].index.tolist()
-                            error_msg = f"Invalid BillDate detected in rows: {bad_rows}. Expected format: DD-MM-YYYY."
-                            try:
-                                with engine.connect() as error_conn:
-                                    log_load_error(conn=error_conn, load_id=load_id,
-                                                   error_message=error_msg, row_number=None, column_name='BillDate')
-                            except Exception as log_err:
-                                print(f"DEBUG: Could not log to load_errors: {log_err}", flush=True)
-                            trans.rollback()
-                            return jsonify({"success": False, "error": error_msg}), 400
-
-                        excel_max_date = pd.to_datetime(
-                            df['BillDate'], format='%d-%m-%Y'
-                        ).max().date()
-
-                        print(f"DEBUG: Excel max date: {excel_max_date}", flush=True)
-
-                    if 'LastPurDate' in df.columns:
-                        df['LastPurDate'] = pd.to_datetime(
-                            df['LastPurDate'], dayfirst=True, errors='coerce'
-                        ).dt.strftime('%d-%m-%Y')
 
                     print(f"DEBUG: Data processed for {target_table_name}", flush=True)
 
-                print(f"DEBUG: Tenant name check: {tenant_name}", flush=True)
+                print(f"DEBUG: Routing → tenant={tenant_name} file_type={file_type}", flush=True)
 
-                if tenant_name == "shinde_shoes":
-                    handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, excel_max_date, log_load_error, engine)
+                # ── Route to correct handler ──────────────────────────────
+                if tenant_name == "shinde_shoes" and file_type == "sales":
+                    handle_shinde_shoes(conn, df, tenant_schema, target_table_name,
+                                        load_id, excel_max_date, log_load_error, engine)
+
+                elif tenant_name == "shinde_shoes" and file_type == "stock":
+                    handle_shinde_shoes_stock(conn, df, tenant_schema, target_table_name,
+                                              load_id, log_load_error, filename=clean_filename)
                 elif tenant_name == "apparel_sales":
                     handle_apparel_store(conn, df_original, tenant_schema, load_id, log_load_error)
+
                 elif tenant_name == "siddhesh":
-                    handle_client_orders(conn, df, tenant_schema, target_table_name, load_id, log_load_error)
+                    handle_client_orders(conn, df, tenant_schema, target_table_name,
+                                         load_id, log_load_error)
+
                 elif tenant_name == "tally_data":
-                    handle_tally_sales(conn, df_original, tenant_schema, target_table_name, load_id, log_load_error)
+                    handle_tally_sales(conn, df_original, tenant_schema, target_table_name,
+                                       load_id, log_load_error)
+
                 elif tenant_name == "tally_data2":
-                    handle_tally_sales_v2(conn, df_original, tenant_schema, target_table_name, load_id, log_load_error)
+                    handle_tally_sales_v2(conn, df_original, tenant_schema, target_table_name,
+                                          load_id, log_load_error)
+
                 else:
                     trans.rollback()
                     return jsonify({
                         "success": False,
-                        "error":   f"No upload handler configured for tenant '{tenant_name}'."
+                        "error":   f"No handler configured for tenant '{tenant_name}' file type '{file_type}'."
                     }), 400
 
                 conn.execute(text("""
@@ -642,9 +917,10 @@ def upload_excel():
                     print(f"DEBUG: Cache clear failed (non-critical): {cache_err}", flush=True)
 
                 return jsonify({
-                    "success": True,
-                    "message": "Data uploaded successfully. Please Go To The Dashboard",
-                    "load_id": load_id
+                    "success":   True,
+                    "message":   f"{'Stock' if file_type == 'stock' else 'Sales'} data uploaded successfully. Please Go To The Dashboard",
+                    "load_id":   load_id,
+                    "file_type": file_type,
                 }), 200
 
             except Exception as e:
@@ -669,10 +945,8 @@ def upload_excel():
                 return jsonify({"success": False, "error": error_message}), 500
 
     finally:
-        # ✅ ALWAYS release the lock — success, failure, or crash
         r.delete(lock_key)
         print(f"DEBUG: Upload lock released for {tenant_schema}", flush=True)
-
 
 # ---------------------------------------------------------
 # BRANDING
@@ -771,19 +1045,30 @@ def get_dashboard_charts():
                 except Exception:
                     form_data = {}
 
+            # ── Merge params into form_data for fields only in params ──────
+            # Some fields like conditional_formatting only exist in params, not form_data
+            try:
+                params_raw = detail.get("params", "{}")
+                params     = json.loads(params_raw) if isinstance(params_raw, str) else (params_raw or {})
+                for k, v in params.items():
+                    if k not in form_data:
+                        form_data[k] = v
+            except Exception:
+                pass
+
             viz_type = (
                 form_data.get("viz_type")
                 or detail.get("viz_type")
                 or "echarts_timeseries_bar"
             )
 
-            # ── Debug for timeseries/line charts — AFTER viz_type is defined ──
+            # ── Debug for timeseries/line charts ──
             if 'timeseries' in viz_type.lower() or 'line' in viz_type.lower():
                 print(f"DEBUG chart {chart_id} form_data keys: {list(form_data.keys())}", flush=True)
                 print(f"DEBUG chart {chart_id} groupby raw: {form_data.get('groupby')}", flush=True)
                 print(f"DEBUG chart {chart_id} metrics raw: {form_data.get('metrics', [])[:3]}", flush=True)
 
-            # ── Helper: extract plain string from str, dict, or None ──────
+            # ── Helper: extract plain string ──────────────────────────────
             def _extract_col_string(raw):
                 if not raw:
                     return ""
@@ -799,7 +1084,6 @@ def get_dashboard_charts():
                 return ""
 
             # ── Helper: extract list of plain strings from groupby lists ──
-            # ✅ MUST be defined BEFORE any call to _col_names below
             def _col_names(lst):
                 out = []
                 for item in (lst or []):
@@ -817,7 +1101,7 @@ def get_dashboard_charts():
                             out.append(name)
                 return [x for x in out if x]
 
-            # ── x_axis: normalize to plain string ─────────────────────────
+            # ── x_axis ────────────────────────────────────────────────────
             x_axis_raw = (
                 form_data.get("x_axis")
                 or form_data.get("granularity_sqla")
@@ -825,19 +1109,17 @@ def get_dashboard_charts():
             )
             x_axis = _extract_col_string(x_axis_raw)
 
-            # Fallback to first groupby column if x_axis is still empty
             if not x_axis:
                 gb_list = form_data.get("groupby") or []
                 if gb_list:
                     x_axis = _extract_col_string(gb_list[0])
 
-            # metrics = form_data.get("metrics", [])
-
+            # ── metrics ───────────────────────────────────────────────────
             metrics_primary   = form_data.get("metrics",   [])
             metrics_secondary = form_data.get("metrics_b", [])
             metrics = metrics_primary + (metrics_secondary if metrics_secondary else [])
 
-            # ✅ groupby normalized to plain strings — called AFTER _col_names defined
+            # ── groupby ───────────────────────────────────────────────────
             groupby_raw = (
                 form_data.get("groupby")
                 or form_data.get("series_columns")
@@ -862,7 +1144,7 @@ def get_dashboard_charts():
             groupby_rows = _col_names(groupby_rows_raw)
             groupby_cols = _col_names(groupby_cols_raw)
 
-            # ── raw_x_axis_column for x_axis_is_temporal check ────────────
+            # ── raw_x_axis_column ─────────────────────────────────────────
             raw_x_axis_column = _extract_col_string(
                 form_data.get("x_axis") or form_data.get("granularity_sqla") or ""
             )
@@ -883,6 +1165,43 @@ def get_dashboard_charts():
                 flush=True,
             )
 
+            # ── Extract BigNum color from conditional_formatting ──────────
+            font_color         = None   # ← always reset per chart
+            conditional_colors = []     # ← always reset per chart
+
+            if viz_type and "big_number" in viz_type.lower():
+                conditional_formatting = form_data.get("conditional_formatting") or []
+
+                COLOR_SCHEME_MAP = {
+                    "success":        "#22c55e",
+                    "alert":          "#fbbf24",
+                    "error":          "#f87171",
+                    "colorsuccessbg": "#22c55e",
+                    "colorwarningbg": "#fbbf24",
+                    "colorerrorbg":   "#f87171",
+                }
+
+                for rule in (conditional_formatting or []):
+                    scheme   = rule.get("colorScheme", "")
+                    operator = rule.get("operator", "")
+                    target   = rule.get("targetValue", 0)
+
+                    if scheme and scheme.startswith("#"):
+                        color = scheme
+                    else:
+                        color = COLOR_SCHEME_MAP.get(scheme.lower(), None)
+
+                    if color and operator and operator != "None":
+                        conditional_colors.append({
+                            "operator":    operator,
+                            "targetValue": target,
+                            "color":       color,
+                        })
+
+                if conditional_colors:
+                    font_color = conditional_colors[0]["color"]
+
+            # ── Append to chart list ──────────────────────────────────────
             chart_list.append({
                 "slice_id":           chart_id,
                 "slice_name":         detail.get("slice_name"),
@@ -895,15 +1214,14 @@ def get_dashboard_charts():
                 "raw_x_axis_column":  raw_x_axis_column,
                 "x_axis_is_temporal": x_axis_is_temporal,
                 "zoomable":           bool(form_data.get("zoomable", False)),
+                "font_color":         font_color,
+                "conditional_colors": conditional_colors,
             })
-            # ── Debug: check what zoomable value Superset returns ──
+
             print(f"DEBUG chart {chart_id}: zoomable = {form_data.get('zoomable')} | viz = {viz_type}", flush=True)
 
             if 'bar' in viz_type.lower():
                 print(f"DEBUG chart {chart_id} bar form_data keys: {list(form_data.keys())}", flush=True)
-                    
-
-
 
         return jsonify({"success": True, "charts": chart_list}), 200
 
@@ -915,13 +1233,420 @@ def get_dashboard_charts():
 # GET ALL CHARTS FOR A DASHBOARD
 # ---------------------------------------------------------
 
+# @app.route("/api/chart-data", methods=["POST"])
+# @login_required
+# def get_chart_data():
+#     body           = request.get_json(force=True, silent=True) or {}
+#     slice_id       = body.get("sliceId")
+#     date_from      = body.get("dateFrom")
+#     date_to        = body.get("dateTo")
+#     active_filters = body.get("activeFilters", [])
+#     cross_filters  = body.get("crossFilters",  [])
+
+#     VALID_OPS = {
+#         "IN", "NOT IN", "==", "!=", ">", "<", ">=", "<=",
+#         "LIKE", "ILIKE", "IS NULL", "IS NOT NULL", "TEMPORAL_RANGE",
+#     }
+
+#     # def normalise_filter(f):
+#     #     col = str(f.get("col", "")).strip()
+#     #     op  = str(f.get("op", "IN")).upper().strip()
+#     #     val = f.get("val")
+#     #     if not col: return None
+#     #     if op not in VALID_OPS: op = "IN"
+#     #     if not isinstance(val, list): val = [val]
+#     #     val = [v for v in val if v is not None and v != ""]
+#     #     if not val and op not in ("IS NULL", "IS NOT NULL"): return None
+#     #     return {"col": col, "op": op, "val": val}
+
+#     def normalise_filter(f):
+#         col = str(f.get("col", "")).strip()
+#         op  = str(f.get("op", "IN")).upper().strip()
+#         val = f.get("val")
+#         if not col: return None
+#         if op not in VALID_OPS: op = "IN"
+#         if not isinstance(val, list): val = [val]
+
+#         # ── Fix double-wrapped arrays: [['GORAI BRANCH']] → ['GORAI BRANCH'] ──
+#         flat = []
+#         for v in val:
+#             if isinstance(v, list):
+#                 flat.extend(v)   # unwrap inner list
+#             else:
+#                 flat.append(v)
+#         val = flat
+
+#         val = [v for v in val if v is not None and v != ""]
+#         if not val and op not in ("IS NULL", "IS NOT NULL"): return None
+#         return {"col": col, "op": op, "val": val}
+
+#     # def resolve_col(col, query):
+#     #     candidates = set()
+#     #     for c in query.get("columns", []):
+#     #         if isinstance(c, str):
+#     #             candidates.add(c)
+#     #         elif isinstance(c, dict):
+#     #             name = (
+#     #                 c.get("column_name") or
+#     #                 c.get("label") or
+#     #                 c.get("sqlExpression") or ""
+#     #             )
+#     #             if name:
+#     #                 candidates.add(name)
+#     #     for f in query.get("filters", []):
+#     #         if f.get("col"):
+#     #             candidates.add(f["col"])
+#     #     if col in candidates:
+#     #         return col
+#     #     col_lower = col.lower()
+#     #     for candidate in candidates:
+#     #         if candidate.lower() == col_lower:
+#     #             print(f"DEBUG: Resolved column '{col}' → '{candidate}' (case-insensitive match)", flush=True)
+#     #             return candidate
+#     #     print(f"DEBUG: No column match for '{col}' in query context. Available: {candidates}", flush=True)
+#     #     return col
+
+#     def resolve_col(col, query):
+#         import re as _re
+
+#         candidates = set()
+#         for c in query.get("columns", []):
+#             if isinstance(c, str):
+#                 candidates.add(c)
+#             elif isinstance(c, dict):
+#                 name = (
+#                     c.get("column_name") or
+#                     c.get("label") or
+#                     c.get("sqlExpression") or ""
+#                 )
+#                 if name:
+#                     candidates.add(name)
+#         for f in query.get("filters", []):
+#             if f.get("col"):
+#                 candidates.add(f["col"])
+
+#         # ── Step 1: exact match ───────────────────────────────────────
+#         if col in candidates:
+#             return col
+
+#         # ── Step 2: case-insensitive match ────────────────────────────
+#         col_lower = col.lower()
+#         for candidate in candidates:
+#             if candidate.lower() == col_lower:
+#                 print(f"DEBUG: Resolved column '{col}' → '{candidate}' (case-insensitive match)", flush=True)
+#                 return candidate
+
+#         # ── Step 3: smart fallback — ONLY for series values ───────────
+#         #
+#         # Real column names use word chars only: category_name, brand_name, State
+#         # Series values contain special chars:   301-450, 450+, 61-160
+#         #
+#         # If col looks like a real column name (^\w+$), skip smart fallback
+#         # and return col_lower — let Superset handle it as a WHERE clause.
+#         # Only apply smart fallback when col looks like a series value.
+#         IS_COLUMN_NAME = _re.compile(r'^\w+$')
+
+#         if not IS_COLUMN_NAME.match(col):
+#             # col has special chars (-, +, etc.) → looks like a series value
+#             # Find the one dimension column it should map to
+#             already_filtered = {
+#                 f.get("col", "").lower()
+#                 for f in query.get("filters", [])
+#                 if f.get("col")
+#             }
+#             DATE_KEY_PATTERN = _re.compile(
+#                 r'date|time|key|offset|full|month', _re.IGNORECASE
+#             )
+#             spare_dims = [
+#                 c for c in candidates
+#                 if not DATE_KEY_PATTERN.search(c)
+#                 and c.lower() not in already_filtered
+#             ]
+#             if len(spare_dims) == 1:
+#                 print(
+#                     f"DEBUG: Mapping series value '{col}' → dimension col "
+#                     f"'{spare_dims[0]}' (smart fallback). Available: {candidates}",
+#                     flush=True
+#                 )
+#                 return spare_dims[0]
+
+#         # ── Step 4: final fallback ─────────────────────────────────────
+#     # Two patterns need different treatment:
+#     #
+#     #   "State"        → only first letter is uppercase (Title Case)
+#     #                    real column is probably "state" (all lower)
+#     #                    → return col_lower so Superset finds it
+#     #
+#     #   "locationName" → has uppercase letters AFTER first char (camelCase)
+#     #                    real column IS "locationName" with exact case
+#     #                    → return col as-is so Superset matches exactly
+#     #
+#         has_inner_uppercase = any(c.isupper() for c in col[1:]) if len(col) > 1 else False
+
+#         if has_inner_uppercase:
+#             # camelCase column — Superset needs exact original casing
+#             print(
+#                 f"DEBUG: No match for '{col}' (camelCase). "
+#                 f"Available: {candidates}. Returning original.",
+#                 flush=True
+#             )
+#             return col          # locationName → locationName
+#         else:
+#             # Simple word — lowercase to match actual DB column
+#             print(
+#                 f"DEBUG: No match for '{col}' (title/lower). "
+#                 f"Available: {candidates}. Returning lowercase.",
+#                 flush=True
+#             )
+#             return col_lower    # State → state
+
+#     # ── NEW: merge multiple query results (mixed charts) ──────
+#     def merge_query_results(all_results):
+#         def find_dim_col(rows_sample):
+#             if not rows_sample:
+#                 return None
+#             for k, v in rows_sample[0].items():
+#                 try:
+#                     float(v)
+#                 except (TypeError, ValueError):
+#                     return k
+#             return list(rows_sample[0].keys())[0]
+
+#         merged    = {}
+#         dim_col   = None
+#         col_order = []
+
+#         # ← RESTORE the original loop (the one that was commented out)
+#         for query_rows in all_results:
+#             if not query_rows:
+#                 continue
+#             qd = find_dim_col(query_rows)
+#             if dim_col is None:
+#                 dim_col = qd
+#                 col_order.append(dim_col)
+#             for row in query_rows:
+#                 dim_val = row.get(dim_col) or row.get(qd)
+#                 key     = str(dim_val)
+#                 if key not in merged:
+#                     merged[key] = {dim_col: dim_val}
+#                 for col, val in row.items():
+#                     if col == dim_col or col == qd:
+#                         continue
+#                     merged[key][col] = val
+#                     if col not in col_order:
+#                         col_order.append(col)
+
+#         rows = list(merged.values())
+#         return rows, col_order
+
+#     incoming_filters = []
+#     for f in (active_filters + cross_filters):
+#         nf = normalise_filter(f)
+#         if nf:
+#             incoming_filters.append(nf)
+
+#     print(f"DEBUG chart {slice_id}: incoming_filters = {incoming_filters}", flush=True)
+
+#     try:
+#         access_token = get_superset_access_token()
+#         chart_resp   = requests.get(
+#             f"{SUPERSET_URL}/api/v1/chart/{slice_id}",
+#             headers={"Authorization": f"Bearer {access_token}"},
+#             timeout=10
+#         )
+#         chart_result = chart_resp.json().get("result", {})
+#         raw_context  = chart_result.get("query_context")
+
+#         if not raw_context:
+#             params = {}
+#             try:
+#                 params = json.loads(chart_result.get("params", "{}"))
+#             except Exception:
+#                 pass
+
+#             datasource_id   = chart_result.get("datasource_id")
+#             datasource_type = chart_result.get("datasource_type", "table")
+
+#             if not datasource_id:
+#                 return jsonify({"success": True, "data": [], "reason": "No datasource"}), 200
+
+#             all_metrics  = params.get("metrics", [])
+#             time_col     = params.get("x_axis") or params.get("granularity_sqla") or ""
+#             groupby_cols = params.get("groupby", [])
+#             time_range   = params.get("time_range", "No filter")
+#             time_grain   = params.get("time_grain_sqla", "P1M")
+
+#             all_columns = []
+#             if time_col:
+#                 all_columns.append(time_col)
+#             for col in groupby_cols:
+#                 if col and col not in all_columns:
+#                     all_columns.append(col)
+
+#             query_context = {
+#                 "datasource": {"id": datasource_id, "type": datasource_type},
+#                 "force": False,
+#                 "queries": [{
+#                     "filters": [],
+#                     "extras": {"having": "", "where": "", "time_grain_sqla": time_grain},
+#                     "applied_time_extras": {},
+#                     "columns":    all_columns,
+#                     "metrics":    all_metrics,
+#                     "orderby":    [],
+#                     "time_range": time_range,
+#                     "row_limit":  params.get("row_limit", 10000),
+#                     "annotation_layers": [],
+#                 }],
+#                 "result_format": "json",
+#                 "result_type":   "results"
+#             }
+#         else:
+#             query_context = json.loads(raw_context)
+
+#         # ── Apply filters to every query ──────────────────────
+#         for query in query_context.get("queries", []):
+
+#             if incoming_filters:
+#                 resolved_filters = []
+#                 for f in incoming_filters:
+#                     resolved_col = resolve_col(f["col"], query)
+#                     resolved_filters.append({**f, "col": resolved_col})
+
+#                 # ── Merge multiple IN filters on the same column into one ──
+#                 # e.g. 3x stock_age_bucket IN ('301-450'), IN ('450+'), IN ('161-300')
+#                 # becomes stock_age_bucket IN ('301-450', '450+', '161-300')
+#                 merged = {}
+#                 for f in resolved_filters:
+#                     key = (f["col"], f["op"])
+#                     if f["op"] == "IN" and key in merged:
+#                         existing_vals = merged[key]["val"] if isinstance(merged[key]["val"], list) else [merged[key]["val"]]
+#                         new_vals      = f["val"] if isinstance(f["val"], list) else [f["val"]]
+#                         merged[key]["val"] = list(dict.fromkeys(existing_vals + new_vals))  # dedup, preserve order
+#                     else:
+#                         merged[key] = dict(f)
+#                 resolved_filters = list(merged.values())
+
+#                 print(f"DEBUG chart {slice_id}: resolved_filters after merge = {resolved_filters}", flush=True)
+
+#                 override_cols = {f["col"] for f in resolved_filters}
+#                 existing = [
+#                     f for f in query.get("filters", [])
+#                     if f.get("col") not in override_cols
+#                 ]
+#                 query["filters"]       = existing + resolved_filters
+#                 query_context["force"] = True
+
+
+#                 # ── adhoc_filters: Superset's native filter mechanism ────────
+#                 # This is exactly how Superset's own filter bar passes filters.
+#                 # Works for ANY column in the dataset, even if not in SELECT.
+#                 # More reliable than extras.where for cross-dataset columns.
+#                 for f in resolved_filters:
+#                     col  = f["col"]
+#                     op   = f.get("op", "IN")
+#                     vals = f["val"] if isinstance(f["val"], list) else [f["val"]]
+
+#                     if op == "IN" and vals:
+#                         query.setdefault("adhoc_filters", []).append({
+#                             "expressionType":   "SIMPLE",
+#                             "subject":          col,
+#                             "operator":         "IN",
+#                             "comparator":       vals,
+#                             "clause":           "WHERE",
+#                             "filterOptionName": f"cross_filter_{col.replace(' ','_')}",
+#                             "isExtra":          True,
+#                         })
+
+#                 print(
+#                     f"DEBUG chart {slice_id}: adhoc_filters = "
+#                     f"{query.get('adhoc_filters', [])}",
+#                     flush=True
+#                 )
+
+#             if date_from and date_to:
+#                 date_range_val = f"{date_from} : {date_to}"
+#                 temporal_found = False
+#                 for f in query.get("filters", []):
+#                     if f.get("op") == "TEMPORAL_RANGE":
+#                         f["val"]       = date_range_val
+#                         temporal_found = True
+#                         break
+#                 if not temporal_found:
+#                     query.setdefault("filters", []).append({
+#                         "col": "sale_date",
+#                         "op":  "TEMPORAL_RANGE",
+#                         "val": date_range_val
+#                     })
+#                 query["applied_time_extras"] = {}
+#                 query_context["force"]       = True
+
+#             print(f"DEBUG chart {slice_id}: final filters = {query.get('filters')}", flush=True)
+
+#         data_resp = requests.post(
+#             f"{SUPERSET_URL}/api/v1/chart/data",
+#             headers={
+#                 "Authorization": f"Bearer {access_token}",
+#                 "Content-Type":  "application/json"
+#             },
+#             json=query_context,
+#             timeout=30
+#         )
+
+#         print(f"DEBUG chart {slice_id}: Superset response status = {data_resp.status_code}", flush=True)
+
+#         result      = data_resp.json()
+#         all_results = result.get("result", [])
+
+#         if not all_results:
+#             # ── No results at all ─────────────────────────────
+#             rows     = []
+#             colnames = []
+#             coltypes = []
+
+#         elif len(all_results) == 1:
+#             # ── Single query — existing behaviour unchanged ───
+#             first_result = all_results[0]
+#             rows     = first_result.get("data",     [])
+#             colnames = first_result.get("colnames") or (list(rows[0].keys()) if rows else [])
+#             coltypes = first_result.get("coltypes", [])
+
+#         else:
+#             # ── Mixed chart: 2+ queries → merge all results ───
+#             print(
+#                 f"DEBUG chart {slice_id}: mixed chart with {len(all_results)} queries — merging",
+#                 flush=True
+#             )
+#             all_data_lists = [r.get("data", []) for r in all_results]
+#             rows, colnames = merge_query_results(all_data_lists)
+#             coltypes       = []
+#             print(
+#                 f"DEBUG chart {slice_id}: merged → {len(rows)} rows, columns={colnames}",
+#                 flush=True
+#             )
+
+#         print(f"DEBUG chart {slice_id}: rows returned = {len(rows)}", flush=True)
+
+#         return jsonify({
+#             "success":  True,
+#             "data":     rows,
+#             "colnames": colnames,
+#             "coltypes": coltypes,
+#         }), 200
+
+#     except Exception as e:
+#         print(f"DEBUG chart {slice_id} ERROR: {e}", flush=True)
+#         import traceback
+#         traceback.print_exc()
+#         return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/chart-data", methods=["POST"])
 @login_required
 def get_chart_data():
     body           = request.get_json(force=True, silent=True) or {}
     slice_id       = body.get("sliceId")
-    date_from      = body.get("dateFrom")
-    date_to        = body.get("dateTo")
+    date_from      = body.get("dateFrom")   # "2026-01-01" or None
+    date_to        = body.get("dateTo")     # "2026-03-31" or None
     active_filters = body.get("activeFilters", [])
     cross_filters  = body.get("crossFilters",  [])
 
@@ -929,17 +1654,6 @@ def get_chart_data():
         "IN", "NOT IN", "==", "!=", ">", "<", ">=", "<=",
         "LIKE", "ILIKE", "IS NULL", "IS NOT NULL", "TEMPORAL_RANGE",
     }
-
-    # def normalise_filter(f):
-    #     col = str(f.get("col", "")).strip()
-    #     op  = str(f.get("op", "IN")).upper().strip()
-    #     val = f.get("val")
-    #     if not col: return None
-    #     if op not in VALID_OPS: op = "IN"
-    #     if not isinstance(val, list): val = [val]
-    #     val = [v for v in val if v is not None and v != ""]
-    #     if not val and op not in ("IS NULL", "IS NOT NULL"): return None
-    #     return {"col": col, "op": op, "val": val}
 
     def normalise_filter(f):
         col = str(f.get("col", "")).strip()
@@ -953,7 +1667,7 @@ def get_chart_data():
         flat = []
         for v in val:
             if isinstance(v, list):
-                flat.extend(v)   # unwrap inner list
+                flat.extend(v)
             else:
                 flat.append(v)
         val = flat
@@ -961,32 +1675,6 @@ def get_chart_data():
         val = [v for v in val if v is not None and v != ""]
         if not val and op not in ("IS NULL", "IS NOT NULL"): return None
         return {"col": col, "op": op, "val": val}
-
-    # def resolve_col(col, query):
-    #     candidates = set()
-    #     for c in query.get("columns", []):
-    #         if isinstance(c, str):
-    #             candidates.add(c)
-    #         elif isinstance(c, dict):
-    #             name = (
-    #                 c.get("column_name") or
-    #                 c.get("label") or
-    #                 c.get("sqlExpression") or ""
-    #             )
-    #             if name:
-    #                 candidates.add(name)
-    #     for f in query.get("filters", []):
-    #         if f.get("col"):
-    #             candidates.add(f["col"])
-    #     if col in candidates:
-    #         return col
-    #     col_lower = col.lower()
-    #     for candidate in candidates:
-    #         if candidate.lower() == col_lower:
-    #             print(f"DEBUG: Resolved column '{col}' → '{candidate}' (case-insensitive match)", flush=True)
-    #             return candidate
-    #     print(f"DEBUG: No column match for '{col}' in query context. Available: {candidates}", flush=True)
-    #     return col
 
     def resolve_col(col, query):
         import re as _re
@@ -1007,30 +1695,18 @@ def get_chart_data():
             if f.get("col"):
                 candidates.add(f["col"])
 
-        # ── Step 1: exact match ───────────────────────────────────────
         if col in candidates:
             return col
 
-        # ── Step 2: case-insensitive match ────────────────────────────
         col_lower = col.lower()
         for candidate in candidates:
             if candidate.lower() == col_lower:
                 print(f"DEBUG: Resolved column '{col}' → '{candidate}' (case-insensitive match)", flush=True)
                 return candidate
 
-        # ── Step 3: smart fallback — ONLY for series values ───────────
-        #
-        # Real column names use word chars only: category_name, brand_name, State
-        # Series values contain special chars:   301-450, 450+, 61-160
-        #
-        # If col looks like a real column name (^\w+$), skip smart fallback
-        # and return col_lower — let Superset handle it as a WHERE clause.
-        # Only apply smart fallback when col looks like a series value.
         IS_COLUMN_NAME = _re.compile(r'^\w+$')
 
         if not IS_COLUMN_NAME.match(col):
-            # col has special chars (-, +, etc.) → looks like a series value
-            # Find the one dimension column it should map to
             already_filtered = {
                 f.get("col", "").lower()
                 for f in query.get("filters", [])
@@ -1052,37 +1728,23 @@ def get_chart_data():
                 )
                 return spare_dims[0]
 
-        # ── Step 4: final fallback ─────────────────────────────────────
-    # Two patterns need different treatment:
-    #
-    #   "State"        → only first letter is uppercase (Title Case)
-    #                    real column is probably "state" (all lower)
-    #                    → return col_lower so Superset finds it
-    #
-    #   "locationName" → has uppercase letters AFTER first char (camelCase)
-    #                    real column IS "locationName" with exact case
-    #                    → return col as-is so Superset matches exactly
-    #
         has_inner_uppercase = any(c.isupper() for c in col[1:]) if len(col) > 1 else False
 
         if has_inner_uppercase:
-            # camelCase column — Superset needs exact original casing
             print(
                 f"DEBUG: No match for '{col}' (camelCase). "
                 f"Available: {candidates}. Returning original.",
                 flush=True
             )
-            return col          # locationName → locationName
+            return col
         else:
-            # Simple word — lowercase to match actual DB column
             print(
                 f"DEBUG: No match for '{col}' (title/lower). "
                 f"Available: {candidates}. Returning lowercase.",
                 flush=True
             )
-            return col_lower    # State → state
+            return col_lower
 
-    # ── NEW: merge multiple query results (mixed charts) ──────
     def merge_query_results(all_results):
         def find_dim_col(rows_sample):
             if not rows_sample:
@@ -1098,7 +1760,6 @@ def get_chart_data():
         dim_col   = None
         col_order = []
 
-        # ← RESTORE the original loop (the one that was commented out)
         for query_rows in all_results:
             if not query_rows:
                 continue
@@ -1120,6 +1781,34 @@ def get_chart_data():
 
         rows = list(merged.values())
         return rows, col_order
+
+    # ── Detect temporal date column from query ────────────────
+    def detect_temporal_col(query):
+        """
+        Find the date column from the query's existing TEMPORAL_RANGE filter,
+        or fall back to common date column name patterns.
+        """
+        # 1. Check existing TEMPORAL_RANGE filters — most reliable
+        for f in query.get("filters", []):
+            if f.get("op") == "TEMPORAL_RANGE" and f.get("col"):
+                return f["col"]
+
+        # 2. Check adhoc_filters for temporal range
+        for f in query.get("adhoc_filters", []):
+            if f.get("operator") == "TEMPORAL_RANGE" and f.get("subject"):
+                return f["subject"]
+
+        # 3. Look through columns for date-like names
+        DATE_PATTERN = __import__("re").compile(
+            r'date|time|month|day|year|period|sale_dt|invoice_dt',
+            __import__("re").IGNORECASE
+        )
+        for c in query.get("columns", []):
+            name = c if isinstance(c, str) else (c.get("column_name") or "")
+            if name and DATE_PATTERN.search(name):
+                return name
+
+        return None
 
     incoming_filters = []
     for f in (active_filters + cross_filters):
@@ -1188,22 +1877,20 @@ def get_chart_data():
         # ── Apply filters to every query ──────────────────────
         for query in query_context.get("queries", []):
 
+            # ── 1. Active + cross filters ─────────────────────
             if incoming_filters:
                 resolved_filters = []
                 for f in incoming_filters:
                     resolved_col = resolve_col(f["col"], query)
                     resolved_filters.append({**f, "col": resolved_col})
 
-                # ── Merge multiple IN filters on the same column into one ──
-                # e.g. 3x stock_age_bucket IN ('301-450'), IN ('450+'), IN ('161-300')
-                # becomes stock_age_bucket IN ('301-450', '450+', '161-300')
                 merged = {}
                 for f in resolved_filters:
                     key = (f["col"], f["op"])
                     if f["op"] == "IN" and key in merged:
                         existing_vals = merged[key]["val"] if isinstance(merged[key]["val"], list) else [merged[key]["val"]]
                         new_vals      = f["val"] if isinstance(f["val"], list) else [f["val"]]
-                        merged[key]["val"] = list(dict.fromkeys(existing_vals + new_vals))  # dedup, preserve order
+                        merged[key]["val"] = list(dict.fromkeys(existing_vals + new_vals))
                     else:
                         merged[key] = dict(f)
                 resolved_filters = list(merged.values())
@@ -1218,11 +1905,6 @@ def get_chart_data():
                 query["filters"]       = existing + resolved_filters
                 query_context["force"] = True
 
-
-                # ── adhoc_filters: Superset's native filter mechanism ────────
-                # This is exactly how Superset's own filter bar passes filters.
-                # Works for ANY column in the dataset, even if not in SELECT.
-                # More reliable than extras.where for cross-dataset columns.
                 for f in resolved_filters:
                     col  = f["col"]
                     op   = f.get("op", "IN")
@@ -1245,22 +1927,48 @@ def get_chart_data():
                     flush=True
                 )
 
-            if date_from and date_to:
-                date_range_val = f"{date_from} : {date_to}"
-                temporal_found = False
-                for f in query.get("filters", []):
-                    if f.get("op") == "TEMPORAL_RANGE":
-                        f["val"]       = date_range_val
-                        temporal_found = True
-                        break
-                if not temporal_found:
-                    query.setdefault("filters", []).append({
-                        "col": "sale_date",
-                        "op":  "TEMPORAL_RANGE",
-                        "val": date_range_val
-                    })
-                query["applied_time_extras"] = {}
-                query_context["force"]       = True
+            # ── 2. Date range filter ──────────────────────────
+            if date_from or date_to:
+                from_str       = date_from if date_from else "2000-01-01"
+                to_str         = date_to   if date_to   else "2099-12-31"
+                date_range_val = f"{from_str} : {to_str}"
+
+                # Detect which column to filter on
+                temporal_col = detect_temporal_col(query)
+
+                if temporal_col:
+                    # Update existing TEMPORAL_RANGE filter if present
+                    temporal_found = False
+                    for f in query.get("filters", []):
+                        if f.get("op") == "TEMPORAL_RANGE":
+                            f["col"] = temporal_col
+                            f["val"] = date_range_val
+                            temporal_found = True
+                            break
+
+                    # Add new one if not found
+                    if not temporal_found:
+                        query.setdefault("filters", []).append({
+                            "col": temporal_col,
+                            "op":  "TEMPORAL_RANGE",
+                            "val": date_range_val,
+                        })
+
+                    # Clear time extras so our range takes effect
+                    query["applied_time_extras"] = {}
+                    query_context["force"]       = True
+
+                    print(
+                        f"DEBUG chart {slice_id}: date filter applied → "
+                        f"col={temporal_col} val={date_range_val}",
+                        flush=True
+                    )
+                else:
+                    print(
+                        f"DEBUG chart {slice_id}: date filter skipped — "
+                        f"no temporal column found in query",
+                        flush=True
+                    )
 
             print(f"DEBUG chart {slice_id}: final filters = {query.get('filters')}", flush=True)
 
@@ -1280,20 +1988,17 @@ def get_chart_data():
         all_results = result.get("result", [])
 
         if not all_results:
-            # ── No results at all ─────────────────────────────
             rows     = []
             colnames = []
             coltypes = []
 
         elif len(all_results) == 1:
-            # ── Single query — existing behaviour unchanged ───
             first_result = all_results[0]
             rows     = first_result.get("data",     [])
             colnames = first_result.get("colnames") or (list(rows[0].keys()) if rows else [])
             coltypes = first_result.get("coltypes", [])
 
         else:
-            # ── Mixed chart: 2+ queries → merge all results ───
             print(
                 f"DEBUG chart {slice_id}: mixed chart with {len(all_results)} queries — merging",
                 flush=True
@@ -1320,7 +2025,6 @@ def get_chart_data():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
 
 # ---------------------------------------------------------
 # GET FILTER OPTIONS
@@ -1386,16 +2090,41 @@ def get_filter_options():
                 continue
 
             if filter_type == "filter_time":
+                scope_obj     = f.get("scope", {})
+                root_path     = scope_obj.get("rootPath", ["ROOT_ID"])
+                tabs_in_scope = f.get("tabsInScope") or []
+                if not tabs_in_scope:
+                    tabs_in_scope = [p for p in root_path if p.startswith("TAB-")]
+
                 filter_options.append({
-                    "id": f.get("id"), "name": f.get("name"),
-                    "type": "date", "column": col_name, "values": []
-                })
+                    "id":           f.get("id"),
+                    "name":         f.get("name"),
+                    "type":         "date",
+                    "column":       col_name,
+                    "values":       [],
+                    "tabsInScope":  tabs_in_scope,
+                    "chartsInScope": f.get("chartsInScope", []),
+                  })
+                
             elif filter_type in ["filter_select", "filter_groupby"]:
                 values = get_distinct_values(dataset_id, col_name)
+
+                scope_obj     = f.get("scope", {})
+                root_path     = scope_obj.get("rootPath", ["ROOT_ID"])
+                tabs_in_scope = f.get("tabsInScope") or []
+                if not tabs_in_scope:
+                    tabs_in_scope = [p for p in root_path if p.startswith("TAB-")]
+
                 filter_options.append({
-                    "id": f.get("id"), "name": f.get("name"),
-                    "type": "select", "column": col_name, "values": values
-                })
+                        "id":           f.get("id"),
+                        "name":         f.get("name"),
+                        "type":         "select",
+                        "column":       col_name,
+                        "values":       values,
+                        "tabsInScope":  tabs_in_scope,
+                        "chartsInScope": f.get("chartsInScope", []),
+                    })
+        print(f"DEBUG filter '{f.get('name')}': scope={scope_obj}, tabs_in_scope={tabs_in_scope}, charts_in_scope={f.get('chartsInScope', [])}", flush=True)        
 
         print(f"DEBUG filter_options: {filter_options}", flush=True)
         return jsonify({"success": True, "filters": filter_options}), 200
