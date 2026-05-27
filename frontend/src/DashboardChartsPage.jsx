@@ -1071,10 +1071,10 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
   }, []);
 
   const handleReset        = useCallback(() => { setActiveFilters({}); setDateFrom(""); setDateTo(""); }, []);
-  const handleCrossFilter  = useCallback((column, value, sourceChartId, sourceChartTitle, fromTable = false) => {
+  const handleCrossFilter  = useCallback((column, value, sourceChartId, sourceChartTitle, fromTable = false, chartsInScope = null) => {
     setCrossFilters(prev => {
       if (!value) { const next = { ...prev }; delete next[column]; return next; }
-      return { ...prev, [column]: { value, sourceChartId, sourceChartTitle, fromTable } };
+      return { ...prev, [column]: { value, sourceChartId, sourceChartTitle, fromTable, chartsInScope, } };
     });
   }, []);
   const clearCrossFilter     = useCallback((col) => setCrossFilters(prev => { const n = { ...prev }; delete n[col]; return n; }), []);
@@ -1233,22 +1233,58 @@ useEffect(() => {
 
   const chartMap = Object.fromEntries(charts.map(c => [c.slice_id, c]));
 
-  const cardProps = (chart, chartHeightPx = 320) => ({
+  // const cardProps = (chart, chartHeightPx = 320) => ({
+    
+  //   sliceId:           chart.slice_id,
+  //   title:             chart.slice_name,
+  //   vizType:           chart.viz_type,
+  //   xAxis:             chart.x_axis,
+  //   height: (chart.viz_type || "").toLowerCase().includes("big_number") ? BIGNUM_HEIGHT : chartHeightPx,
+  //   activeFilters, dateFrom: dateFrom || null, dateTo: dateTo || null,
+  //   crossFilters,  onCrossFilter: handleCrossFilter, onDrillDown: handleFilterChange,
+  //   metrics:           chart.metrics            || [],
+  //   groupby:           chart.groupby            || [],
+  //   groupbyRows:       chart.groupby_rows       || [],
+  //   groupbyColumns:    chart.groupby_cols       || [],
+  //   zoomable:          chart.zoomable           || false,
+  //   fontColor:         chart.font_color         || null,
+  //   conditionalColors: chart.conditional_colors || [],  // ← ADD
+  // });
+
+
+  const cardProps = (chart, chartHeightPx = 320) => {
+
+  // ── Only pass cross-filters that are scoped to affect this chart ──
+  const applicableCrossFilters = Object.fromEntries(
+    Object.entries(crossFilters).filter(([, f]) => {
+      if (!f.chartsInScope) return true;          // no scope = affects all
+      return f.chartsInScope.includes(chart.slice_id);  // ← respect scoping
+    })
+  );
+
+  return {
     sliceId:           chart.slice_id,
     title:             chart.slice_name,
     vizType:           chart.viz_type,
     xAxis:             chart.x_axis,
-    height: (chart.viz_type || "").toLowerCase().includes("big_number") ? BIGNUM_HEIGHT : chartHeightPx,
-    activeFilters, dateFrom: dateFrom || null, dateTo: dateTo || null,
-    crossFilters,  onCrossFilter: handleCrossFilter, onDrillDown: handleFilterChange,
-    metrics:           chart.metrics            || [],
-    groupby:           chart.groupby            || [],
-    groupbyRows:       chart.groupby_rows       || [],
-    groupbyColumns:    chart.groupby_cols       || [],
-    zoomable:          chart.zoomable           || false,
-    fontColor:         chart.font_color         || null,
-    conditionalColors: chart.conditional_colors || [],  // ← ADD
-  });
+    height:            (chart.viz_type || "").toLowerCase().includes("big_number")
+                         ? BIGNUM_HEIGHT : chartHeightPx,
+    activeFilters,
+    dateFrom:          dateFrom || null,
+    dateTo:            dateTo   || null,
+    crossFilters:      applicableCrossFilters,     // ← scoped, not full
+    onCrossFilter:     handleCrossFilter,
+    onDrillDown:       handleFilterChange,
+    metrics:           chart.metrics       || [],
+    groupby:           chart.groupby       || [],
+    groupbyRows:       chart.groupby_rows  || [],
+    groupbyColumns:    chart.groupby_cols  || [],
+    zoomable:          chart.zoomable      || false,
+    fontColor:         chart.font_color    || null,
+    conditionalColors: chart.conditional_colors || [],
+    crossFilterScope:  chart.cross_filter_scope || null,  // ← ADD
+  };
+};
 
   const renderRows = (rows) => rows.map((row, rIdx) => {
     const totalCols = row.reduce((sum, item) => sum + (item.width || 6), 0);

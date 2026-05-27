@@ -330,9 +330,32 @@ const darkTooltip = {
 const axisX = (cats) => ({
   type: "category", data: cats,
   axisLine: { lineStyle: { color: "#2d3748" } }, axisTick: { show: false },
-  axisLabel: { color: "#8b9ab0", fontSize: 10, fontFamily: "inherit", rotate: cats.length > 8 ? 30 : 0 },
+  // axisLabel: { color: "#8b9ab0", fontSize: 10, fontFamily: "inherit", rotate: cats.length > 8 ? 30 : 0 },
+
+  axisLabel: {
+  color:      "#8b9ab0",
+  fontSize:   11,
+  fontFamily: "inherit",
+  interval: 0,
+  formatter: function(val) {
+    if (!val) return val;
+
+    // Try parsing as a date string or timestamp
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      const mon = d.toLocaleDateString("en-IN", { month: "short" }); // "Apr"
+      const yr  = String(d.getFullYear()).slice(2);                   // "25"
+      return `${mon}-${yr}`;  // → "Apr-25"
+    }
+
+    // If not a date, return as-is
+    return val;
+  },
+},
   splitLine: { show: false },
 });
+
+
 const axisY = () => ({
   type: "value", axisLine: { show: false }, axisTick: { show: false },
   axisLabel: { color: "#8b9ab0", fontSize: 10, fontFamily: "inherit", formatter: fmtNum },
@@ -984,7 +1007,8 @@ export default function ChartCard({
   groupbyColumns: groupbyColsProp = [],
   zoomable = false,    // ← ADD THIS
   fontColor = null,
-  conditionalColors  = [],    // ← ADD
+  conditionalColors  = [],
+   crossFilterScope  = null,    // ← ADD
 }) {
   const [data,         setData]         = useState([]);
   const [keys,         setKeys]         = useState([]);
@@ -1212,7 +1236,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
   const activeFilter = Object.values(crossFilters).find(f => f.sourceChartId === sliceId);
   const isSameValue  = activeFilter?.value === clickedName;
 
-  onCrossFilter(filterCol, isSameValue ? null : clickedName, sliceId, title);
+  onCrossFilter(filterCol, isSameValue ? null : clickedName, sliceId, title, false, crossFilterScope);
 };
 
 
@@ -1342,7 +1366,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
         </div>
 
         {/* ── Subtitle ── */}
-        <div style={{
+        {/* <div style={{
           fontSize:     10,
           color:        "#64748b",
           fontWeight:   500,
@@ -1352,7 +1376,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
           overflowWrap: "break-word",
         }}>
           {subtitle}
-        </div>
+        </div> */}
 
       </div>
     </div>
