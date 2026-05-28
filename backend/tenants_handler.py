@@ -992,3 +992,169 @@ def handle_tally_sales_v2(conn, df_original, tenant_schema, target_table_name, l
     )
 
     print(f"DEBUG: Inserted {len(insert_data)} rows into {tenant_schema}.{target_table_name}", flush=True)
+
+
+# ----------------------------------------------------------------------------------------
+#  New Accres Invoices Data
+# ----------------------------------------------------------------------------------------
+
+def handle_accrec(conn, df, tenant_schema, target_table_name, load_id, log_load_error):
+    """
+    Handler for AccRec (Accounts Receivable) invoice files.
+    Source: Tally / manual export — Tab or CSV separated.
+
+    Expected columns (exact names from export):
+        Invoice No./Txn No., Date, Parent Party, Party Name,
+        Category, GSTIN, Party Address, PINCODE, CITY, STATE,
+        Party Phone No., Total Amount, Item Name, Description,
+        Quantity, Unit, UnitPrice, Discount, Tax Percent, Tax, Amount
+    """
+    import re
+    from datetime import datetime
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 1: Validate required columns
+    # ─────────────────────────────────────────────────────────────
+    REQUIRED_COLS = ["Invoice No./Txn No.", "Date", "Party Name", "Amount"]
+    missing = [c for c in REQUIRED_COLS if c not in df.columns]
+    if missing:
+        raise ValueError(
+            f"Missing required columns in uploaded file: {missing}. "
+            f"Found columns: {list(df.columns)}"
+        )
+
+    print(f"DEBUG [{tenant_schema}]: AccRec file — {len(df)} rows", flush=True)
+    print(f"DEBUG [{tenant_schema}]: Columns: {list(df.columns)}", flush=True)
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 2: Column rename map → clean DB column names
+    # ─────────────────────────────────────────────────────────────
+    COLUMN_MAP = {
+        "Invoice No./Txn No.": "invoice_no",
+        "Date":                "invoice_date",
+        "Parent Party":        "parent_party",
+        "Party Name":          "party_name",
+        "Category":            "category",
+        "GSTIN":               "gstin",
+        "Party Address":       "party_address",
+        "PINCODE":             "pincode",
+        "CITY":                "city",
+        "STATE":               "state",
+        "Party Phone No.":     "party_phone",
+        "Total Amount":        "total_amount",
+        "Item Name":           "item_name",
+        "Description":         "description",
+        "Quantity":            "quantity",
+        "Unit":                "unit",
+        "UnitPrice":           "unit_price",
+        "Discount":            "discount",
+        "Tax Percent":         "tax_percent",
+        "Tax":                 "tax",
+        "Amount":              "amount",
+    }
+
+    # Rename only columns that exist in the file
+    existing_map = {k: v for k, v in COLUMN_MAP.items() if k in df.columns}
+    df = df.rename(columns=existing_map)
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 3: Clean nullish strings
+    # ─────────────────────────────────────────────────────────────
+    df = df.replace(
+        {'nan': None, 'NaT': None, 'None': None, '<NA>': None, '': None}
+    )
+    # Strip whitespace from all string columns
+    for col in df.select_dtypes(include='object').columns:
+        df[col] = df[col].str.strip()
+    # Re-replace empty strings after strip
+    df = df.replace({'': None})
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 4: Explicit type conversions
+    # ─────────────────────────────────────────────────────────────
+
+    # ── Date: DD/MM/YYYY → Python date ───────────────────────────
+    if "invoice_date" in df.columns:
+        df["invoice_date"] = pd.to_datetime(
+            df["invoice_date"], dayfirst=True, errors="coerce"
+        ).dt.date
+
+    # ── Amount column: remove commas, spaces, ₹ symbol ───────────
+    def clean_amount(val):
+        """'  17,500 '  →  17500.0"""
+        if val is None:
+            return None
+        cleaned = re.sub(r'[₹,\s]', '', str(val))
+        try:
+            return float(cleaned) if cleaned else None
+        except ValueError:
+            return None
+
+    NUMERIC_COLS = [
+        "total_amount", "unit_price", "discount",
+        "tax_percent", "tax", "amount"
+    ]
+    for col in NUMERIC_COLS:
+        if col in df.columns:
+            df[col] = df[col].apply(clean_amount)
+
+    # ── Quantity: numeric ─────────────────────────────────────────
+    if "quantity" in df.columns:
+        df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce")
+
+    # ── PINCODE and phone: keep as text, no formatting ────────────
+    for col in ["pincode", "party_phone"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).replace('nan', None)
+
+    print(
+        f"DEBUG [{tenant_schema}]: Types after conversion: "
+        f"{ {c: str(df[c].dtype) for c in df.columns} }",
+        flush=True
+    )
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 5: Add system columns
+    # ─────────────────────────────────────────────────────────────
+    df["load_id"] = load_id
+    df["row_no"]  = range(1, len(df) + 1)
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 6: Keep only columns that exist in the DB table
+    # ─────────────────────────────────────────────────────────────
+    table_columns = conn.execute(text("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = :schema
+          AND table_name   = :table
+    """), {
+        "schema": tenant_schema,
+        "table":  target_table_name
+    }).scalars().all()
+
+    # Drop columns not in DB, keep all DB columns that exist in df
+    df = df[[col for col in df.columns if col in table_columns]]
+
+    print(
+        f"DEBUG [{tenant_schema}]: Final columns for insert: {list(df.columns)}",
+        flush=True
+    )
+
+    # ─────────────────────────────────────────────────────────────
+    #  STEP 7: Insert (append — no truncate, each upload adds rows)
+    # ─────────────────────────────────────────────────────────────
+    print(
+        f"DEBUG [{tenant_schema}]: Inserting {len(df)} invoice rows...",
+        flush=True
+    )
+    df.to_sql(
+        target_table_name,
+        con=conn,
+        schema=tenant_schema,
+        if_exists="append",
+        index=False,
+    )
+    print(
+        f"DEBUG [{tenant_schema}]: AccRec insert done. load_id={load_id}",
+        flush=True
+    )    
