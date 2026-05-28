@@ -835,7 +835,7 @@ if (type === "line") {
          </div>`,
     },
     series: sortedKeys.map((k, i) => ({   // ← sortedKeys here too
-      type: "line", name: k, data: sData(k), smooth: 0.3,
+      type: "line", name: k, data: sData(k), smooth: false,
       triggerLineEvent: true,
       symbol: "circle",
       symbolSize: showLabels ? 10 : 8,
@@ -1236,6 +1236,15 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
   const activeFilter = Object.values(crossFilters).find(f => f.sourceChartId === sliceId);
   const isSameValue  = activeFilter?.value === clickedName;
 
+
+  console.log("CROSS FILTER FIRING:", {
+  sliceId,
+  crossFilterScope,   // ← is this [116] or null?
+  filterCol,
+  clickedName
+})
+
+
   onCrossFilter(filterCol, isSameValue ? null : clickedName, sliceId, title, false, crossFilterScope);
 };
 
@@ -1398,7 +1407,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
           title={title} 
           onRowClick={(col, val) => {
             if (!onCrossFilter) return;
-            onCrossFilter(col, val, sliceId, title, true);  // ← true = fromTable
+            onCrossFilter(col, val, sliceId, title, true, crossFilterScope);  // ← true = fromTable
           }
             
           }
@@ -1460,7 +1469,7 @@ return (
         <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0, marginLeft: 8 }}>
           {isSource && (
             <span
-              onClick={() => onCrossFilter && onCrossFilter(xKey, null, sliceId, title)}
+              onClick={() => onCrossFilter && onCrossFilter(xKey, null, sliceId, title, true, crossFilterScope)}  // ← true = clear filter from table
               title="Click to clear cross-filter"
               style={{ fontSize: 9, background: "rgba(31,168,201,0.2)", color: "#1FA8C9", border: "1px solid rgba(31,168,201,0.5)", padding: "2px 7px", borderRadius: 6, cursor: "pointer", letterSpacing: "0.06em", fontWeight: 700, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 4 }}>
               ✕ {selectedValue}

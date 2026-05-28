@@ -320,20 +320,73 @@ function TabGroup({
         borderBottom: "1px solid rgba(255,255,255,0.07)",
         background: "#12151f",
         minHeight: 42,
+        marginBottom: 14,
       }}>
+
+       <style>{`
+            /* ── Custom themed scrollbar for tabs ── */
+
+            /* Chrome, Safari, Edge */
+            .tabs-scroll-container::-webkit-scrollbar {
+              height: 3px;                          /* thin horizontal bar */
+            }
+            .tabs-scroll-container::-webkit-scrollbar-track {
+              background: rgba(255, 255, 255, 0.04);
+              border-radius: 10px;
+            }
+            .tabs-scroll-container::-webkit-scrollbar-thumb {
+              background: rgba(31, 168, 201, 0.4);  /* your cyan theme color */
+              border-radius: 10px;
+              transition: background 0.2s;
+            }
+            .tabs-scroll-container::-webkit-scrollbar-thumb:hover {
+              background: rgba(31, 168, 201, 0.8);  /* brighter on hover */
+            }
+
+            /* Firefox */
+            .tabs-scroll-container {
+              scrollbar-width: thin;
+              scrollbar-color: rgba(31, 168, 201, 0.4) rgba(255, 255, 255, 0.04);
+            }
+          `}</style>   
+
+      {/* LEFT — scrollable tabs with hidden scrollbar */}
         {tabs.length > 0 && (
-          <div style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            overflowX: "auto",
-            overflowY: "hidden",
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-            gap: 2,
-            padding: "0 8px",
-            minWidth: 0,
-          }}>
+          <div
+            className="tabs-scroll-container"
+
+            onWheel={(e) => {
+              // Shift+Scroll or plain scroll on this element → horizontal scroll
+              if (e.deltaY !== 0) {
+                e.currentTarget.scrollLeft += e.deltaY;
+                e.preventDefault();
+              }
+            }}
+
+
+            style={{
+              flex:            1,
+              display:         "flex",
+              alignItems:      "center",
+              overflowX:       "auto",
+              overflowY:       "hidden",
+              // scrollbarWidth:  "none",      // Firefox
+              // msOverflowStyle: "none",      // IE
+              gap:             2,
+              padding:         "4px 8px 8px 8px",
+              minWidth:        0,
+              cursor:     "grab",
+              // paddingBottom:   6,           // ← breathing room below tabs
+              // marginBottom:    4,           // ← space between tab row and charts
+            }}
+          >
+
+
+          {/* Hide scrollbar in Chrome/Safari */}
+              {/* <style>{`
+                .tabs-scroll-container::-webkit-scrollbar { display: none; }
+              `}</style> */}
+
             {tabs.map((tab, i) => (
               <button
                 key={tab.id}
@@ -1071,12 +1124,40 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
   }, []);
 
   const handleReset        = useCallback(() => { setActiveFilters({}); setDateFrom(""); setDateTo(""); }, []);
-  const handleCrossFilter  = useCallback((column, value, sourceChartId, sourceChartTitle, fromTable = false, chartsInScope = null) => {
-    setCrossFilters(prev => {
-      if (!value) { const next = { ...prev }; delete next[column]; return next; }
-      return { ...prev, [column]: { value, sourceChartId, sourceChartTitle, fromTable, chartsInScope, } };
-    });
-  }, []);
+  // const handleCrossFilter  = useCallback((column, value, sourceChartId, sourceChartTitle, fromTable = false, chartsInScope = null) => {
+  //   setCrossFilters(prev => {
+  //     if (!value) { const next = { ...prev }; delete next[column]; return next; }
+  //     return { ...prev, [column]: { value, sourceChartId, sourceChartTitle, fromTable, chartsInScope, } };
+  //   });
+  // }, []);
+
+  const handleCrossFilter = useCallback((
+  column, value, sourceChartId, sourceChartTitle,
+  fromTable = false, chartsInScope = null
+) => {
+  // Normalize to numbers to avoid string/int mismatch
+  const normalizedScope = chartsInScope
+    ? chartsInScope.map(Number)
+    : null;
+
+  setCrossFilters(prev => {
+    if (!value) {
+      const next = { ...prev };
+      delete next[column];
+      return next;
+    }
+    return {
+      ...prev,
+      [column]: {
+        value,
+        sourceChartId,
+        sourceChartTitle,
+        fromTable,
+        chartsInScope: normalizedScope,   // ← normalized
+      },
+    };
+  });
+}, []);
   const clearCrossFilter     = useCallback((col) => setCrossFilters(prev => { const n = { ...prev }; delete n[col]; return n; }), []);
   const clearAllCrossFilters = useCallback(() => setCrossFilters({}), []);
 
@@ -1256,11 +1337,15 @@ useEffect(() => {
 
   // ── Only pass cross-filters that are scoped to affect this chart ──
   const applicableCrossFilters = Object.fromEntries(
-    Object.entries(crossFilters).filter(([, f]) => {
-      if (!f.chartsInScope) return true;          // no scope = affects all
-      return f.chartsInScope.includes(chart.slice_id);  // ← respect scoping
-    })
-  );
+  Object.entries(crossFilters).filter(([col, f]) => {
+    console.log(`Chart ${chart.slice_id} | col=${col} | chartsInScope=`, f.chartsInScope);
+    if (!f.chartsInScope) return true;
+    
+    // ── Fix type mismatch: compare as numbers ──
+    const chartId = Number(chart.slice_id);
+    return f.chartsInScope.map(Number).includes(chartId);
+  })
+);
 
   return {
     sliceId:           chart.slice_id,
@@ -1282,7 +1367,8 @@ useEffect(() => {
     zoomable:          chart.zoomable      || false,
     fontColor:         chart.font_color    || null,
     conditionalColors: chart.conditional_colors || [],
-    crossFilterScope:  chart.cross_filter_scope || null,  // ← ADD
+    // crossFilterScope:  chart.cross_filter_scope || null,  // ← ADD
+     crossFilterScope: chart.cross_filter_scope ?? null,
   };
 };
 
@@ -1316,6 +1402,8 @@ useEffect(() => {
     );
   });
 
+
+  
 
 
   // Helper to extract chart IDs from a tab's rows:
