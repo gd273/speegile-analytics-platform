@@ -17,7 +17,7 @@ from flask_session import Session
 from dotenv import load_dotenv
 from pathlib import Path
 import io
-from tenants_handler import handle_client_orders, handle_shinde_shoes, handle_apparel_store, handle_shinde_shoes_stock, handle_tally_sales,handle_tally_sales_v2
+from tenants_handler import handle_client_orders, handle_shinde_shoes, handle_apparel_store, handle_shinde_shoes_stock, handle_tally_sales,handle_tally_sales_v2, handle_accrec
 from db_utils import log_load_error
 
 
@@ -894,6 +894,11 @@ def upload_excel():
                     handle_tally_sales_v2(conn, df_original, tenant_schema, target_table_name,
                                           load_id, log_load_error)
 
+                # In upload route, add the handler call:
+                elif tenant_name == "accrec":
+                    handle_accrec(conn, df_original, tenant_schema, target_table_name,
+                                load_id, log_load_error)    
+
                 else:
                     trans.rollback()
                     return jsonify({
@@ -1026,6 +1031,33 @@ def get_dashboard_charts():
 
         charts     = response.json().get("result", [])
         chart_list = []
+
+        # ── Fetch dashboard metadata for cross-filter scoping ────────
+        dashboard_meta_resp = requests.get(
+            f"{SUPERSET_URL}/api/v1/dashboard/{dashboard_id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=15
+        )
+        dashboard_meta      = dashboard_meta_resp.json().get("result", {})
+        raw_json_meta       = dashboard_meta.get("json_metadata") or "{}"
+        try:
+            json_metadata   = json.loads(raw_json_meta)
+        except Exception:
+            json_metadata   = {}
+
+        # ── Read from chart_configuration (correct location) ─────────
+        chart_configuration = json_metadata.get("chart_configuration", {})
+
+        # chart_configuration      = json_metadata.get("chart_configuration", {})
+        # global_chart_config      = json_metadata.get("global_chart_configuration", {})
+
+        # print(f"DEBUG: chart_configuration = {json.dumps(chart_configuration, indent=2)}", flush=True)
+        # print(f"DEBUG: global_chart_configuration = {json.dumps(global_chart_config, indent=2)}", flush=True)
+        # # print(f"DEBUG: cross_filter_scoping keys: {list(cross_filter_scoping.keys())}", flush=True)
+        # # print(f"DEBUG: raw json_metadata keys = {list(json_metadata.keys())}", flush=True)
+        # # print(f"DEBUG: cross_filter_scoping = {cross_filter_scoping}", flush=True)
+
+
 
         for chart in charts:
             chart_id    = chart.get("id")
@@ -1201,6 +1233,22 @@ def get_dashboard_charts():
                 if conditional_colors:
                     font_color = conditional_colors[0]["color"]
 
+
+            # chart_scope      = cross_filter_scoping.get(str(chart_id), {})
+            # charts_in_scope  = chart_scope.get("chartsInScope", None)
+
+            chart_cfg       = chart_configuration.get(str(chart_id), {})
+            charts_in_scope = chart_cfg.get("crossFilters", {}).get("chartsInScope", None)
+
+            if charts_in_scope is not None and len(charts_in_scope) == 0:
+                charts_in_scope = []   # empty = affects NO chart (cross-filter disabled)
+
+            print(f"DEBUG chart {chart_id}: chartsInScope = {charts_in_scope}", flush=True)
+
+            print(f"DEBUG chart {chart_id}: cross_filter_scope = {charts_in_scope}", flush=True)
+
+            print(f"DEBUG chart {chart_id}: cross_filter chartsInScope = {charts_in_scope}", flush=True)
+
             # ── Append to chart list ──────────────────────────────────────
             chart_list.append({
                 "slice_id":           chart_id,
@@ -1216,6 +1264,7 @@ def get_dashboard_charts():
                 "zoomable":           bool(form_data.get("zoomable", False)),
                 "font_color":         font_color,
                 "conditional_colors": conditional_colors,
+                "cross_filter_scope": charts_in_scope,
             })
 
             print(f"DEBUG chart {chart_id}: zoomable = {form_data.get('zoomable')} | viz = {viz_type}", flush=True)
@@ -1232,413 +1281,6 @@ def get_dashboard_charts():
 # ---------------------------------------------------------
 # GET ALL CHARTS FOR A DASHBOARD
 # ---------------------------------------------------------
-
-# @app.route("/api/chart-data", methods=["POST"])
-# @login_required
-# def get_chart_data():
-#     body           = request.get_json(force=True, silent=True) or {}
-#     slice_id       = body.get("sliceId")
-#     date_from      = body.get("dateFrom")
-#     date_to        = body.get("dateTo")
-#     active_filters = body.get("activeFilters", [])
-#     cross_filters  = body.get("crossFilters",  [])
-
-#     VALID_OPS = {
-#         "IN", "NOT IN", "==", "!=", ">", "<", ">=", "<=",
-#         "LIKE", "ILIKE", "IS NULL", "IS NOT NULL", "TEMPORAL_RANGE",
-#     }
-
-#     # def normalise_filter(f):
-#     #     col = str(f.get("col", "")).strip()
-#     #     op  = str(f.get("op", "IN")).upper().strip()
-#     #     val = f.get("val")
-#     #     if not col: return None
-#     #     if op not in VALID_OPS: op = "IN"
-#     #     if not isinstance(val, list): val = [val]
-#     #     val = [v for v in val if v is not None and v != ""]
-#     #     if not val and op not in ("IS NULL", "IS NOT NULL"): return None
-#     #     return {"col": col, "op": op, "val": val}
-
-#     def normalise_filter(f):
-#         col = str(f.get("col", "")).strip()
-#         op  = str(f.get("op", "IN")).upper().strip()
-#         val = f.get("val")
-#         if not col: return None
-#         if op not in VALID_OPS: op = "IN"
-#         if not isinstance(val, list): val = [val]
-
-#         # ── Fix double-wrapped arrays: [['GORAI BRANCH']] → ['GORAI BRANCH'] ──
-#         flat = []
-#         for v in val:
-#             if isinstance(v, list):
-#                 flat.extend(v)   # unwrap inner list
-#             else:
-#                 flat.append(v)
-#         val = flat
-
-#         val = [v for v in val if v is not None and v != ""]
-#         if not val and op not in ("IS NULL", "IS NOT NULL"): return None
-#         return {"col": col, "op": op, "val": val}
-
-#     # def resolve_col(col, query):
-#     #     candidates = set()
-#     #     for c in query.get("columns", []):
-#     #         if isinstance(c, str):
-#     #             candidates.add(c)
-#     #         elif isinstance(c, dict):
-#     #             name = (
-#     #                 c.get("column_name") or
-#     #                 c.get("label") or
-#     #                 c.get("sqlExpression") or ""
-#     #             )
-#     #             if name:
-#     #                 candidates.add(name)
-#     #     for f in query.get("filters", []):
-#     #         if f.get("col"):
-#     #             candidates.add(f["col"])
-#     #     if col in candidates:
-#     #         return col
-#     #     col_lower = col.lower()
-#     #     for candidate in candidates:
-#     #         if candidate.lower() == col_lower:
-#     #             print(f"DEBUG: Resolved column '{col}' → '{candidate}' (case-insensitive match)", flush=True)
-#     #             return candidate
-#     #     print(f"DEBUG: No column match for '{col}' in query context. Available: {candidates}", flush=True)
-#     #     return col
-
-#     def resolve_col(col, query):
-#         import re as _re
-
-#         candidates = set()
-#         for c in query.get("columns", []):
-#             if isinstance(c, str):
-#                 candidates.add(c)
-#             elif isinstance(c, dict):
-#                 name = (
-#                     c.get("column_name") or
-#                     c.get("label") or
-#                     c.get("sqlExpression") or ""
-#                 )
-#                 if name:
-#                     candidates.add(name)
-#         for f in query.get("filters", []):
-#             if f.get("col"):
-#                 candidates.add(f["col"])
-
-#         # ── Step 1: exact match ───────────────────────────────────────
-#         if col in candidates:
-#             return col
-
-#         # ── Step 2: case-insensitive match ────────────────────────────
-#         col_lower = col.lower()
-#         for candidate in candidates:
-#             if candidate.lower() == col_lower:
-#                 print(f"DEBUG: Resolved column '{col}' → '{candidate}' (case-insensitive match)", flush=True)
-#                 return candidate
-
-#         # ── Step 3: smart fallback — ONLY for series values ───────────
-#         #
-#         # Real column names use word chars only: category_name, brand_name, State
-#         # Series values contain special chars:   301-450, 450+, 61-160
-#         #
-#         # If col looks like a real column name (^\w+$), skip smart fallback
-#         # and return col_lower — let Superset handle it as a WHERE clause.
-#         # Only apply smart fallback when col looks like a series value.
-#         IS_COLUMN_NAME = _re.compile(r'^\w+$')
-
-#         if not IS_COLUMN_NAME.match(col):
-#             # col has special chars (-, +, etc.) → looks like a series value
-#             # Find the one dimension column it should map to
-#             already_filtered = {
-#                 f.get("col", "").lower()
-#                 for f in query.get("filters", [])
-#                 if f.get("col")
-#             }
-#             DATE_KEY_PATTERN = _re.compile(
-#                 r'date|time|key|offset|full|month', _re.IGNORECASE
-#             )
-#             spare_dims = [
-#                 c for c in candidates
-#                 if not DATE_KEY_PATTERN.search(c)
-#                 and c.lower() not in already_filtered
-#             ]
-#             if len(spare_dims) == 1:
-#                 print(
-#                     f"DEBUG: Mapping series value '{col}' → dimension col "
-#                     f"'{spare_dims[0]}' (smart fallback). Available: {candidates}",
-#                     flush=True
-#                 )
-#                 return spare_dims[0]
-
-#         # ── Step 4: final fallback ─────────────────────────────────────
-#     # Two patterns need different treatment:
-#     #
-#     #   "State"        → only first letter is uppercase (Title Case)
-#     #                    real column is probably "state" (all lower)
-#     #                    → return col_lower so Superset finds it
-#     #
-#     #   "locationName" → has uppercase letters AFTER first char (camelCase)
-#     #                    real column IS "locationName" with exact case
-#     #                    → return col as-is so Superset matches exactly
-#     #
-#         has_inner_uppercase = any(c.isupper() for c in col[1:]) if len(col) > 1 else False
-
-#         if has_inner_uppercase:
-#             # camelCase column — Superset needs exact original casing
-#             print(
-#                 f"DEBUG: No match for '{col}' (camelCase). "
-#                 f"Available: {candidates}. Returning original.",
-#                 flush=True
-#             )
-#             return col          # locationName → locationName
-#         else:
-#             # Simple word — lowercase to match actual DB column
-#             print(
-#                 f"DEBUG: No match for '{col}' (title/lower). "
-#                 f"Available: {candidates}. Returning lowercase.",
-#                 flush=True
-#             )
-#             return col_lower    # State → state
-
-#     # ── NEW: merge multiple query results (mixed charts) ──────
-#     def merge_query_results(all_results):
-#         def find_dim_col(rows_sample):
-#             if not rows_sample:
-#                 return None
-#             for k, v in rows_sample[0].items():
-#                 try:
-#                     float(v)
-#                 except (TypeError, ValueError):
-#                     return k
-#             return list(rows_sample[0].keys())[0]
-
-#         merged    = {}
-#         dim_col   = None
-#         col_order = []
-
-#         # ← RESTORE the original loop (the one that was commented out)
-#         for query_rows in all_results:
-#             if not query_rows:
-#                 continue
-#             qd = find_dim_col(query_rows)
-#             if dim_col is None:
-#                 dim_col = qd
-#                 col_order.append(dim_col)
-#             for row in query_rows:
-#                 dim_val = row.get(dim_col) or row.get(qd)
-#                 key     = str(dim_val)
-#                 if key not in merged:
-#                     merged[key] = {dim_col: dim_val}
-#                 for col, val in row.items():
-#                     if col == dim_col or col == qd:
-#                         continue
-#                     merged[key][col] = val
-#                     if col not in col_order:
-#                         col_order.append(col)
-
-#         rows = list(merged.values())
-#         return rows, col_order
-
-#     incoming_filters = []
-#     for f in (active_filters + cross_filters):
-#         nf = normalise_filter(f)
-#         if nf:
-#             incoming_filters.append(nf)
-
-#     print(f"DEBUG chart {slice_id}: incoming_filters = {incoming_filters}", flush=True)
-
-#     try:
-#         access_token = get_superset_access_token()
-#         chart_resp   = requests.get(
-#             f"{SUPERSET_URL}/api/v1/chart/{slice_id}",
-#             headers={"Authorization": f"Bearer {access_token}"},
-#             timeout=10
-#         )
-#         chart_result = chart_resp.json().get("result", {})
-#         raw_context  = chart_result.get("query_context")
-
-#         if not raw_context:
-#             params = {}
-#             try:
-#                 params = json.loads(chart_result.get("params", "{}"))
-#             except Exception:
-#                 pass
-
-#             datasource_id   = chart_result.get("datasource_id")
-#             datasource_type = chart_result.get("datasource_type", "table")
-
-#             if not datasource_id:
-#                 return jsonify({"success": True, "data": [], "reason": "No datasource"}), 200
-
-#             all_metrics  = params.get("metrics", [])
-#             time_col     = params.get("x_axis") or params.get("granularity_sqla") or ""
-#             groupby_cols = params.get("groupby", [])
-#             time_range   = params.get("time_range", "No filter")
-#             time_grain   = params.get("time_grain_sqla", "P1M")
-
-#             all_columns = []
-#             if time_col:
-#                 all_columns.append(time_col)
-#             for col in groupby_cols:
-#                 if col and col not in all_columns:
-#                     all_columns.append(col)
-
-#             query_context = {
-#                 "datasource": {"id": datasource_id, "type": datasource_type},
-#                 "force": False,
-#                 "queries": [{
-#                     "filters": [],
-#                     "extras": {"having": "", "where": "", "time_grain_sqla": time_grain},
-#                     "applied_time_extras": {},
-#                     "columns":    all_columns,
-#                     "metrics":    all_metrics,
-#                     "orderby":    [],
-#                     "time_range": time_range,
-#                     "row_limit":  params.get("row_limit", 10000),
-#                     "annotation_layers": [],
-#                 }],
-#                 "result_format": "json",
-#                 "result_type":   "results"
-#             }
-#         else:
-#             query_context = json.loads(raw_context)
-
-#         # ── Apply filters to every query ──────────────────────
-#         for query in query_context.get("queries", []):
-
-#             if incoming_filters:
-#                 resolved_filters = []
-#                 for f in incoming_filters:
-#                     resolved_col = resolve_col(f["col"], query)
-#                     resolved_filters.append({**f, "col": resolved_col})
-
-#                 # ── Merge multiple IN filters on the same column into one ──
-#                 # e.g. 3x stock_age_bucket IN ('301-450'), IN ('450+'), IN ('161-300')
-#                 # becomes stock_age_bucket IN ('301-450', '450+', '161-300')
-#                 merged = {}
-#                 for f in resolved_filters:
-#                     key = (f["col"], f["op"])
-#                     if f["op"] == "IN" and key in merged:
-#                         existing_vals = merged[key]["val"] if isinstance(merged[key]["val"], list) else [merged[key]["val"]]
-#                         new_vals      = f["val"] if isinstance(f["val"], list) else [f["val"]]
-#                         merged[key]["val"] = list(dict.fromkeys(existing_vals + new_vals))  # dedup, preserve order
-#                     else:
-#                         merged[key] = dict(f)
-#                 resolved_filters = list(merged.values())
-
-#                 print(f"DEBUG chart {slice_id}: resolved_filters after merge = {resolved_filters}", flush=True)
-
-#                 override_cols = {f["col"] for f in resolved_filters}
-#                 existing = [
-#                     f for f in query.get("filters", [])
-#                     if f.get("col") not in override_cols
-#                 ]
-#                 query["filters"]       = existing + resolved_filters
-#                 query_context["force"] = True
-
-
-#                 # ── adhoc_filters: Superset's native filter mechanism ────────
-#                 # This is exactly how Superset's own filter bar passes filters.
-#                 # Works for ANY column in the dataset, even if not in SELECT.
-#                 # More reliable than extras.where for cross-dataset columns.
-#                 for f in resolved_filters:
-#                     col  = f["col"]
-#                     op   = f.get("op", "IN")
-#                     vals = f["val"] if isinstance(f["val"], list) else [f["val"]]
-
-#                     if op == "IN" and vals:
-#                         query.setdefault("adhoc_filters", []).append({
-#                             "expressionType":   "SIMPLE",
-#                             "subject":          col,
-#                             "operator":         "IN",
-#                             "comparator":       vals,
-#                             "clause":           "WHERE",
-#                             "filterOptionName": f"cross_filter_{col.replace(' ','_')}",
-#                             "isExtra":          True,
-#                         })
-
-#                 print(
-#                     f"DEBUG chart {slice_id}: adhoc_filters = "
-#                     f"{query.get('adhoc_filters', [])}",
-#                     flush=True
-#                 )
-
-#             if date_from and date_to:
-#                 date_range_val = f"{date_from} : {date_to}"
-#                 temporal_found = False
-#                 for f in query.get("filters", []):
-#                     if f.get("op") == "TEMPORAL_RANGE":
-#                         f["val"]       = date_range_val
-#                         temporal_found = True
-#                         break
-#                 if not temporal_found:
-#                     query.setdefault("filters", []).append({
-#                         "col": "sale_date",
-#                         "op":  "TEMPORAL_RANGE",
-#                         "val": date_range_val
-#                     })
-#                 query["applied_time_extras"] = {}
-#                 query_context["force"]       = True
-
-#             print(f"DEBUG chart {slice_id}: final filters = {query.get('filters')}", flush=True)
-
-#         data_resp = requests.post(
-#             f"{SUPERSET_URL}/api/v1/chart/data",
-#             headers={
-#                 "Authorization": f"Bearer {access_token}",
-#                 "Content-Type":  "application/json"
-#             },
-#             json=query_context,
-#             timeout=30
-#         )
-
-#         print(f"DEBUG chart {slice_id}: Superset response status = {data_resp.status_code}", flush=True)
-
-#         result      = data_resp.json()
-#         all_results = result.get("result", [])
-
-#         if not all_results:
-#             # ── No results at all ─────────────────────────────
-#             rows     = []
-#             colnames = []
-#             coltypes = []
-
-#         elif len(all_results) == 1:
-#             # ── Single query — existing behaviour unchanged ───
-#             first_result = all_results[0]
-#             rows     = first_result.get("data",     [])
-#             colnames = first_result.get("colnames") or (list(rows[0].keys()) if rows else [])
-#             coltypes = first_result.get("coltypes", [])
-
-#         else:
-#             # ── Mixed chart: 2+ queries → merge all results ───
-#             print(
-#                 f"DEBUG chart {slice_id}: mixed chart with {len(all_results)} queries — merging",
-#                 flush=True
-#             )
-#             all_data_lists = [r.get("data", []) for r in all_results]
-#             rows, colnames = merge_query_results(all_data_lists)
-#             coltypes       = []
-#             print(
-#                 f"DEBUG chart {slice_id}: merged → {len(rows)} rows, columns={colnames}",
-#                 flush=True
-#             )
-
-#         print(f"DEBUG chart {slice_id}: rows returned = {len(rows)}", flush=True)
-
-#         return jsonify({
-#             "success":  True,
-#             "data":     rows,
-#             "colnames": colnames,
-#             "coltypes": coltypes,
-#         }), 200
-
-#     except Exception as e:
-#         print(f"DEBUG chart {slice_id} ERROR: {e}", flush=True)
-#         import traceback
-#         traceback.print_exc()
-#         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/api/chart-data", methods=["POST"])
 @login_required
