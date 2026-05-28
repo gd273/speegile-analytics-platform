@@ -380,7 +380,14 @@ const scrollLegend = (keys) => ({
 // ─────────────────────────────────────────────────────────────
 //  buildOption
 // ─────────────────────────────────────────────────────────────
-function buildOption({ type, data, keys, xKey, selectedValue, initialKeys = [], zoomable = false }) {
+// function buildOption({ type, data, keys, xKey, selectedValue, initialKeys = [], zoomable = false }) {
+
+    function buildOption({ 
+      type, data, keys, xKey, selectedValue, 
+      initialKeys = [], zoomable = false,
+      percentageThreshold = 0,   // ← ADD
+      otherThreshold      = 0,   // ← ADD
+    }) {
 
   // ── Consistent color lookup using original unfiltered key order ──
   // Ensures "161-300" always gets its original purple color even when
@@ -431,6 +438,9 @@ function buildOption({ type, data, keys, xKey, selectedValue, initialKeys = [], 
     if (!selectedValue) return baseColor;
     return catLabel === selectedValue ? baseColor : baseColor + "44";
   };
+
+  
+
 
     if (type === "heatmap") {
         const cols    = Object.keys(data[0]);
@@ -556,55 +566,130 @@ function buildOption({ type, data, keys, xKey, selectedValue, initialKeys = [], 
       }
 
 
-  if (type === "pie") {
-    const numKey = keys.find(k => data.some(r => !isNaN(Number(r[k])) && r[k] != null)) || keys[0];
-    const total  = data.reduce((s, r) => s + (Number(r[numKey]) || 0), 0);
-    return {
-      ...base,
-      // legend: { ...scrollLegend(data.map(r => String(r[xKey] ?? ""))), bottom: 2 },
-      legend: {
-            ...scrollLegend(data.map(r => String(r[xKey] ?? ""))),
-            bottom: 2,
-            selector: [
-              { type: "all",     title: "All" },
-              { type: "inverse", title: "Inv" }
-            ],
-            selectorPosition: "end",
-            selectorLabel: {
-              fontSize: 10,
-              padding:  [3, 8],
-              borderRadius:     4,
-              color:            "#8b9ab0",
-              borderColor:      "rgba(255,255,255,0.18)",
-              backgroundColor:  "rgba(255,255,255,0.04)",
-            },
-            selectorItemGap: 6,
-          },
-      tooltip: {
-        trigger: "item", ...darkTooltip,
-        formatter: p =>
-          `<div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px">${p.name}</div>
-           <span style="color:${p.color};font-size:14px;font-weight:700">${fmtNum(p.value)}</span>
-           <span style="color:#64748b;font-size:10px"> · ${p.percent.toFixed(1)}%</span>`,
+      if (type === "pie") {
+  const numKey = keys.find(k => data.some(r => !isNaN(Number(r[k])) && r[k] != null)) || keys[0];
+  const total  = data.reduce((s, r) => s + (Number(r[numKey]) || 0), 0);
+
+  // ── Build finalData — group small slices only when otherThreshold > 0 ──
+  let finalData;
+  if (otherThreshold > 0) {
+    const mainSlices  = [];
+    const otherSlices = [];
+
+    data.forEach((r, i) => {
+      const name  = String(r[xKey] ?? "");
+      const val   = Number(r[numKey]) || 0;
+      const pct   = total > 0 ? (val / total) * 100 : 0;
+      const color = COLORS[i % COLORS.length];
+      if (pct < otherThreshold) {
+        otherSlices.push({ name, value: val, color });
+      } else {
+        mainSlices.push({ name, value: val, color });
+      }
+    });
+
+    finalData = mainSlices.map(s => ({
+      name:  s.name,
+      value: s.value,
+      itemStyle: {
+        color:       selectedValue && s.name !== selectedValue ? s.color + "44" : s.color,
+        borderWidth: s.name === selectedValue ? 2 : 0,
+        borderColor: "#1FA8C9",
       },
-      graphic: [{
-        type: "text", left: "center", top: "center",
-        style: { text: `Total\n${fmtNum(total)}`, textAlign: "center", fontSize: 11, fill: "#94a3b8", lineHeight: 20, fontWeight: "600", fontFamily: "inherit" },
-      }],
-      series: [{
-        type: "pie", radius: ["40%", "70%"], center: ["50%", "46%"], padAngle: 2,
-        itemStyle: { borderRadius: 4, borderWidth: 0 },
-        label: { show: true, color: "#8b9ab0", fontSize: 10, fontFamily: "inherit", formatter: p => `${p.name}\n${fmtNum(p.value)}`, overflow: "truncate", width: 80 },
-        labelLine: { lineStyle: { color: "#334155" } },
-        emphasis: { scale: true, scaleSize: 5, itemStyle: { shadowBlur: 20, shadowColor: "rgba(0,0,0,0.6)" } },
-        data: data.map((r, i) => {
-          const name  = String(r[xKey] ?? "");
-          const color = COLORS[i % COLORS.length];
-          return { name, value: Number(r[numKey]) || 0, itemStyle: { color: selectedValue && name !== selectedValue ? color + "44" : color, borderWidth: name === selectedValue ? 2 : 0, borderColor: "#1FA8C9" } };
-        }),
-      }],
-    };
+    }));
+
+    if (otherSlices.length > 0) {
+      const otherVal = otherSlices.reduce((sum, s) => sum + s.value, 0);
+      finalData.push({
+        name:  `Other (${otherSlices.length})`,
+        value: otherVal,
+        itemStyle: { color: "#4a5568" },
+      });
+    }
+
+  } else {
+    // ── Original data mapping unchanged ──────────────────────────
+    finalData = data.map((r, i) => {
+      const name  = String(r[xKey] ?? "");
+      const color = COLORS[i % COLORS.length];
+      return {
+        name,
+        value: Number(r[numKey]) || 0,
+        itemStyle: {
+          color:       selectedValue && name !== selectedValue ? color + "44" : color,
+          borderWidth: name === selectedValue ? 2 : 0,
+          borderColor: "#1FA8C9",
+        },
+      };
+    });
   }
+
+  return {
+    ...base,
+    legend: {
+      ...scrollLegend(finalData.map(r => r.name)),  // ← uses finalData names
+      bottom: 2,
+      selector: [
+        { type: "all",     title: "All"  },
+        { type: "inverse", title: "Inv"  }
+      ],
+      selectorPosition: "end",
+      selectorLabel: {
+        fontSize:        10,
+        padding:         [3, 8],
+        borderRadius:    4,
+        color:           "#8b9ab0",
+        borderColor:     "rgba(255,255,255,0.18)",
+        backgroundColor: "rgba(255,255,255,0.04)",
+      },
+      selectorItemGap: 6,
+    },
+    tooltip: {
+      trigger: "item", ...darkTooltip,
+      formatter: p =>
+        `<div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px">${p.name}</div>
+         <span style="color:${p.color};font-size:14px;font-weight:700">${fmtNum(p.value)}</span>
+         <span style="color:#64748b;font-size:10px"> · ${p.percent.toFixed(1)}%</span>`,
+    },
+    graphic: [{
+      type: "text", left: "center", top: "center",
+      style: {
+        text: `Total\n${fmtNum(total)}`,
+        textAlign:  "center", fontSize: 11,
+        fill:       "#94a3b8", lineHeight: 20,
+        fontWeight: "600", fontFamily: "inherit"
+      },
+    }],
+    series: [{
+      type:      "pie",
+      radius:    ["40%", "70%"],    // ← original
+      center:    ["50%", "46%"],    // ← original
+      padAngle:  2,                 // ← original
+      itemStyle: { borderRadius: 4, borderWidth: 0 },  // ← original
+      label: {
+        show:     true,
+        color:    "#8b9ab0",
+        fontSize: 10,
+        fontFamily: "inherit",
+        overflow: "truncate",
+        width:    80,
+        // ← original format preserved + percentageThreshold check added
+        formatter: p => {
+          if (percentageThreshold > 0 && p.percent < percentageThreshold) return "";
+          return `${p.name}\n${fmtNum(p.value)}`;
+        },
+      },
+      labelLine: { lineStyle: { color: "#334155" } },  // ← original
+      emphasis:  {
+        scale: true, scaleSize: 5,
+        itemStyle: { shadowBlur: 20, shadowColor: "rgba(0,0,0,0.6)" }
+      },
+      data: finalData,   // ← only change from original
+    }],
+  };
+}
+
+
 
   if (type === "bar") {
     const isGrouped  = keys.length > 1;
@@ -1008,7 +1093,9 @@ export default function ChartCard({
   zoomable = false,    // ← ADD THIS
   fontColor = null,
   conditionalColors  = [],
-   crossFilterScope  = null,    // ← ADD
+  crossFilterScope  = null,    // ← ADD
+  percentageThreshold = 0,
+  otherThreshold      = 0,
 }) {
   const [data,         setData]         = useState([]);
   const [keys,         setKeys]         = useState([]);
@@ -1422,7 +1509,8 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
 return (
   <ReactECharts
     ref={echartsRef}
-    option={buildOption({ type, data, keys, xKey, selectedValue, initialKeys, zoomable  })}
+    // option={buildOption({ type, data, keys, xKey, selectedValue, initialKeys, zoomable  })}
+    option={buildOption({ type, data, keys, xKey, selectedValue, initialKeys, zoomable, percentageThreshold, otherThreshold,})}
     style={{ height, width: "100%", cursor: onCrossFilter ? "pointer" : "default" }}
     opts={{ renderer: "canvas" }}
     onEvents={{ click: handleChartClick }}

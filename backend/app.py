@@ -1010,6 +1010,287 @@ def truncate_table_simple():
 # ---------------------------------------------------------
 # GET ALL CHARTS FOR A DASHBOARD
 # ---------------------------------------------------------
+# @app.route("/api/dashboard-charts", methods=["GET"])
+# @login_required
+# def get_dashboard_charts():
+#     dashboard_id = request.args.get("dashboardId")
+
+#     if not dashboard_id:
+#         return jsonify({"error": "dashboardId is required"}), 400
+
+#     try:
+#         access_token = get_superset_access_token()
+#         if not access_token:
+#             return jsonify({"error": "Superset auth failed"}), 500
+
+#         response = requests.get(
+#             f"{SUPERSET_URL}/api/v1/dashboard/{dashboard_id}/charts",
+#             headers={"Authorization": f"Bearer {access_token}"},
+#             timeout=15
+#         )
+
+#         charts     = response.json().get("result", [])
+#         chart_list = []
+
+#         # ── Fetch dashboard metadata for cross-filter scoping ────────
+#         dashboard_meta_resp = requests.get(
+#             f"{SUPERSET_URL}/api/v1/dashboard/{dashboard_id}",
+#             headers={"Authorization": f"Bearer {access_token}"},
+#             timeout=15
+#         )
+#         dashboard_meta      = dashboard_meta_resp.json().get("result", {})
+#         raw_json_meta       = dashboard_meta.get("json_metadata") or "{}"
+#         try:
+#             json_metadata   = json.loads(raw_json_meta)
+#         except Exception:
+#             json_metadata   = {}
+
+#         # ── Read from chart_configuration (correct location) ─────────
+#         chart_configuration = json_metadata.get("chart_configuration", {})
+
+#         # chart_configuration      = json_metadata.get("chart_configuration", {})
+#         # global_chart_config      = json_metadata.get("global_chart_configuration", {})
+
+#         # print(f"DEBUG: chart_configuration = {json.dumps(chart_configuration, indent=2)}", flush=True)
+#         # print(f"DEBUG: global_chart_configuration = {json.dumps(global_chart_config, indent=2)}", flush=True)
+#         # # print(f"DEBUG: cross_filter_scoping keys: {list(cross_filter_scoping.keys())}", flush=True)
+#         # # print(f"DEBUG: raw json_metadata keys = {list(json_metadata.keys())}", flush=True)
+#         # # print(f"DEBUG: cross_filter_scoping = {cross_filter_scoping}", flush=True)
+
+
+
+#         for chart in charts:
+#             chart_id    = chart.get("id")
+#             detail_resp = requests.get(
+#                 f"{SUPERSET_URL}/api/v1/chart/{chart_id}",
+#                 headers={"Authorization": f"Bearer {access_token}"},
+#                 timeout=10
+#             )
+#             detail    = detail_resp.json().get("result", {})
+#             form_data = detail.get("form_data", {})
+
+#             if form_data.get("viz_type") == "pie":
+#                 print(f"DEBUG siddhesh pie {chart_id} form_data keys: {list(form_data.keys())}", flush=True)
+#                 for k, v in form_data.items():
+#                     if "other" in k.lower() or "threshold" in k.lower():
+#                         print(f"DEBUG pie threshold key: {k} = {v}", flush=True)
+#             # ── form_data is empty in this Superset version — data is in "params" ──
+#             if not form_data:
+#                 params_raw = detail.get("params", "{}")
+#                 try:
+#                     form_data = json.loads(params_raw) if isinstance(params_raw, str) else (params_raw or {})
+#                 except Exception:
+#                     form_data = {}
+
+#             # ── Pie chart threshold settings ──
+#             percentage_threshold = form_data.get("percentage_threshold", 0)
+#             other_threshold      = form_data.get("other_threshold", 0)
+            
+
+
+#             # ── Merge params into form_data for fields only in params ──────
+#             # Some fields like conditional_formatting only exist in params, not form_data
+#             try:
+#                 params_raw = detail.get("params", "{}")
+#                 params     = json.loads(params_raw) if isinstance(params_raw, str) else (params_raw or {})
+#                 for k, v in params.items():
+#                     if k not in form_data:
+#                         form_data[k] = v
+#             except Exception:
+#                 pass
+
+#             viz_type = (
+#                 form_data.get("viz_type")
+#                 or detail.get("viz_type")
+#                 or "echarts_timeseries_bar"
+#             )
+
+#             # ── Debug for timeseries/line charts ──
+#             if 'timeseries' in viz_type.lower() or 'line' in viz_type.lower():
+#                 print(f"DEBUG chart {chart_id} form_data keys: {list(form_data.keys())}", flush=True)
+#                 print(f"DEBUG chart {chart_id} groupby raw: {form_data.get('groupby')}", flush=True)
+#                 print(f"DEBUG chart {chart_id} metrics raw: {form_data.get('metrics', [])[:3]}", flush=True)
+
+#             # ── Helper: extract plain string ──────────────────────────────
+#             def _extract_col_string(raw):
+#                 if not raw:
+#                     return ""
+#                 if isinstance(raw, str):
+#                     return raw.strip()
+#                 if isinstance(raw, dict):
+#                     return (
+#                         raw.get("column_name") or
+#                         raw.get("label")       or
+#                         raw.get("name")        or
+#                         ""
+#                     ).strip()
+#                 return ""
+
+#             # ── Helper: extract list of plain strings from groupby lists ──
+#             def _col_names(lst):
+#                 out = []
+#                 for item in (lst or []):
+#                     if isinstance(item, str):
+#                         out.append(item)
+#                     elif isinstance(item, dict):
+#                         name = (
+#                             item.get("column_name")
+#                             or item.get("label")
+#                             or item.get("name")
+#                             or item.get("sqlExpression")
+#                             or ""
+#                         )
+#                         if name:
+#                             out.append(name)
+#                 return [x for x in out if x]
+
+#             # ── x_axis ────────────────────────────────────────────────────
+#             x_axis_raw = (
+#                 form_data.get("x_axis")
+#                 or form_data.get("granularity_sqla")
+#                 or ""
+#             )
+#             x_axis = _extract_col_string(x_axis_raw)
+
+#             if not x_axis:
+#                 gb_list = form_data.get("groupby") or []
+#                 if gb_list:
+#                     x_axis = _extract_col_string(gb_list[0])
+
+#             # ── metrics ───────────────────────────────────────────────────
+#             metrics_primary   = form_data.get("metrics",   [])
+#             metrics_secondary = form_data.get("metrics_b", [])
+#             metrics = metrics_primary + (metrics_secondary if metrics_secondary else [])
+
+#             # ── groupby ───────────────────────────────────────────────────
+#             groupby_raw = (
+#                 form_data.get("groupby")
+#                 or form_data.get("series_columns")
+#                 or form_data.get("dimensions")
+#                 or form_data.get("breakdown")
+#                 or []
+#             )
+#             groupby = _col_names(groupby_raw)
+
+#             groupby_rows_raw = (
+#                 form_data.get("groupbyRows")
+#                 or form_data.get("groupby_rows")
+#                 or []
+#             )
+#             groupby_cols_raw = (
+#                 form_data.get("groupbyColumns")
+#                 or form_data.get("groupby_cols")
+#                 or form_data.get("columns")
+#                 or []
+#             )
+
+#             groupby_rows = _col_names(groupby_rows_raw)
+#             groupby_cols = _col_names(groupby_cols_raw)
+
+#             # ── raw_x_axis_column ─────────────────────────────────────────
+#             raw_x_axis_column = _extract_col_string(
+#                 form_data.get("x_axis") or form_data.get("granularity_sqla") or ""
+#             )
+
+#             x_axis_is_temporal = bool(
+#                 form_data.get("granularity_sqla")
+#                 or (raw_x_axis_column and any(
+#                     k in raw_x_axis_column.lower()
+#                     for k in ["date", "time", "month", "day", "year", "period"]
+#                 ))
+#             )
+
+#             print(
+#                 f"DEBUG chart {chart_id}: viz={viz_type!r} x_axis={x_axis!r} "
+#                 f"groupby={groupby} "
+#                 f"groupby_rows={groupby_rows} groupby_cols={groupby_cols} "
+#                 f"metrics=[{[m if isinstance(m, str) else m.get('label', '?') for m in metrics[:3]]}]",
+#                 flush=True,
+#             )
+
+#             # ── Extract BigNum color from conditional_formatting ──────────
+#             font_color         = None   # ← always reset per chart
+#             conditional_colors = []     # ← always reset per chart
+
+#             if viz_type and "big_number" in viz_type.lower():
+#                 conditional_formatting = form_data.get("conditional_formatting") or []
+
+#                 COLOR_SCHEME_MAP = {
+#                     "success":        "#22c55e",
+#                     "alert":          "#fbbf24",
+#                     "error":          "#f87171",
+#                     "colorsuccessbg": "#22c55e",
+#                     "colorwarningbg": "#fbbf24",
+#                     "colorerrorbg":   "#f87171",
+#                 }
+
+#                 for rule in (conditional_formatting or []):
+#                     scheme   = rule.get("colorScheme", "")
+#                     operator = rule.get("operator", "")
+#                     target   = rule.get("targetValue", 0)
+
+#                     if scheme and scheme.startswith("#"):
+#                         color = scheme
+#                     else:
+#                         color = COLOR_SCHEME_MAP.get(scheme.lower(), None)
+
+#                     if color and operator and operator != "None":
+#                         conditional_colors.append({
+#                             "operator":    operator,
+#                             "targetValue": target,
+#                             "color":       color,
+#                         })
+
+#                 if conditional_colors:
+#                     font_color = conditional_colors[0]["color"]
+
+
+#             # chart_scope      = cross_filter_scoping.get(str(chart_id), {})
+#             # charts_in_scope  = chart_scope.get("chartsInScope", None)
+
+#             chart_cfg       = chart_configuration.get(str(chart_id), {})
+#             charts_in_scope = chart_cfg.get("crossFilters", {}).get("chartsInScope", None)
+
+#             if charts_in_scope is not None and len(charts_in_scope) == 0:
+#                 charts_in_scope = []   # empty = affects NO chart (cross-filter disabled)
+
+#             print(f"DEBUG chart {chart_id}: chartsInScope = {charts_in_scope}", flush=True)
+
+#             print(f"DEBUG chart {chart_id}: cross_filter_scope = {charts_in_scope}", flush=True)
+
+#             print(f"DEBUG chart {chart_id}: cross_filter chartsInScope = {charts_in_scope}", flush=True)
+
+#             # ── Append to chart list ──────────────────────────────────────
+#             chart_list.append({
+#                 "slice_id":           chart_id,
+#                 "slice_name":         detail.get("slice_name"),
+#                 "viz_type":           viz_type,
+#                 "x_axis":             x_axis,
+#                 "metrics":            metrics,
+#                 "groupby":            groupby,
+#                 "groupby_rows":       groupby_rows,
+#                 "groupby_cols":       groupby_cols,
+#                 "raw_x_axis_column":  raw_x_axis_column,
+#                 "x_axis_is_temporal": x_axis_is_temporal,
+#                 "zoomable":           bool(form_data.get("zoomable", False)),
+#                 "font_color":         font_color,
+#                 "conditional_colors": conditional_colors,
+#                 "cross_filter_scope": charts_in_scope,
+#                 "percentage_threshold": percentage_threshold,  # ← ADD
+#                 "other_threshold":      other_threshold,        # ← ADD
+#             })
+
+#             print(f"DEBUG chart {chart_id}: zoomable = {form_data.get('zoomable')} | viz = {viz_type}", flush=True)
+
+#             if 'bar' in viz_type.lower():
+#                 print(f"DEBUG chart {chart_id} bar form_data keys: {list(form_data.keys())}", flush=True)
+
+#         return jsonify({"success": True, "charts": chart_list}), 200
+
+#     except Exception as e:
+#         print(f"DEBUG: get_dashboard_charts error: {e}", flush=True)
+#         return jsonify({"error": str(e)}), 500
+
 @app.route("/api/dashboard-charts", methods=["GET"])
 @login_required
 def get_dashboard_charts():
@@ -1038,26 +1319,15 @@ def get_dashboard_charts():
             headers={"Authorization": f"Bearer {access_token}"},
             timeout=15
         )
-        dashboard_meta      = dashboard_meta_resp.json().get("result", {})
-        raw_json_meta       = dashboard_meta.get("json_metadata") or "{}"
+        dashboard_meta    = dashboard_meta_resp.json().get("result", {})
+        raw_json_meta     = dashboard_meta.get("json_metadata") or "{}"
         try:
-            json_metadata   = json.loads(raw_json_meta)
+            json_metadata = json.loads(raw_json_meta)
         except Exception:
-            json_metadata   = {}
+            json_metadata = {}
 
-        # ── Read from chart_configuration (correct location) ─────────
+        # ── Read cross-filter scoping from chart_configuration ───────
         chart_configuration = json_metadata.get("chart_configuration", {})
-
-        # chart_configuration      = json_metadata.get("chart_configuration", {})
-        # global_chart_config      = json_metadata.get("global_chart_configuration", {})
-
-        # print(f"DEBUG: chart_configuration = {json.dumps(chart_configuration, indent=2)}", flush=True)
-        # print(f"DEBUG: global_chart_configuration = {json.dumps(global_chart_config, indent=2)}", flush=True)
-        # # print(f"DEBUG: cross_filter_scoping keys: {list(cross_filter_scoping.keys())}", flush=True)
-        # # print(f"DEBUG: raw json_metadata keys = {list(json_metadata.keys())}", flush=True)
-        # # print(f"DEBUG: cross_filter_scoping = {cross_filter_scoping}", flush=True)
-
-
 
         for chart in charts:
             chart_id    = chart.get("id")
@@ -1069,7 +1339,7 @@ def get_dashboard_charts():
             detail    = detail_resp.json().get("result", {})
             form_data = detail.get("form_data", {})
 
-            # ── form_data is empty in this Superset version — data is in "params" ──
+            # ── Step 1: fallback to params if form_data is empty ─────
             if not form_data:
                 params_raw = detail.get("params", "{}")
                 try:
@@ -1077,8 +1347,9 @@ def get_dashboard_charts():
                 except Exception:
                     form_data = {}
 
-            # ── Merge params into form_data for fields only in params ──────
-            # Some fields like conditional_formatting only exist in params, not form_data
+            # ── Step 2: merge params into form_data ──────────────────
+            # Some fields like conditional_formatting / percentage_threshold
+            # only exist in params, not form_data
             try:
                 params_raw = detail.get("params", "{}")
                 params     = json.loads(params_raw) if isinstance(params_raw, str) else (params_raw or {})
@@ -1088,19 +1359,53 @@ def get_dashboard_charts():
             except Exception:
                 pass
 
+            # ── Step 3: resolve viz_type ─────────────────────────────
             viz_type = (
                 form_data.get("viz_type")
                 or detail.get("viz_type")
                 or "echarts_timeseries_bar"
             )
 
-            # ── Debug for timeseries/line charts ──
+            # ── Step 4: pie threshold debug — AFTER full form_data ───
+            if viz_type == "pie":
+                print(f"DEBUG pie {chart_id} ALL keys: {list(form_data.keys())}", flush=True)
+                for k, v in form_data.items():
+                    if "other" in k.lower() or "threshold" in k.lower():
+                        print(f"DEBUG pie {chart_id} threshold key: {k} = {v}", flush=True)
+
+            # ── Step 5: extract threshold values ─────────────────────
+            # percentage_threshold = form_data.get("percentage_threshold", 0) or 0
+            # other_threshold      = form_data.get("other_threshold", 0) or 0
+
+            # CORRECT key names from Superset:
+            percentage_threshold = (
+                form_data.get("show_labels_threshold")    # ← correct key
+                or form_data.get("percentage_threshold")  # ← fallback
+                or 0
+            ) or 0
+
+            other_threshold = (
+                form_data.get("threshold_for_other")      # ← correct key
+                or form_data.get("other_threshold")       # ← fallback
+                or 0
+            ) or 0
+
+            print(f"DEBUG pie {chart_id}: percentage_threshold={percentage_threshold} other_threshold={other_threshold}", flush=True)
+
+            print(
+                f"DEBUG chart {chart_id}: "
+                f"percentage_threshold={percentage_threshold} "
+                f"other_threshold={other_threshold}",
+                flush=True
+            )
+
+            # ── Debug for timeseries/line charts ─────────────────────
             if 'timeseries' in viz_type.lower() or 'line' in viz_type.lower():
                 print(f"DEBUG chart {chart_id} form_data keys: {list(form_data.keys())}", flush=True)
                 print(f"DEBUG chart {chart_id} groupby raw: {form_data.get('groupby')}", flush=True)
                 print(f"DEBUG chart {chart_id} metrics raw: {form_data.get('metrics', [])[:3]}", flush=True)
 
-            # ── Helper: extract plain string ──────────────────────────────
+            # ── Helper: extract plain string ──────────────────────────
             def _extract_col_string(raw):
                 if not raw:
                     return ""
@@ -1115,7 +1420,7 @@ def get_dashboard_charts():
                     ).strip()
                 return ""
 
-            # ── Helper: extract list of plain strings from groupby lists ──
+            # ── Helper: extract list of plain strings from groupby ───
             def _col_names(lst):
                 out = []
                 for item in (lst or []):
@@ -1133,7 +1438,7 @@ def get_dashboard_charts():
                             out.append(name)
                 return [x for x in out if x]
 
-            # ── x_axis ────────────────────────────────────────────────────
+            # ── x_axis ────────────────────────────────────────────────
             x_axis_raw = (
                 form_data.get("x_axis")
                 or form_data.get("granularity_sqla")
@@ -1146,12 +1451,12 @@ def get_dashboard_charts():
                 if gb_list:
                     x_axis = _extract_col_string(gb_list[0])
 
-            # ── metrics ───────────────────────────────────────────────────
+            # ── metrics ───────────────────────────────────────────────
             metrics_primary   = form_data.get("metrics",   [])
             metrics_secondary = form_data.get("metrics_b", [])
             metrics = metrics_primary + (metrics_secondary if metrics_secondary else [])
 
-            # ── groupby ───────────────────────────────────────────────────
+            # ── groupby ───────────────────────────────────────────────
             groupby_raw = (
                 form_data.get("groupby")
                 or form_data.get("series_columns")
@@ -1176,7 +1481,7 @@ def get_dashboard_charts():
             groupby_rows = _col_names(groupby_rows_raw)
             groupby_cols = _col_names(groupby_cols_raw)
 
-            # ── raw_x_axis_column ─────────────────────────────────────────
+            # ── raw_x_axis_column ─────────────────────────────────────
             raw_x_axis_column = _extract_col_string(
                 form_data.get("x_axis") or form_data.get("granularity_sqla") or ""
             )
@@ -1197,9 +1502,9 @@ def get_dashboard_charts():
                 flush=True,
             )
 
-            # ── Extract BigNum color from conditional_formatting ──────────
-            font_color         = None   # ← always reset per chart
-            conditional_colors = []     # ← always reset per chart
+            # ── BigNum conditional colors ─────────────────────────────
+            font_color         = None
+            conditional_colors = []
 
             if viz_type and "big_number" in viz_type.lower():
                 conditional_formatting = form_data.get("conditional_formatting") or []
@@ -1233,38 +1538,35 @@ def get_dashboard_charts():
                 if conditional_colors:
                     font_color = conditional_colors[0]["color"]
 
-
-            # chart_scope      = cross_filter_scoping.get(str(chart_id), {})
-            # charts_in_scope  = chart_scope.get("chartsInScope", None)
-
+            # ── Cross-filter scoping ──────────────────────────────────
             chart_cfg       = chart_configuration.get(str(chart_id), {})
             charts_in_scope = chart_cfg.get("crossFilters", {}).get("chartsInScope", None)
 
             if charts_in_scope is not None and len(charts_in_scope) == 0:
-                charts_in_scope = []   # empty = affects NO chart (cross-filter disabled)
+                charts_in_scope = []
 
             print(f"DEBUG chart {chart_id}: chartsInScope = {charts_in_scope}", flush=True)
-
             print(f"DEBUG chart {chart_id}: cross_filter_scope = {charts_in_scope}", flush=True)
-
             print(f"DEBUG chart {chart_id}: cross_filter chartsInScope = {charts_in_scope}", flush=True)
 
-            # ── Append to chart list ──────────────────────────────────────
+            # ── Append to chart list ──────────────────────────────────
             chart_list.append({
-                "slice_id":           chart_id,
-                "slice_name":         detail.get("slice_name"),
-                "viz_type":           viz_type,
-                "x_axis":             x_axis,
-                "metrics":            metrics,
-                "groupby":            groupby,
-                "groupby_rows":       groupby_rows,
-                "groupby_cols":       groupby_cols,
-                "raw_x_axis_column":  raw_x_axis_column,
-                "x_axis_is_temporal": x_axis_is_temporal,
-                "zoomable":           bool(form_data.get("zoomable", False)),
-                "font_color":         font_color,
-                "conditional_colors": conditional_colors,
-                "cross_filter_scope": charts_in_scope,
+                "slice_id":             chart_id,
+                "slice_name":           detail.get("slice_name"),
+                "viz_type":             viz_type,
+                "x_axis":               x_axis,
+                "metrics":              metrics,
+                "groupby":              groupby,
+                "groupby_rows":         groupby_rows,
+                "groupby_cols":         groupby_cols,
+                "raw_x_axis_column":    raw_x_axis_column,
+                "x_axis_is_temporal":   x_axis_is_temporal,
+                "zoomable":             bool(form_data.get("zoomable", False)),
+                "font_color":           font_color,
+                "conditional_colors":   conditional_colors,
+                "cross_filter_scope":   charts_in_scope,
+                "percentage_threshold": percentage_threshold,
+                "other_threshold":      other_threshold,
             })
 
             print(f"DEBUG chart {chart_id}: zoomable = {form_data.get('zoomable')} | viz = {viz_type}", flush=True)
