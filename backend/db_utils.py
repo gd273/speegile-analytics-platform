@@ -10,7 +10,7 @@ def log_load_error(conn, load_id, error_message, row_number=None, column_name=No
         """), {"lid": load_id})
         conn.execute(text("""
             INSERT INTO public.load_errors
-                (master_load_id, row_number, column_name, error_message)
+                (load_id, row_number, column_name, error_message)
             VALUES
                 (:lid, :row_num, :col_name, :err_msg)
         """), {

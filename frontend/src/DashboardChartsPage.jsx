@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import api from "./api";
 import ChartCard from "./ChartCard";
-import { Loader2, SlidersHorizontal, RotateCcw, X, ChevronDown, Zap,Check } from "lucide-react";
+import { Loader2, SlidersHorizontal, RotateCcw, X, ChevronDown, Zap, Check } from "lucide-react";
 import DashboardGrid from "./Dashboardgrid";
 
 const BIGNUM_HEIGHT = 160;
@@ -22,25 +22,13 @@ function PdfProgressOverlay({ progress }) {
   const pct = progress.total > 0
     ? Math.round((progress.current / progress.total) * 100)
     : 0;
-
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 9999,
-      background: "rgba(0,0,0,0.82)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.82)", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <style>{`
         @keyframes pdf-spin    { to { transform: rotate(360deg); } }
         @keyframes pdf-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
       `}</style>
-      <div style={{
-        background: "#1a1d26",
-        border: "1px solid rgba(31,168,201,0.25)",
-        borderRadius: 16, padding: "36px 44px",
-        width: 400, display: "flex",
-        flexDirection: "column", alignItems: "center", gap: 22,
-        boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
-      }}>
+      <div style={{ background: "#1a1d26", border: "1px solid rgba(31,168,201,0.25)", borderRadius: 16, padding: "36px 44px", width: 400, display: "flex", flexDirection: "column", alignItems: "center", gap: 22, boxShadow: "0 24px 60px rgba(0,0,0,0.6)" }}>
         <div style={{ position: "relative", width: 56, height: 56 }}>
           <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px solid rgba(31,168,201,0.12)" }} />
           <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px solid transparent", borderTopColor: "#1FA8C9", animation: "pdf-spin 1s linear infinite" }} />
@@ -48,19 +36,11 @@ function PdfProgressOverlay({ progress }) {
         </div>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 8 }}>Generating PDF</div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>
-            Processing: <span style={{ color: "#1FA8C9", fontWeight: 600 }}>{progress.tabName}</span>
-          </div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>Processing: <span style={{ color: "#1FA8C9", fontWeight: 600 }}>{progress.tabName}</span></div>
         </div>
         <div style={{ width: "100%" }}>
           <div style={{ width: "100%", height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 99, overflow: "hidden" }}>
-            <div style={{
-              width: `${pct}%`, height: "100%", borderRadius: 99,
-              background: "linear-gradient(90deg,#1FA8C9 0%,#A868B7 60%,#1FA8C9 100%)",
-              backgroundSize: "200% 100%",
-              animation: "pdf-shimmer 1.5s linear infinite",
-              transition: "width 0.6s ease",
-            }} />
+            <div style={{ width: `${pct}%`, height: "100%", borderRadius: 99, background: "linear-gradient(90deg,#1FA8C9 0%,#A868B7 60%,#1FA8C9 100%)", backgroundSize: "200% 100%", animation: "pdf-shimmer 1.5s linear infinite", transition: "width 0.6s ease" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
             <span style={{ fontSize: 11, color: "#374151" }}>Page {progress.current} of {progress.total}</span>
@@ -76,29 +56,13 @@ function PdfProgressOverlay({ progress }) {
 // ── Simple markdown renderer ────────────────────────────────
 function MarkdownBlock({ code }) {
   const hasHtml = /<[a-z][\s\S]*?>/i.test(code || "");
-  const containerStyle = {
-    background: "#1e2129", border: "1px solid rgba(255,255,255,0.065)",
-    borderRadius: 10, padding: "20px 22px", height: "100%",
-    boxSizing: "border-box", overflowY: "auto", position: "relative",
-  };
-  const topBar = (
-    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3,
-      background: "linear-gradient(90deg,#1FA8C9,#454E7C,#A868B7)", opacity: 0.75 }} />
-  );
+  const containerStyle = { background: "#1e2129", border: "1px solid rgba(255,255,255,0.065)", borderRadius: 10, padding: "20px 22px", height: "100%", boxSizing: "border-box", overflowY: "auto", position: "relative" };
+  const topBar = <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg,#1FA8C9,#454E7C,#A868B7)", opacity: 0.75 }} />;
   if (hasHtml) {
     return (
       <div style={containerStyle}>
         {topBar}
-        <style>{`
-          .md-html-block { font-size: 13px; color: #94a3b8; line-height: 1.7; }
-          .md-html-block p  { margin: 0 0 8px; }
-          .md-html-block b, .md-html-block strong { color: #cbd5e1; font-weight: 600; }
-          .md-html-block h1 { font-size: 16px; color: #f1f5f9; font-weight: 700; margin: 0 0 12px; }
-          .md-html-block h2 { font-size: 14px; color: #e2e8f0; font-weight: 700; margin: 0 0 10px; }
-          .md-html-block h3 { font-size: 12px; color: #1FA8C9; font-weight: 700; margin: 12px 0 4px; text-transform: uppercase; }
-          .md-html-block center { display: block; text-align: center; }
-          .md-html-block a  { color: #1FA8C9; }
-        `}</style>
+        <style>{`.md-html-block{font-size:13px;color:#94a3b8;line-height:1.7}.md-html-block p{margin:0 0 8px}.md-html-block b,.md-html-block strong{color:#cbd5e1;font-weight:600}.md-html-block h1{font-size:16px;color:#f1f5f9;font-weight:700;margin:0 0 12px}.md-html-block h2{font-size:14px;color:#e2e8f0;font-weight:700;margin:0 0 10px}.md-html-block h3{font-size:12px;color:#1FA8C9;font-weight:700;margin:12px 0 4px;text-transform:uppercase}.md-html-block center{display:block;text-align:center}.md-html-block a{color:#1FA8C9}`}</style>
         <div className="md-html-block" dangerouslySetInnerHTML={{ __html: code }} />
       </div>
     );
@@ -111,7 +75,7 @@ function MarkdownBlock({ code }) {
         if (line.startsWith("### ")) return <p key={i} style={{ fontSize: 12, fontWeight: 700, color: "#1FA8C9", margin: "12px 0 4px", letterSpacing: "0.04em", textTransform: "uppercase" }}>{line.slice(4)}</p>;
         if (line.startsWith("## "))  return <h4 key={i} style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0", margin: "0 0 10px", lineHeight: 1.4 }}>{line.slice(3)}</h4>;
         if (line.startsWith("# "))   return <h3 key={i} style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9", margin: "0 0 12px", lineHeight: 1.3 }}>{line.slice(2)}</h3>;
-        if (line.trim() === "") return <div key={i} style={{ height: 10 }} />;
+        if (line.trim() === "")      return <div key={i} style={{ height: 10 }} />;
         const parts = line.split(/(\*\*.*?\*\*)/g).map((p, j) =>
           p.startsWith("**") && p.endsWith("**")
             ? <strong key={j} style={{ color: "#cbd5e1", fontWeight: 600 }}>{p.slice(2, -2)}</strong>
@@ -284,155 +248,122 @@ function CrossFilterPills({ crossFilters, onClear, onClearAll }) {
   );
 }
 
+// ── Date Range Picker ───────────────────────────────────────
+function DateRangePicker({ dateFrom, dateTo, onFromChange, onToChange, onClear, dataDateRange }) {
+  const [draftFrom, setDraftFrom] = useState(dateFrom || "");
+  const [draftTo,   setDraftTo]   = useState(dateTo   || "");
+
+  useEffect(() => {
+    setDraftFrom(dateFrom || "");
+    setDraftTo(dateTo     || "");
+  }, [dateFrom, dateTo]);
+
+  const hasDate = dateFrom || dateTo;
+
+  const handleSearch = () => {
+    onFromChange(draftFrom || null);
+    onToChange(draftTo     || null);
+  };
+
+  const handleClear = () => {
+    setDraftFrom("");
+    setDraftTo("");
+    onClear();
+  };
+
+  const inputStyle = (hasVal) => ({
+    background: "#12151f",
+    border: `1px solid ${hasVal ? "#1FA8C9" : "rgba(255,255,255,0.1)"}`,
+    borderRadius: 6, padding: "4px 8px",
+    color: hasVal ? "#e2e8f0" : "#64748b",
+    fontSize: 11, cursor: "pointer", outline: "none", colorScheme: "dark",
+  });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>📅 Date</span>
+        <input type="date" value={draftFrom}
+          min={dataDateRange?.min || undefined}
+          max={draftTo || dataDateRange?.max || undefined}
+          onChange={e => setDraftFrom(e.target.value)}
+          style={inputStyle(draftFrom)} />
+        <span style={{ color: "#64748b", fontSize: 11 }}>→</span>
+        <input type="date" value={draftTo}
+          min={draftFrom || dataDateRange?.min || undefined}
+          max={dataDateRange?.max || undefined}
+          onChange={e => setDraftTo(e.target.value)}
+          style={inputStyle(draftTo)} />
+        <button onClick={handleSearch} disabled={!draftFrom || !draftTo}
+          style={{
+            display: "flex", alignItems: "center", gap: 4,
+            background: (draftFrom && draftTo) ? "rgba(31,168,201,0.15)" : "rgba(255,255,255,0.03)",
+            border: `1px solid ${(draftFrom && draftTo) ? "rgba(31,168,201,0.4)" : "rgba(255,255,255,0.08)"}`,
+            borderRadius: 6, padding: "4px 12px",
+            color: (draftFrom && draftTo) ? "#1FA8C9" : "#374151",
+            fontSize: 11, fontWeight: 600,
+            cursor: (draftFrom && draftTo) ? "pointer" : "not-allowed",
+            whiteSpace: "nowrap", transition: "all 0.15s",
+          }}>
+          🔍 Search
+        </button>
+        {hasDate && (
+          <button onClick={handleClear}
+            style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 6, padding: "4px 8px", color: "#f87171", fontSize: 11, cursor: "pointer" }}>
+            ✕
+          </button>
+        )}
+      </div>
+      {dataDateRange?.min && dataDateRange?.max && (
+        <div style={{ fontSize: 10, color: "#475569", paddingLeft: 24, letterSpacing: "0.02em" }}>
+          {/* Data available hint commented out */}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Tab group ───────────────────────────────────────────────
-function TabGroup({
-  tabs = [],
-  chartMap,
-  cardProps,
-  isMobile,
-  renderRows,
-  onTabChange,
-  pdfTabIdx,
-  pdfNestedTabIdx,
-  dateFrom,
-  dateTo,
-  setDateFrom,
-  setDateTo,
-}) {
+function TabGroup({ tabs = [], chartMap, cardProps, isMobile, renderRows, onTabChange, pdfTabIdx, pdfNestedTabIdx, dateFrom, dateTo, setDateFrom, setDateTo, dataDateRange }) {
   const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
     if (tabs.length > 0 && onTabChange) onTabChange(tabs[0].id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const displayIdx = (pdfTabIdx !== null && pdfTabIdx !== undefined)
-    ? Math.min(pdfTabIdx, tabs.length - 1)
-    : activeIdx;
-
-  const activeTab = tabs[displayIdx];
+  const displayIdx = (pdfTabIdx !== null && pdfTabIdx !== undefined) ? Math.min(pdfTabIdx, tabs.length - 1) : activeIdx;
+  const activeTab  = tabs[displayIdx];
   const hasContent = activeTab?.rows?.length > 0 || activeTab?.nestedTabsSection != null;
 
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        borderBottom: "1px solid rgba(255,255,255,0.07)",
-        background: "#12151f",
-        minHeight: 42,
-        marginBottom: 14,
-      }}>
-
-       <style>{`
-            /* ── Custom themed scrollbar for tabs ── */
-
-            /* Chrome, Safari, Edge */
-            .tabs-scroll-container::-webkit-scrollbar {
-              height: 3px;                          /* thin horizontal bar */
-            }
-            .tabs-scroll-container::-webkit-scrollbar-track {
-              background: rgba(255, 255, 255, 0.04);
-              border-radius: 10px;
-            }
-            .tabs-scroll-container::-webkit-scrollbar-thumb {
-              background: rgba(31, 168, 201, 0.4);  /* your cyan theme color */
-              border-radius: 10px;
-              transition: background 0.2s;
-            }
-            .tabs-scroll-container::-webkit-scrollbar-thumb:hover {
-              background: rgba(31, 168, 201, 0.8);  /* brighter on hover */
-            }
-
-            /* Firefox */
-            .tabs-scroll-container {
-              scrollbar-width: thin;
-              scrollbar-color: rgba(31, 168, 201, 0.4) rgba(255, 255, 255, 0.04);
-            }
-          `}</style>   
-
-      {/* LEFT — scrollable tabs with hidden scrollbar */}
+      <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "#12151f", minHeight: 42, marginBottom: 14 }}>
+        <style>{`
+          .tabs-scroll-container::-webkit-scrollbar { height: 3px; }
+          .tabs-scroll-container::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 10px; }
+          .tabs-scroll-container::-webkit-scrollbar-thumb { background: rgba(31,168,201,0.4); border-radius: 10px; transition: background 0.2s; }
+          .tabs-scroll-container::-webkit-scrollbar-thumb:hover { background: rgba(31,168,201,0.8); }
+          .tabs-scroll-container { scrollbar-width: thin; scrollbar-color: rgba(31,168,201,0.4) rgba(255,255,255,0.04); }
+        `}</style>
         {tabs.length > 0 && (
-          <div
-            className="tabs-scroll-container"
-
-            onWheel={(e) => {
-              // Shift+Scroll or plain scroll on this element → horizontal scroll
-              if (e.deltaY !== 0) {
-                e.currentTarget.scrollLeft += e.deltaY;
-                e.preventDefault();
-              }
-            }}
-
-
-            style={{
-              flex:            1,
-              display:         "flex",
-              alignItems:      "center",
-              overflowX:       "auto",
-              overflowY:       "hidden",
-              // scrollbarWidth:  "none",      // Firefox
-              // msOverflowStyle: "none",      // IE
-              gap:             2,
-              padding:         "4px 8px 8px 8px",
-              minWidth:        0,
-              cursor:     "grab",
-              // paddingBottom:   6,           // ← breathing room below tabs
-              // marginBottom:    4,           // ← space between tab row and charts
-            }}
-          >
-
-
-          {/* Hide scrollbar in Chrome/Safari */}
-              {/* <style>{`
-                .tabs-scroll-container::-webkit-scrollbar { display: none; }
-              `}</style> */}
-
+          <div className="tabs-scroll-container"
+            onWheel={(e) => { if (e.deltaY !== 0) { e.currentTarget.scrollLeft += e.deltaY; e.preventDefault(); } }}
+            style={{ flex: 1, display: "flex", alignItems: "center", overflowX: "auto", overflowY: "hidden", gap: 2, padding: "4px 8px 8px 8px", minWidth: 0, cursor: "grab" }}>
             {tabs.map((tab, i) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveIdx(i);
-                  if (onTabChange) onTabChange(tab.id);
-                }}
-                style={{
-                  flexShrink: 0,
-                  padding: "10px 18px",
-                  fontSize: 13,
-                  fontWeight: displayIdx === i ? 600 : 400,
-                  color: displayIdx === i ? "#1FA8C9" : "#64748b",
-                  background: "transparent",
-                  border: "none",
-                  borderBottom: displayIdx === i
-                    ? "2px solid #1FA8C9"
-                    : "2px solid transparent",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  transition: "color 0.15s, border-color 0.15s",
-                }}
-              >
+              <button key={tab.id}
+                onClick={() => { setActiveIdx(i); if (onTabChange) onTabChange(tab.id); }}
+                style={{ flexShrink: 0, padding: "10px 18px", fontSize: 13, fontWeight: displayIdx === i ? 600 : 400, color: displayIdx === i ? "#1FA8C9" : "#64748b", background: "transparent", border: "none", borderBottom: displayIdx === i ? "2px solid #1FA8C9" : "2px solid transparent", cursor: "pointer", whiteSpace: "nowrap", transition: "color 0.15s, border-color 0.15s" }}>
                 {tab.name}
               </button>
             ))}
           </div>
         )}
-
-        <div style={{
-          marginLeft: "auto",
-          flexShrink: 0,
-          borderLeft: "1px solid rgba(255,255,255,0.07)",
-          padding: "0 12px",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          height: "100%",
-          minHeight: 42,
-        }}>
+        <div style={{ marginLeft: "auto", flexShrink: 0, borderLeft: "1px solid rgba(255,255,255,0.07)", padding: "0 12px", display: "flex", alignItems: "center", gap: 8, height: "100%", minHeight: 42 }}>
           <DateRangePicker
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            onFromChange={setDateFrom}
-            onToChange={setDateTo}
+            dateFrom={dateFrom} dateTo={dateTo}
+            onFromChange={setDateFrom} onToChange={setDateTo}
             onClear={() => { setDateFrom(null); setDateTo(null); }}
+            dataDateRange={dataDateRange}
           />
         </div>
       </div>
@@ -442,303 +373,113 @@ function TabGroup({
       {activeTab?.nestedTabsSection && (
         <TabGroup
           tabs={activeTab.nestedTabsSection.tabs}
-          chartMap={chartMap}
-          cardProps={cardProps}
-          isMobile={isMobile}
-          renderRows={renderRows}
-          onTabChange={onTabChange}
-          pdfTabIdx={pdfNestedTabIdx}
-          pdfNestedTabIdx={null}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          setDateFrom={setDateFrom}
-          setDateTo={setDateTo}
+          chartMap={chartMap} cardProps={cardProps} isMobile={isMobile} renderRows={renderRows}
+          onTabChange={onTabChange} pdfTabIdx={pdfNestedTabIdx} pdfNestedTabIdx={null}
+          dateFrom={dateFrom} dateTo={dateTo} setDateFrom={setDateFrom} setDateTo={setDateTo}
+          dataDateRange={dataDateRange}
         />
       )}
 
       {tabs.length > 0 && !hasContent && (
-        <div style={{ padding: "40px 0", textAlign: "center", color: "#374151", fontSize: 13 }}>
-          No charts in this tab
-        </div>
+        <div style={{ padding: "40px 0", textAlign: "center", color: "#374151", fontSize: 13 }}>No charts in this tab</div>
       )}
     </div>
   );
 }
 
-// ══════════════════════════════════════════════════════════════
-//  HORIZONTAL FILTER BAR — Replace the existing FilterPanel
-//  in DashboardChartsPage.jsx with this entire block
-// ══════════════════════════════════════════════════════════════
- 
-// ── Single dropdown filter ──────────────────────────────────
+// ── Filter dropdown ─────────────────────────────────────────
 function FilterDropdown({ fd, activeFilters, dateFrom, dateTo, onFilterChange, onDateFromChange, onDateToChange }) {
   const [open,   setOpen]   = useState(false);
   const [search, setSearch] = useState("");
-  const ref                 = useRef(null);
- 
-  // Close on outside click
+  const ref = useRef(null);
+
   useEffect(() => {
     if (!open) return;
     const fn = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setSearch(""); } };
     document.addEventListener("mousedown", fn);
     return () => document.removeEventListener("mousedown", fn);
   }, [open]);
- 
-  // Support both single value and array
+
   const rawVal       = activeFilters[fd.column];
   const selectedVals = Array.isArray(rawVal) ? rawVal : (rawVal ? [rawVal] : []);
   const hasSelection = fd.type === "date" ? !!dateFrom : selectedVals.length > 0;
   const selCount     = selectedVals.length;
- 
-  const displayed = fd.type === "select"
-    ? (fd.values || []).filter(v => !search.trim() || String(v).toLowerCase().includes(search.toLowerCase()))
-    : [];
- 
+  const displayed    = fd.type === "select" ? (fd.values || []).filter(v => !search.trim() || String(v).toLowerCase().includes(search.toLowerCase())) : [];
+
   const handleClearAll = (e) => {
     e?.stopPropagation();
-    if (fd.type === "date") {
-      onDateFromChange?.(""); onDateToChange?.("");
-    } else {
-      // Remove all selected values one by one
-      selectedVals.forEach(v => onFilterChange?.(fd.column, v));
-    }
+    if (fd.type === "date") { onDateFromChange?.(""); onDateToChange?.(""); }
+    else selectedVals.forEach(v => onFilterChange?.(fd.column, v));
   };
- 
-  const handleToggle = (val) => {
-    onFilterChange?.(fd.column, val);
-    // Do NOT close — allow multi-select
-  };
- 
-  const handleSelectAll = () => {
-    // Add all displayed values that are not yet selected
-    displayed.forEach(v => {
-      if (!selectedVals.includes(v)) onFilterChange?.(fd.column, v);
-    });
-  };
- 
-  const isAllSelected = displayed.length > 0 && displayed.every(v => selectedVals.includes(v));
- 
+  const handleToggle    = (val) => onFilterChange?.(fd.column, val);
+  const handleSelectAll = () => displayed.forEach(v => { if (!selectedVals.includes(v)) onFilterChange?.(fd.column, v); });
+  const isAllSelected   = displayed.length > 0 && displayed.every(v => selectedVals.includes(v));
+
   return (
     <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
- 
-      {/* ── Trigger button ── */}
-      <button
-        onClick={() => { setOpen(p => !p); setSearch(""); }}
-        style={{
-          display: "flex", alignItems: "center", gap: 6,
-          padding: "6px 12px", borderRadius: 8,
-          fontSize: 12, fontWeight: hasSelection ? 700 : 500,
-          border: `1px solid ${hasSelection
-            ? "rgba(31,168,201,0.55)"
-            : open ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.09)"}`,
-          background: hasSelection
-            ? "rgba(31,168,201,0.13)"
-            : open ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)",
-          color:      hasSelection ? "#1FA8C9" : "#94a3b8",
-          cursor:     "pointer", outline: "none",
-          whiteSpace: "nowrap", userSelect: "none",
-          transition: "all .15s",
-        }}
-      >
+      <button onClick={() => { setOpen(p => !p); setSearch(""); }}
+        style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: hasSelection ? 700 : 500, border: `1px solid ${hasSelection ? "rgba(31,168,201,0.55)" : open ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.09)"}`, background: hasSelection ? "rgba(31,168,201,0.13)" : open ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)", color: hasSelection ? "#1FA8C9" : "#94a3b8", cursor: "pointer", outline: "none", whiteSpace: "nowrap", userSelect: "none", transition: "all .15s" }}>
         <span>{fd.name}</span>
- 
-        {/* Count badge */}
-        {selCount > 0 && (
-          <span style={{
-            fontSize: 9, background: "#1FA8C9", color: "#fff",
-            borderRadius: 8, padding: "1px 6px", fontWeight: 700,
-            lineHeight: 1.5, flexShrink: 0,
-          }}>
-            {selCount}
-          </span>
-        )}
- 
-        {/* Clear all × or chevron */}
-        {hasSelection ? (
-          <X
-            size={11}
-            onClick={handleClearAll}
-            style={{ color: "#1FA8C9", cursor: "pointer", flexShrink: 0 }}
-          />
-        ) : (
-          <ChevronDown size={11} style={{
-            color:      open ? "#94a3b8" : "#475569",
-            transform:  open ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform .15s", flexShrink: 0,
-          }} />
-        )}
+        {selCount > 0 && <span style={{ fontSize: 9, background: "#1FA8C9", color: "#fff", borderRadius: 8, padding: "1px 6px", fontWeight: 700, lineHeight: 1.5, flexShrink: 0 }}>{selCount}</span>}
+        {hasSelection
+          ? <X size={11} onClick={handleClearAll} style={{ color: "#1FA8C9", cursor: "pointer", flexShrink: 0 }} />
+          : <ChevronDown size={11} style={{ color: open ? "#94a3b8" : "#475569", transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .15s", flexShrink: 0 }} />}
       </button>
- 
-      {/* ── Dropdown panel ── */}
+
       {open && (
-        <div style={{
-          position:     "absolute",
-          top:          "calc(100% + 6px)",
-          left:         0,
-          minWidth:     240,
-          maxWidth:     380,
-          background:   "#181b24",
-          border:       "1px solid rgba(255,255,255,0.1)",
-          borderRadius: 10,
-          boxShadow:    "0 16px 48px rgba(0,0,0,0.65)",
-          zIndex:       500,
-          overflow:     "hidden",
-        }}>
- 
-          {/* Panel header */}
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "9px 14px 8px",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
-          }}>
+        <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, minWidth: 240, maxWidth: 380, background: "#181b24", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, boxShadow: "0 16px 48px rgba(0,0,0,0.65)", zIndex: 500, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                {fd.name}
-              </span>
-              {selCount > 0 && (
-                <span style={{ fontSize: 10, color: "#1FA8C9", fontWeight: 600 }}>
-                  {selCount} selected
-                </span>
-              )}
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.07em" }}>{fd.name}</span>
+              {selCount > 0 && <span style={{ fontSize: 10, color: "#1FA8C9", fontWeight: 600 }}>{selCount} selected</span>}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              {/* Select all / Deselect all */}
-              {fd.type === "select" && (
-                <button
-                  onClick={isAllSelected ? handleClearAll : handleSelectAll}
-                  style={{ fontSize: 10, color: "#64748b", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                  onMouseEnter={e => e.currentTarget.style.color = "#1FA8C9"}
-                  onMouseLeave={e => e.currentTarget.style.color = "#64748b"}
-                >
-                  {isAllSelected ? "Deselect all" : "Select all"}
-                </button>
-              )}
-              {hasSelection && (
-                <button
-                  onClick={handleClearAll}
-                  style={{ fontSize: 10, color: "#64748b", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                  onMouseEnter={e => e.currentTarget.style.color = "#f87171"}
-                  onMouseLeave={e => e.currentTarget.style.color = "#64748b"}
-                >
-                  Clear
-                </button>
-              )}
+              {fd.type === "select" && <button onClick={isAllSelected ? handleClearAll : handleSelectAll} style={{ fontSize: 10, color: "#64748b", background: "none", border: "none", cursor: "pointer", padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = "#1FA8C9"} onMouseLeave={e => e.currentTarget.style.color = "#64748b"}>{isAllSelected ? "Deselect all" : "Select all"}</button>}
+              {hasSelection && <button onClick={handleClearAll} style={{ fontSize: 10, color: "#64748b", background: "none", border: "none", cursor: "pointer", padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = "#f87171"} onMouseLeave={e => e.currentTarget.style.color = "#64748b"}>Clear</button>}
             </div>
           </div>
- 
-          {/* ── Date filter ── */}
+
           {fd.type === "date" && (
             <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
               {[["From", dateFrom, onDateFromChange], ["To", dateTo, onDateToChange]].map(([label, val, setter]) => (
                 <div key={label}>
                   <p style={{ fontSize: 10, color: "#475569", marginBottom: 5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</p>
-                  <input type="date" value={val} onChange={e => setter?.(e.target.value)}
-                    style={{ background: "#0d1117", border: "1px solid #2d3748", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#94a3b8", width: "100%", outline: "none", cursor: "pointer" }} />
+                  <input type="date" value={val} onChange={e => setter?.(e.target.value)} style={{ background: "#0d1117", border: "1px solid #2d3748", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#94a3b8", width: "100%", outline: "none", cursor: "pointer" }} />
                 </div>
               ))}
             </div>
           )}
- 
-          {/* ── Select filter — multi-select ── */}
+
           {fd.type === "select" && (
             <>
-              {/* Search */}
               {fd.values.length > 8 && (
                 <div style={{ padding: "8px 12px 6px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                  <input
-                    autoFocus
-                    placeholder={`Search ${fd.name.toLowerCase()}…`}
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    style={{
-                      width: "100%", background: "rgba(255,255,255,0.05)",
-                      border: "1px solid rgba(255,255,255,0.09)",
-                      borderRadius: 6, padding: "5px 10px",
-                      fontSize: 11, color: "#e2e8f0", outline: "none",
-                    }}
-                  />
+                  <input autoFocus placeholder={`Search ${fd.name.toLowerCase()}…`} value={search} onChange={e => setSearch(e.target.value)} style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 6, padding: "5px 10px", fontSize: 11, color: "#e2e8f0", outline: "none" }} />
                 </div>
               )}
- 
-              {/* Selected values shown at top (when some selected and search is empty) */}
               {selCount > 0 && !search && (
-                <div style={{
-                  padding: "8px 12px 6px",
-                  borderBottom: "1px solid rgba(255,255,255,0.05)",
-                  display: "flex", flexWrap: "wrap", gap: 4,
-                }}>
+                <div style={{ padding: "8px 12px 6px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", flexWrap: "wrap", gap: 4 }}>
                   {selectedVals.map(v => (
-                    <span key={v} style={{
-                      display: "flex", alignItems: "center", gap: 3,
-                      padding: "3px 8px", borderRadius: 14, fontSize: 10,
-                      fontWeight: 700,
-                      background: "rgba(31,168,201,0.2)",
-                      color: "#1FA8C9",
-                      border: "1px solid rgba(31,168,201,0.4)",
-                    }}>
-                      {v}
-                      <X
-                        size={9}
-                        style={{ cursor: "pointer", opacity: 0.7 }}
-                        onClick={() => handleToggle(v)}
-                      />
+                    <span key={v} style={{ display: "flex", alignItems: "center", gap: 3, padding: "3px 8px", borderRadius: 14, fontSize: 10, fontWeight: 700, background: "rgba(31,168,201,0.2)", color: "#1FA8C9", border: "1px solid rgba(31,168,201,0.4)" }}>
+                      {v}<X size={9} style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => handleToggle(v)} />
                     </span>
                   ))}
                 </div>
               )}
- 
-              {/* All options */}
-              <div style={{
-                padding: "8px 12px 10px",
-                maxHeight: 200,
-                overflowY: "auto",
-                scrollbarWidth: "thin",
-                scrollbarColor: "#2d3748 transparent",
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 5,
-              }}>
-                {displayed.length === 0 && (
-                  <span style={{ fontSize: 11, color: "#374151", padding: "4px 2px" }}>No results</span>
-                )}
- 
+              <div style={{ padding: "8px 12px 10px", maxHeight: 200, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#2d3748 transparent", display: "flex", flexWrap: "wrap", gap: 5 }}>
+                {displayed.length === 0 && <span style={{ fontSize: 11, color: "#374151", padding: "4px 2px" }}>No results</span>}
                 {displayed.map(val => {
                   const active = selectedVals.includes(val);
                   return (
-                    <button
-                      key={val}
-                      onClick={() => handleToggle(val)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 4,
-                        padding: "4px 10px", borderRadius: 16, fontSize: 11,
-                        fontWeight: 600, cursor: "pointer",
-                        border: `1px solid ${active ? "#1FA8C9" : "rgba(31,168,201,0.2)"}`,
-                        background: active ? "#1FA8C9" : "rgba(31,168,201,0.07)",
-                        color: active ? "#fff" : "#5ba8b9",
-                        outline: "none", transition: "all .12s ease",
-                      }}
-                    >
-                      {active && <Check size={9} />}
-                      {val}
+                    <button key={val} onClick={() => handleToggle(val)} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer", border: `1px solid ${active ? "#1FA8C9" : "rgba(31,168,201,0.2)"}`, background: active ? "#1FA8C9" : "rgba(31,168,201,0.07)", color: active ? "#fff" : "#5ba8b9", outline: "none", transition: "all .12s ease" }}>
+                      {active && <Check size={9} />}{val}
                     </button>
                   );
                 })}
               </div>
- 
-              {/* Footer */}
-              <div style={{
-                padding: "5px 14px 8px",
-                fontSize: 10, color: "#374151",
-                borderTop: "1px solid rgba(255,255,255,0.04)",
-                display: "flex", justifyContent: "space-between",
-              }}>
-                <span>
-                  {fd.values.length} option{fd.values.length !== 1 ? "s" : ""}
-                  {search ? ` · ${displayed.length} matching` : ""}
-                </span>
-                {selCount > 0 && (
-                  <span style={{ color: "#1FA8C9", fontWeight: 600 }}>{selCount} selected</span>
-                )}
+              <div style={{ padding: "5px 14px 8px", fontSize: 10, color: "#374151", borderTop: "1px solid rgba(255,255,255,0.04)", display: "flex", justifyContent: "space-between" }}>
+                <span>{fd.values.length} option{fd.values.length !== 1 ? "s" : ""}{search ? ` · ${displayed.length} matching` : ""}</span>
+                {selCount > 0 && <span style={{ color: "#1FA8C9", fontWeight: 600 }}>{selCount} selected</span>}
               </div>
             </>
           )}
@@ -748,77 +489,27 @@ function FilterDropdown({ fd, activeFilters, dateFrom, dateTo, onFilterChange, o
   );
 }
 
-
-
-// ── Horizontal filter panel ─────────────────────────────────
-// Replace the existing FilterPanel function with this one
+// ── Filter panel ────────────────────────────────────────────
 function FilterPanel({ filterDefs, activeFilters, dateFrom, dateTo, onFilterChange, onDateFromChange, onDateToChange, onReset }) {
   if (!filterDefs?.length) return null;
- 
-  const activeCount = Object.values(activeFilters).reduce((acc, v) => {
-    if (Array.isArray(v)) return acc + v.length;
-    return acc + (v ? 1 : 0);
-  }, 0) + (dateFrom ? 1 : 0);
- 
-  const hasActive = activeCount > 0;
- 
+  const activeCount = Object.values(activeFilters).reduce((acc, v) => acc + (Array.isArray(v) ? v.length : (v ? 1 : 0)), 0) + (dateFrom ? 1 : 0);
+  const hasActive   = activeCount > 0;
   return (
-    <div style={{
-      background:   "#12151f",
-      border:       "1px solid rgba(255,255,255,0.07)",
-      borderRadius: 10,
-      marginBottom: 14,
-      padding:      "10px 14px",
-    }}>
+    <div style={{ background: "#12151f", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, marginBottom: 14, padding: "10px 14px" }}>
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
- 
-        {/* Label */}
         <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
           <SlidersHorizontal size={13} style={{ color: "#475569" }} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#475569", letterSpacing: "0.09em", textTransform: "uppercase" }}>
-            Filters
-          </span>
-          {hasActive && (
-            <span style={{ fontSize: 9, background: "#1FA8C9", color: "#fff", borderRadius: 8, padding: "1px 6px", fontWeight: 700 }}>
-              {activeCount}
-            </span>
-          )}
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#475569", letterSpacing: "0.09em", textTransform: "uppercase" }}>Filters</span>
+          {hasActive && <span style={{ fontSize: 9, background: "#1FA8C9", color: "#fff", borderRadius: 8, padding: "1px 6px", fontWeight: 700 }}>{activeCount}</span>}
         </div>
- 
-        {/* Divider */}
         <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
- 
-        {/* Dropdowns */}
         {filterDefs.map(fd => (
-          <FilterDropdown
-            key={fd.id}
-            fd={fd}
-            activeFilters={activeFilters}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            onFilterChange={onFilterChange}
-            onDateFromChange={onDateFromChange}
-            onDateToChange={onDateToChange}
-          />
+          <FilterDropdown key={fd.id} fd={fd} activeFilters={activeFilters} dateFrom={dateFrom} dateTo={dateTo} onFilterChange={onFilterChange} onDateFromChange={onDateFromChange} onDateToChange={onDateToChange} />
         ))}
- 
-        {/* Reset */}
         {hasActive && (
           <>
             <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
-            <button
-              onClick={onReset}
-              style={{
-                display: "flex", alignItems: "center", gap: 5,
-                padding: "5px 11px", borderRadius: 7,
-                fontSize: 11, fontWeight: 600,
-                border: "1px solid rgba(239,68,68,0.28)",
-                color: "#f87171", background: "rgba(239,68,68,0.06)",
-                cursor: "pointer", flexShrink: 0, outline: "none", transition: "all .15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.5)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.06)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.28)"; }}
-            >
+            <button onClick={onReset} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: 7, fontSize: 11, fontWeight: 600, border: "1px solid rgba(239,68,68,0.28)", color: "#f87171", background: "rgba(239,68,68,0.06)", cursor: "pointer", flexShrink: 0, outline: "none", transition: "all .15s" }} onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.5)"; }} onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.06)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.28)"; }}>
               <RotateCcw size={10} /> Reset
             </button>
           </>
@@ -828,349 +519,136 @@ function FilterPanel({ filterDefs, activeFilters, dateFrom, dateTo, onFilterChan
   );
 }
 
-
-
-// const FLabel = ({ children }) => <p style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 7, fontWeight: 700 }}>{children}</p>;
-// const FDate  = ({ value, onChange }) => <input type="date" value={value} onChange={onChange} style={{ background: "#0d1117", border: "1px solid #2d3748", borderRadius: 7, padding: "5px 9px", fontSize: 11, color: "#94a3b8", width: 132, outline: "none", cursor: "pointer" }} />;
-// function FResetBtn({ onClick }) {
-//   const [hov, setHov] = useState(false);
-//   return (
-//     <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-//       style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 13px", borderRadius: 7, fontSize: 11, fontWeight: 600, border: `1px solid ${hov ? "#475569" : "#2d3748"}`, color: hov ? "#94a3b8" : "#64748b", background: "transparent", cursor: "pointer", transition: "all .15s" }}>
-//       <RotateCcw size={11} /> Reset
-//     </button>
-//   );
-// }
-
-// function ActivePills({ activeFilters, dateFrom, dateTo, onRemove, onRemoveDate }) {
-//   const entries = Object.entries(activeFilters).filter(([, v]) => v);
-//   if (!entries.length && !dateFrom) return null;
-//   return (
-//     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14, alignItems: "center" }}>
-//       <span style={{ fontSize: 9, color: "#374151", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase" }}>Active:</span>
-//       {entries.map(([col, val]) => (
-//         <span key={col} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, background: "rgba(31,168,201,0.12)", color: "#67c5d8", border: "1px solid rgba(31,168,201,0.22)", padding: "3px 8px 3px 10px", borderRadius: 16 }}>
-//           <span style={{ color: "#4a5568", fontSize: 9 }}>{col}:</span>&nbsp;{val}
-//           <button onClick={() => onRemove(col)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}><X size={10} /></button>
-//         </span>
-//       ))}
-//       {dateFrom && dateTo && (
-//         <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, background: "rgba(139,92,246,0.12)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.22)", padding: "3px 8px 3px 10px", borderRadius: 16 }}>
-//           {dateFrom} → {dateTo}
-//           <button onClick={onRemoveDate} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}><X size={10} /></button>
-//         </span>
-//       )}
-//     </div>
-//   );
-// }
-
-
-
+// ── Active pills ────────────────────────────────────────────
 function ActivePills({ activeFilters, dateFrom, dateTo, onRemove, onRemoveDate }) {
-  // Build flat list of {col, val} pairs from multi-select arrays
   const pills = [];
   for (const [col, val] of Object.entries(activeFilters)) {
     if (!val) continue;
     const vals = Array.isArray(val) ? val : [val];
     vals.forEach(v => pills.push({ col, val: v }));
   }
- 
   if (!pills.length && !dateFrom) return null;
- 
-  const removeOne = (col, val) => {
-    // Re-use handleFilterChange logic: toggle the value off
-    // Parent passes onRemove(col, val) so it can update the array
-    onRemove(col, val);
-  };
- 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14, alignItems: "center" }}>
-      <span style={{ fontSize: 9, color: "#374151", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase" }}>
-        Active:
-      </span>
- 
+      <span style={{ fontSize: 9, color: "#374151", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase" }}>Active:</span>
       {pills.map(({ col, val }) => (
-        <span key={`${col}:${val}`} style={{
-          display: "flex", alignItems: "center", gap: 5, fontSize: 11,
-          background: "rgba(31,168,201,0.12)", color: "#67c5d8",
-          border: "1px solid rgba(31,168,201,0.22)", padding: "3px 8px 3px 10px", borderRadius: 16,
-        }}>
+        <span key={`${col}:${val}`} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, background: "rgba(31,168,201,0.12)", color: "#67c5d8", border: "1px solid rgba(31,168,201,0.22)", padding: "3px 8px 3px 10px", borderRadius: 16 }}>
           <span style={{ color: "#4a5568", fontSize: 9 }}>{col}:</span>&nbsp;{val}
-          <button
-            onClick={() => removeOne(col, val)}
-            style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
-          >
-            <X size={10} />
-          </button>
+          <button onClick={() => onRemove(col, val)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}><X size={10} /></button>
         </span>
       ))}
- 
       {dateFrom && dateTo && (
-        <span style={{
-          display: "flex", alignItems: "center", gap: 5, fontSize: 11,
-          background: "rgba(139,92,246,0.12)", color: "#a78bfa",
-          border: "1px solid rgba(139,92,246,0.22)", padding: "3px 8px 3px 10px", borderRadius: 16,
-        }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, background: "rgba(139,92,246,0.12)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.22)", padding: "3px 8px 3px 10px", borderRadius: 16 }}>
           {dateFrom} → {dateTo}
-          <button onClick={onRemoveDate} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}>
-            <X size={10} />
-          </button>
+          <button onClick={onRemoveDate} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}><X size={10} /></button>
         </span>
       )}
     </div>
   );
 }
-
-// ----------------------------------------------------------------
-// ── Date Range Picker ─────────────────────────────────────────
-// ----------------------------------------------------------------
-
-function DateRangePicker({ dateFrom, dateTo, onFromChange, onToChange, onClear }) {
-
-  // ── Local draft state — doesn't trigger filter until Search clicked ──
-  const [draftFrom, setDraftFrom] = useState(dateFrom || "");
-  const [draftTo,   setDraftTo]   = useState(dateTo   || "");
-
-  // Sync draft if parent clears the dates (e.g. ✕ Clear clicked)
-  useEffect(() => {
-    setDraftFrom(dateFrom || "");
-    setDraftTo(dateTo     || "");
-  }, [dateFrom, dateTo]);
-
-  const hasDate    = dateFrom || dateTo;
-  const hasDraft   = draftFrom || draftTo;
-  const isDirty    = draftFrom !== (dateFrom || "")
-                  || draftTo   !== (dateTo   || "");
-
-  // ── Apply filter — called only when Search is clicked ────────────
-  const handleSearch = () => {
-    onFromChange(draftFrom || null);
-    onToChange(draftTo     || null);
-  };
-
-  // ── Clear both draft and applied filter ──────────────────────────
-  const handleClear = () => {
-    setDraftFrom("");
-    setDraftTo("");
-    onClear();
-  };
-
-  return (
-    <div style={{
-      display:    "flex",
-      alignItems: "center",
-      gap:        8,
-    }}>
-
-      {/* Label */}
-      <span style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
-        📅 Date
-      </span>
-
-      {/* Start Date */}
-      <input
-        type="date"
-        value={draftFrom}
-        max={draftTo || undefined}
-        onChange={e => setDraftFrom(e.target.value)}
-        style={{
-          background:  "#12151f",
-          border:      `1px solid ${draftFrom ? "#1FA8C9" : "rgba(255,255,255,0.1)"}`,
-          borderRadius: 6,
-          padding:     "4px 8px",
-          color:       draftFrom ? "#e2e8f0" : "#64748b",
-          fontSize:    11,
-          cursor:      "pointer",
-          outline:     "none",
-          colorScheme: "dark",
-        }}
-      />
-
-      <span style={{ color: "#64748b", fontSize: 11 }}>→</span>
-
-      {/* End Date */}
-      <input
-        type="date"
-        value={draftTo}
-        min={draftFrom || undefined}
-        onChange={e => setDraftTo(e.target.value)}
-        style={{
-          background:  "#12151f",
-          border:      `1px solid ${draftTo ? "#1FA8C9" : "rgba(255,255,255,0.1)"}`,
-          borderRadius: 6,
-          padding:     "4px 8px",
-          color:       draftTo ? "#e2e8f0" : "#64748b",
-          fontSize:    11,
-          cursor:      "pointer",
-          outline:     "none",
-          colorScheme: "dark",
-        }}
-      />
-
-      {/* Search button — active only when both dates selected */}
-      <button
-        onClick={handleSearch}
-        disabled={!draftFrom || !draftTo}
-        title={!draftFrom || !draftTo ? "Select both dates first" : "Apply date filter"}
-        style={{
-          display:      "flex",
-          alignItems:   "center",
-          gap:          4,
-          background:   (draftFrom && draftTo)
-                          ? "rgba(31,168,201,0.15)"
-                          : "rgba(255,255,255,0.03)",
-          border:       `1px solid ${(draftFrom && draftTo)
-                          ? "rgba(31,168,201,0.4)"
-                          : "rgba(255,255,255,0.08)"}`,
-          borderRadius: 6,
-          padding:      "4px 12px",
-          color:        (draftFrom && draftTo) ? "#1FA8C9" : "#374151",
-          fontSize:     11,
-          fontWeight:   600,
-          cursor:       (draftFrom && draftTo) ? "pointer" : "not-allowed",
-          whiteSpace:   "nowrap",
-          transition:   "all 0.15s",
-        }}
-        onMouseEnter={e => {
-          if (draftFrom && draftTo)
-            e.currentTarget.style.background = "rgba(31,168,201,0.25)";
-        }}
-        onMouseLeave={e => {
-          if (draftFrom && draftTo)
-            e.currentTarget.style.background = "rgba(31,168,201,0.15)";
-        }}
-      >
-        🔍 Search
-      </button>
-
-      {/* Clear button — only when filter is actively applied */}
-      {hasDate && (
-        <button
-          onClick={handleClear}
-          title="Clear date filter"
-          style={{
-            background:   "rgba(248,113,113,0.1)",
-            border:       "1px solid rgba(248,113,113,0.3)",
-            borderRadius: 6,
-            padding:      "4px 8px",
-            color:        "#f87171",
-            fontSize:     11,
-            cursor:       "pointer",
-            whiteSpace:   "nowrap",
-          }}
-        >
-          ✕
-        </button>
-      )}
-
-    </div>
-  );
-}
-
-
-
-
 
 // ══════════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ══════════════════════════════════════════════════════════════
 export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) {
-  const [charts,        setCharts]        = useState([]);
-  const [sections,      setSections]      = useState(null);
-  const [filterDefs,    setFilterDefs]    = useState([]);
-  const [activeFilters, setActiveFilters] = useState({});
-  const [loading,       setLoading]       = useState(true);
-  const [error,         setError]         = useState(null);
-  const [crossFilters,  setCrossFilters]  = useState({});
 
-  // Date filter state
-  const [dateFrom, setDateFrom] = useState(null);
-  const [dateTo,   setDateTo]   = useState(null);
-
-  // scoping for active tab and its charts — reset on tab change to avoid showing wrong pills/charts during loading
-  const [activeTabId, setActiveTabId] = useState(null);
-  // const [activeTabChartIds, setActiveTabChartIds] = useState(new Set());
-
-
-  // ── PDF state ─────────────────────────────────────────────
-  const [isPdfLoading,    setIsPdfLoading]    = useState(false);
+  // ── State ─────────────────────────────────────────────────
+  const [charts,          setCharts]          = useState([]);
+  const [sections,        setSections]        = useState(null);
+  const [filterDefs,      setFilterDefs]      = useState([]);
+  const [activeFilters,   setActiveFilters]   = useState({});
+  const [loading,         setLoading]         = useState(true);
+  const [error,           setError]           = useState(null);
+  const [crossFilters,    setCrossFilters]    = useState({});
+  const [dataDateRange,   setDataDateRange]   = useState({ min: null, max: null });
+  const [dateFrom,        setDateFrom]        = useState(null);
+  const [dateTo,          setDateTo]          = useState(null);
+  const [activeTabId,     setActiveTabId]     = useState(null);
+  const [isPdfLoading,    setIsPdfLoading]    = useState(false); // eslint-disable-line no-unused-vars
   const [pdfTabIdx,       setPdfTabIdx]       = useState(null);
   const [pdfNestedTabIdx, setPdfNestedTabIdx] = useState(null);
   const [pdfProgress,     setPdfProgress]     = useState(null);
 
+  // ── Refs ──────────────────────────────────────────────────
   const dashboardContentRef = useRef(null);
   const pdfResolveRef       = useRef(null);
-  const isPdfLoadingRef     = useRef(false);  // guard — no re-renders on change
-  const sectionsRef         = useRef(null);   // always-current sections without deps
-  const downloadRef         = useRef(null);   // stable wrapper ref for parent
+  const isPdfLoadingRef     = useRef(false);
+  const sectionsRef         = useRef(null);
+  const downloadRef         = useRef(null);
 
   const windowWidth = useWindowWidth();
   const isMobile    = windowWidth < 768;
 
-  // Keep sectionsRef in sync
-  useEffect(() => { sectionsRef.current = sections; }, [sections]);
+  // ── Refs for PDF (snapshot of state at PDF click time) ────
+  const [tenantLogoUrl, setTenantLogoUrl] = useState(null);
+  const tenantLogoRef    = useRef(null);
+  const activeFiltersRef = useRef({});
+  const crossFiltersRef  = useRef({});
+  const dateFromRef      = useRef(null);
+  const dateToRef        = useRef(null);
+  const filterDefsRef    = useRef([]);
 
-  // const handleFilterChange = useCallback((col, val) => setActiveFilters(prev => ({ ...prev, [col]: prev[col] === val ? null : val })), []);
+  // ── Keep refs in sync with state ──────────────────────────
+  useEffect(() => { sectionsRef.current      = sections;      }, [sections]);
+  useEffect(() => { tenantLogoRef.current    = tenantLogoUrl; }, [tenantLogoUrl]);
+  useEffect(() => { activeFiltersRef.current = activeFilters; }, [activeFilters]);
+  useEffect(() => { crossFiltersRef.current  = crossFilters;  }, [crossFilters]);
+  useEffect(() => { dateFromRef.current      = dateFrom;      }, [dateFrom]);
+  useEffect(() => { dateToRef.current        = dateTo;        }, [dateTo]);
+  useEffect(() => { filterDefsRef.current    = filterDefs;    }, [filterDefs]);  // ← ADD THIS LINE
+
+  // ── Fetch tenant logo for PDF header ──────────────────────
+  useEffect(() => {
+    api.get("/branding")
+      .then(r => { if (r.data?.logo_url) setTenantLogoUrl(r.data.logo_url); })
+      .catch(() => {});
+  }, []);
+
+  // ── Callbacks ─────────────────────────────────────────────
+  const handleDateRangeDetected = useCallback((minDate, maxDate) => {
+    setDataDateRange(prev => ({
+      min: !prev.min || minDate < prev.min ? minDate : prev.min,
+      max: !prev.max || maxDate > prev.max ? maxDate : prev.max,
+    }));
+  }, []);
+
   const handleFilterChange = useCallback((col, val) => {
     setActiveFilters(prev => {
       const current = Array.isArray(prev[col]) ? prev[col] : (prev[col] ? [prev[col]] : []);
-      const exists   = current.includes(val);
-      const updated  = exists ? current.filter(v => v !== val) : [...current, val];
-      if (updated.length === 0) {
-        const next = { ...prev }; delete next[col]; return next;
-      }
+      const exists  = current.includes(val);
+      const updated = exists ? current.filter(v => v !== val) : [...current, val];
+      if (updated.length === 0) { const next = { ...prev }; delete next[col]; return next; }
       return { ...prev, [col]: updated };
     });
   }, []);
 
-  const handleReset        = useCallback(() => { setActiveFilters({}); setDateFrom(""); setDateTo(""); }, []);
-  // const handleCrossFilter  = useCallback((column, value, sourceChartId, sourceChartTitle, fromTable = false, chartsInScope = null) => {
-  //   setCrossFilters(prev => {
-  //     if (!value) { const next = { ...prev }; delete next[column]; return next; }
-  //     return { ...prev, [column]: { value, sourceChartId, sourceChartTitle, fromTable, chartsInScope, } };
-  //   });
-  // }, []);
+  const handleReset = useCallback(() => {
+    setActiveFilters({});
+    setDateFrom("");
+    setDateTo("");
+  }, []);
 
-  const handleCrossFilter = useCallback((
-  column, value, sourceChartId, sourceChartTitle,
-  fromTable = false, chartsInScope = null
-) => {
-  // Normalize to numbers to avoid string/int mismatch
-  const normalizedScope = chartsInScope
-    ? chartsInScope.map(Number)
-    : null;
+  const handleCrossFilter = useCallback((column, value, sourceChartId, sourceChartTitle, fromTable = false, chartsInScope = null) => {
+    const normalizedScope = chartsInScope ? chartsInScope.map(Number) : null;
+    setCrossFilters(prev => {
+      if (!value) { const next = { ...prev }; delete next[column]; return next; }
+      return { ...prev, [column]: { value, sourceChartId, sourceChartTitle, fromTable, chartsInScope: normalizedScope } };
+    });
+  }, []);
 
-  setCrossFilters(prev => {
-    if (!value) {
-      const next = { ...prev };
-      delete next[column];
-      return next;
-    }
-    return {
-      ...prev,
-      [column]: {
-        value,
-        sourceChartId,
-        sourceChartTitle,
-        fromTable,
-        chartsInScope: normalizedScope,   // ← normalized
-      },
-    };
-  });
-}, []);
   const clearCrossFilter     = useCallback((col) => setCrossFilters(prev => { const n = { ...prev }; delete n[col]; return n; }), []);
   const clearAllCrossFilters = useCallback(() => setCrossFilters({}), []);
 
-  // ── After React renders new tab state → wait 3s → resolve ──
+  // ── PDF tab change resolver ───────────────────────────────
   useEffect(() => {
     if (pdfResolveRef.current) {
       const resolve = pdfResolveRef.current;
       pdfResolveRef.current = null;
-      setTimeout(resolve, 3000);
+      setTimeout(resolve, 8000);
     }
   }, [pdfTabIdx, pdfNestedTabIdx]);
 
-  //  PDF download — EMPTY deps, created once, never recreated
+  // ── PDF download ──────────────────────────────────────────
   const downloadDashboardPDF = useCallback(async () => {
     if (isPdfLoadingRef.current || !dashboardContentRef.current) return;
     isPdfLoadingRef.current = true;
@@ -1185,75 +663,274 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
       const pdf   = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
-      const HDR   = 16;
+      const HDR   = 18;
+      const FTR   = 10;
 
-      const drawPage = (tabName) => {
-        pdf.setFillColor(13, 17, 23);  pdf.rect(0, 0, pageW, pageH, "F");
-        pdf.setFillColor(18, 21, 31);  pdf.rect(0, 0, pageW, HDR, "F");
-        pdf.setDrawColor(45, 55, 72);  pdf.setLineWidth(0.4);  pdf.line(0, HDR, pageW, HDR);
-        pdf.setFont("helvetica", "bold");  pdf.setFontSize(13);
-        pdf.setTextColor(255, 255, 255);   pdf.text("Speegile", 8, 10.5);
-        const sw = pdf.getStringUnitWidth("Speegile") * 13 * 0.352778;
-        pdf.setTextColor(31, 168, 201);    pdf.text(" Analytics", 8 + sw, 10.5);
-        if (tabName) {
-          pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
-          pdf.setTextColor(203, 213, 225);
-          pdf.text(tabName, pageW - 8, 10.5, { align: "right" });
+      // ── Snapshot all filter state at the moment Download is clicked ──
+      // Nothing will change these during PDF generation.
+      // What the user had active = what shows in the PDF.
+      const snapshotFilters     = { ...activeFiltersRef.current };
+      const snapshotCrossFilters = { ...crossFiltersRef.current };
+      const snapshotDateFrom    = dateFromRef.current;
+      const snapshotDateTo      = dateToRef.current;
+
+
+      // ── ADD THIS BLOCK HERE ───────────────────────────────────────────
+      const applyTabScopedFilters = (tabId) => {
+        if (!tabId) return;
+        const scopedFilters = {};
+        for (const [col, val] of Object.entries(snapshotFilters)) {
+          const filterDef = filterDefsRef.current.find(fd => fd.column === col);
+          const inScope = (
+            !filterDef ||
+            !filterDef.tabsInScope?.length ||
+            filterDef.tabsInScope.includes(tabId)
+          );
+          if (inScope) scopedFilters[col] = val;
         }
+        setActiveFilters(scopedFilters);
+      };
+      // ─────────────────────────────────────────────────────────────────
+
+
+
+
+      // ── Build filter text from snapshot ───────────────────────────────
+      // Simple: just show whatever was active when user clicked Download.
+      // No chartsInScope checking. No tab scoping. Just show as-is.
+      // ── Build filter text ─────────────────────────────────────────────
+      const buildFilterText = () => {
+        const parts = [];
+
+        // Panel filters — already scoped by applyTabScopedFilters
+        const af = { ...activeFiltersRef.current };
+        for (const [col, val] of Object.entries(af)) {
+          if (!val) continue;
+          const vals = Array.isArray(val) ? val : [val];
+          if (vals.length) parts.push(`${col}: ${vals.join(", ")}`);
+        }
+
+        // Cross-filters
+        for (const [col, filter] of Object.entries(snapshotCrossFilters)) {
+          if (filter?.value) parts.push(`${col}: ${filter.value}`);
+        }
+
+        // Date range
+        if (snapshotDateFrom && snapshotDateTo)
+          parts.push(`Date: ${snapshotDateFrom} → ${snapshotDateTo}`);
+        else if (snapshotDateFrom)
+          parts.push(`From: ${snapshotDateFrom}`);
+        else if (snapshotDateTo)
+          parts.push(`To: ${snapshotDateTo}`);
+
+        return parts.length ? `Filters: ${parts.join("  |  ")}` : "";
       };
 
+      // ── Load logos ─────────────────────────────────────────────────────
+      const loadImg = (url) => new Promise((resolve) => {
+        if (!url) return resolve(null);
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try {
+            const c = document.createElement("canvas");
+            c.width = img.naturalWidth; c.height = img.naturalHeight;
+            c.getContext("2d").drawImage(img, 0, 0);
+            resolve(c.toDataURL("image/png"));
+          } catch { resolve(null); }
+        };
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+
+      const tenantLogoB64   = await loadImg(tenantLogoRef.current);
+      const speegileLogoB64 = await loadImg("/speegile-logo.png");
+      const downloadDate    = new Date().toLocaleDateString("en-IN", {
+        day: "2-digit", month: "short", year: "numeric"
+      });
+
+      // ── Screenshot ─────────────────────────────────────────────────────
       const capture = () => html2canvas(dashboardContentRef.current, {
-        scale: 1.5, useCORS: true, allowTaint: true,
-        backgroundColor: "#0d1117", logging: false, imageTimeout: 0,
-        onclone: (doc) => { doc.querySelectorAll("svg").forEach(s => { s.style.overflow = "visible"; }); },
+        scale:           3,
+        useCORS:         true,
+        allowTaint:      true,
+        backgroundColor: "#0d1117",
+        logging:         false,
+        imageTimeout:    0,
+        onclone: (doc) => {
+          doc.querySelectorAll("svg").forEach(s => { s.style.overflow = "visible"; });
+          // Replace date inputs with readable spans
+          doc.querySelectorAll('input[type="date"]').forEach(input => {
+            const val  = input.value;
+            const span = doc.createElement("span");
+            span.style.cssText = `
+              display: inline-block;
+              background: #12151f;
+              border: 1px solid ${val ? "#1FA8C9" : "rgba(255,255,255,0.1)"};
+              border-radius: 6px;
+              padding: 4px 10px;
+              color: ${val ? "#e2e8f0" : "#64748b"};
+              font-size: 11px;
+              font-family: inherit;
+              min-width: 90px;
+            `;
+            if (val) {
+              try {
+                span.textContent = new Date(val).toLocaleDateString("en-IN", {
+                  day: "2-digit", month: "short", year: "numeric"
+                });
+              } catch { span.textContent = val; }
+            } else {
+              span.textContent = "dd-mm-yyyy";
+            }
+            input.parentNode?.replaceChild(span, input);
+          });
+        },
       });
 
-      const addPage = (canvas, tabName, isFirst) => {
+      // ── Add one page to PDF ─────────────────────────────────────────────
+      const addPage = (canvas, tabName, isFirst, pageNum, totalPages) => {
         if (!isFirst) pdf.addPage();
-        drawPage(tabName);
-        const margin = 3, availW = pageW - margin * 2, availH = pageH - HDR - margin * 2;
-        const aspect = canvas.width / canvas.height;
-        const img    = canvas.toDataURL("image/jpeg", 0.9);
+
+        const filterText = buildFilterText();
+        const filterH    = filterText ? 7 : 0;
+        const topOffset  = HDR + filterH;
+        const margin     = 2;
+        const availW     = pageW - margin * 2;
+        const availH     = pageH - topOffset - FTR - margin;
+        const aspect     = canvas.width / canvas.height;
+        const img        = canvas.toDataURL("image/jpeg", 0.98);
+
+        // Background
+        pdf.setFillColor(13, 17, 23);
+        pdf.rect(0, 0, pageW, pageH, "F");
+
+        // Chart screenshot
         let w, h, x, y;
-        if (aspect > availW / availH) { w = availW; h = availW / aspect; x = margin; y = HDR + margin + (availH - h) / 2; }
-        else                           { h = availH; w = availH * aspect; x = margin + (availW - w) / 2; y = HDR + margin; }
+        if (aspect > availW / availH) {
+          w = availW; h = availW / aspect; x = margin; y = topOffset + margin;
+        } else {
+          h = availH; w = availH * aspect;
+          x = margin + (availW - w) / 2; y = topOffset + margin;
+        }
         pdf.addImage(img, "JPEG", x, y, w, h);
+
+        // Header strip
+        pdf.setFillColor(18, 21, 31);
+        pdf.rect(0, 0, pageW, HDR, "F");
+        pdf.setDrawColor(45, 55, 72);
+        pdf.setLineWidth(0.3);
+        pdf.line(0, HDR, pageW, HDR);
+
+        // Tenant logo left
+        let logoDrawn = false;
+        if (tenantLogoB64) {
+          try { pdf.addImage(tenantLogoB64, "PNG", 6, 3, 0, 12); logoDrawn = true; }
+          catch { logoDrawn = false; }
+        }
+        if (!logoDrawn) {
+          pdf.setFont("helvetica", "bold"); pdf.setFontSize(11);
+          pdf.setTextColor(255, 255, 255);
+          pdf.text("Dashboard", 8, 11.5);
+        }
+
+        // Tab name right
+        if (tabName) {
+          pdf.setFont("helvetica", "normal"); pdf.setFontSize(9);
+          pdf.setTextColor(203, 213, 225);
+          pdf.text(tabName, pageW - 8, 11.5, { align: "right" });
+        }
+
+        // Filter strip — shows what filters were active at download time
+        if (filterText) {
+          pdf.setFillColor(15, 20, 30);
+          pdf.rect(0, HDR, pageW, filterH, "F");
+          pdf.setDrawColor(31, 50, 70);
+          pdf.setLineWidth(0.2);
+          pdf.line(0, HDR + filterH, pageW, HDR + filterH);
+          pdf.setFont("helvetica", "normal"); pdf.setFontSize(7);
+          pdf.setTextColor(100, 148, 180);
+          const txt = filterText.length > 160
+            ? filterText.slice(0, 160) + "..."
+            : filterText;
+          pdf.text(txt, 8, HDR + filterH - 1.5);
+        }
+
+        // Footer strip
+        const footerY = pageH - FTR;
+        pdf.setFillColor(18, 21, 31);
+        pdf.rect(0, footerY, pageW, FTR, "F");
+        pdf.setDrawColor(45, 55, 72);
+        pdf.setLineWidth(0.3);
+        pdf.line(0, footerY, pageW, footerY);
+
+        let footerLogoDrawn = false;
+        if (speegileLogoB64) {
+          try { pdf.addImage(speegileLogoB64, "PNG", 6, footerY + 1.5, 0, 6); footerLogoDrawn = true; }
+          catch { footerLogoDrawn = false; }
+        }
+        if (!footerLogoDrawn) {
+          pdf.setFont("helvetica", "bold"); pdf.setFontSize(7);
+          pdf.setTextColor(31, 168, 201);
+          pdf.text("Speegile Analytics", 6, footerY + 6.5);
+        }
+
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.5);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(`Downloaded: ${downloadDate}`, pageW / 2, footerY + 6.5, { align: "center" });
+        pdf.text(`Page ${pageNum} of ${totalPages}`, pageW - 8, footerY + 6.5, { align: "right" });
       };
 
-      // Read from ref — no stale closure issues
+      // ── Build tab list ──────────────────────────────────────────────────
       const currentSections = sectionsRef.current;
-      const tabSection   = currentSections?.find(s => s.type === "tabs");
-      const topLevelTabs = tabSection?.tabs || [];
-      const totalPages   = topLevelTabs.length === 0 ? 1 :
-        topLevelTabs.reduce((acc, tab) => acc + ((tab.nestedTabsSection?.tabs?.length || 0) > 1 ? tab.nestedTabsSection.tabs.length : 1), 0);
+      const tabSection      = currentSections?.find(s => s.type === "tabs");
+      const topLevelTabs    = tabSection?.tabs || [];
+      const totalPages      = topLevelTabs.length === 0 ? 1 :
+        topLevelTabs.reduce((acc, tab) =>
+          acc + ((tab.nestedTabsSection?.tabs?.length || 0) > 1
+            ? tab.nestedTabsSection.tabs.length : 1), 0);
 
-      const switchAndWait = (ti, ni, tabName, pageNum) => new Promise(resolve => {
-        setPdfProgress({ current: pageNum, total: totalPages, tabName });
-        pdfResolveRef.current = resolve;
-        setPdfTabIdx(ti);
-        setPdfNestedTabIdx(ni);
-      });
+      
+      // ── Switch tab and apply only its scoped filters ──────────────────
+      const switchAndWait = (ti, ni, tabName, pageNum) =>
+        new Promise(resolve => {
+          const tab = topLevelTabs[ti];
 
+          // Apply filters scoped to this top-level tab
+          applyTabScopedFilters(tab?.id);
+
+          setPdfProgress({ current: pageNum, total: totalPages, tabName });
+          pdfResolveRef.current = resolve;
+          setPdfTabIdx(ti);
+          setPdfNestedTabIdx(ni !== null && ni !== undefined ? ni : null);
+        });
+
+
+
+      // ── Loop through all tabs and capture ───────────────────────────────
       let isFirst = true, pagesDone = 0;
 
       if (topLevelTabs.length === 0) {
         setPdfProgress({ current: 0, total: 1, tabName: "Dashboard" });
-        await new Promise(r => setTimeout(r, 3000));
-        addPage(await capture(), "Dashboard", true);
+        await new Promise(r => setTimeout(r, 8000));
+        addPage(await capture(), "Dashboard", true, 1, 1);
       } else {
         for (let ti = 0; ti < topLevelTabs.length; ti++) {
           const topTab     = topLevelTabs[ti];
           const nestedTabs = topTab.nestedTabsSection?.tabs || [];
+
           if (nestedTabs.length <= 1) {
-            const label = nestedTabs.length === 1 ? `${topTab.name}  ›  ${nestedTabs[0].name}` : topTab.name;
+            const label = nestedTabs.length === 1
+              ? `${topTab.name}  ›  ${nestedTabs[0].name}`
+              : topTab.name;
             await switchAndWait(ti, null, label, pagesDone + 1);
-            addPage(await capture(), label, isFirst);
+            addPage(await capture(), label, isFirst, pagesDone + 1, totalPages);
             isFirst = false; pagesDone++;
           } else {
             for (let ni = 0; ni < nestedTabs.length; ni++) {
               const label = `${topTab.name}  ›  ${nestedTabs[ni].name}`;
               await switchAndWait(ti, ni, label, pagesDone + 1);
-              addPage(await capture(), label, isFirst);
+              addPage(await capture(), label, isFirst, pagesDone + 1, totalPages);
               isFirst = false; pagesDone++;
             }
           }
@@ -1261,6 +938,7 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
       }
 
       setPdfTabIdx(null); setPdfNestedTabIdx(null); setPdfProgress(null);
+      setActiveFilters(snapshotFilters);   // ← ADD: restore user's original filters
       pdf.save("speegile_dashboard.pdf");
 
     } catch (err) {
@@ -1270,24 +948,26 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
       setIsPdfLoading(false);
       setPdfTabIdx(null); setPdfNestedTabIdx(null); setPdfProgress(null);
     }
-  }, []); // ← EMPTY — function created once, never recreated, no loop possible
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Always keep ref current
   downloadRef.current = downloadDashboardPDF;
 
-  // ── Register with parent ONCE on mount — stable wrapper via ref ──
-useEffect(() => {
-  if (onPdfReady) {
-    onPdfReady(() => () => downloadRef.current?.());  // ← double-wrap
-  }
-}, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── Register PDF handler with parent ──────────────────────
+  useEffect(() => {
+    if (onPdfReady) onPdfReady(() => () => downloadRef.current?.());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load dashboard data ───────────────────────────────────
   useEffect(() => {
     if (!dashboardNumericId) return;
-    setLoading(true); setError(null);
-    setActiveFilters({}); setDateFrom(""); setDateTo("");
-    setSections(null); setCrossFilters({});
+    setLoading(true);
+    setError(null);
+    setActiveFilters({});
+    setDateFrom("");
+    setDateTo("");
+    setSections(null);
+    setCrossFilters({});
+    setDataDateRange({ min: null, max: null });
 
     Promise.all([
       api.get("/dashboard-charts", { params: { dashboardId: dashboardNumericId } }),
@@ -1301,7 +981,7 @@ useEffect(() => {
       .finally(() => setLoading(false));
   }, [dashboardNumericId]);
 
-  // ── Early returns (after all hooks) ──────────────────────
+  // ── Early returns ─────────────────────────────────────────
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "64px 0" }}>
       <Loader2 size={20} style={{ color: "#1FA8C9", animation: "spin .9s linear infinite" }} />
@@ -1309,69 +989,47 @@ useEffect(() => {
       <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
     </div>
   );
-  if (error)         return <div style={{ textAlign: "center", padding: "64px 0", color: "#f87171",  fontSize: 13 }}>⚠ {error}</div>;
+  if (error)          return <div style={{ textAlign: "center", padding: "64px 0", color: "#f87171",  fontSize: 13 }}>⚠ {error}</div>;
   if (!charts.length) return <div style={{ textAlign: "center", padding: "64px 0", color: "#374151", fontSize: 13 }}>No charts found.</div>;
 
   const chartMap = Object.fromEntries(charts.map(c => [c.slice_id, c]));
 
-  // const cardProps = (chart, chartHeightPx = 320) => ({
-    
-  //   sliceId:           chart.slice_id,
-  //   title:             chart.slice_name,
-  //   vizType:           chart.viz_type,
-  //   xAxis:             chart.x_axis,
-  //   height: (chart.viz_type || "").toLowerCase().includes("big_number") ? BIGNUM_HEIGHT : chartHeightPx,
-  //   activeFilters, dateFrom: dateFrom || null, dateTo: dateTo || null,
-  //   crossFilters,  onCrossFilter: handleCrossFilter, onDrillDown: handleFilterChange,
-  //   metrics:           chart.metrics            || [],
-  //   groupby:           chart.groupby            || [],
-  //   groupbyRows:       chart.groupby_rows       || [],
-  //   groupbyColumns:    chart.groupby_cols       || [],
-  //   zoomable:          chart.zoomable           || false,
-  //   fontColor:         chart.font_color         || null,
-  //   conditionalColors: chart.conditional_colors || [],  // ← ADD
-  // });
-
-
+  // ── Card props ────────────────────────────────────────────
   const cardProps = (chart, chartHeightPx = 320) => {
-
-  // ── Only pass cross-filters that are scoped to affect this chart ──
-  const applicableCrossFilters = Object.fromEntries(
-  Object.entries(crossFilters).filter(([col, f]) => {
-    console.log(`Chart ${chart.slice_id} | col=${col} | chartsInScope=`, f.chartsInScope);
-    if (!f.chartsInScope) return true;
-    
-    // ── Fix type mismatch: compare as numbers ──
-    const chartId = Number(chart.slice_id);
-    return f.chartsInScope.map(Number).includes(chartId);
-  })
-);
-
-  return {
-    sliceId:           chart.slice_id,
-    title:             chart.slice_name,
-    vizType:           chart.viz_type,
-    xAxis:             chart.x_axis,
-    height:            (chart.viz_type || "").toLowerCase().includes("big_number")
-                         ? BIGNUM_HEIGHT : chartHeightPx,
-    activeFilters,
-    dateFrom:          dateFrom || null,
-    dateTo:            dateTo   || null,
-    crossFilters:      applicableCrossFilters,     // ← scoped, not full
-    onCrossFilter:     handleCrossFilter,
-    onDrillDown:       handleFilterChange,
-    metrics:           chart.metrics       || [],
-    groupby:           chart.groupby       || [],
-    groupbyRows:       chart.groupby_rows  || [],
-    groupbyColumns:    chart.groupby_cols  || [],
-    zoomable:          chart.zoomable      || false,
-    fontColor:         chart.font_color    || null,
-    conditionalColors: chart.conditional_colors || [],
-    // crossFilterScope:  chart.cross_filter_scope || null,  // ← ADD
-     crossFilterScope: chart.cross_filter_scope ?? null,
+    const applicableCrossFilters = Object.fromEntries(
+      Object.entries(crossFilters).filter(([, f]) => {
+        // if (!f.chartsInScope) return true;
+            if (!f.chartsInScope || f.chartsInScope.length === 0) return false;  // ← skip if no scope defined (means filter is meant for tables only)
+        return f.chartsInScope.map(Number).includes(Number(chart.slice_id));
+      })
+    );
+    return {
+      sliceId:             chart.slice_id,
+      title:               chart.slice_name,
+      vizType:             chart.viz_type,
+      xAxis:               chart.x_axis,
+      height:              (chart.viz_type || "").toLowerCase().includes("big_number") ? BIGNUM_HEIGHT : chartHeightPx,
+      activeFilters,
+      dateFrom:            dateFrom || null,
+      dateTo:              dateTo   || null,
+      crossFilters:        applicableCrossFilters,
+      onCrossFilter:       handleCrossFilter,
+      onDrillDown:         handleFilterChange,
+      metrics:             chart.metrics             || [],
+      groupby:             chart.groupby             || [],
+      groupbyRows:         chart.groupby_rows        || [],
+      groupbyColumns:      chart.groupby_cols        || [],
+      zoomable:            chart.zoomable            || false,
+      fontColor:           chart.font_color          || null,
+      conditionalColors:   chart.conditional_colors  || [],
+      crossFilterScope:    chart.cross_filter_scope  ?? null,
+      percentageThreshold: chart.percentage_threshold || 0,
+      otherThreshold:      chart.other_threshold      || 0,
+      onDateRangeDetected: handleDateRangeDetected,
+    };
   };
-};
 
+  // ── Render rows ───────────────────────────────────────────
   const renderRows = (rows) => rows.map((row, rIdx) => {
     const totalCols = row.reduce((sum, item) => sum + (item.width || 6), 0);
     const gridCols  = Math.min(Math.max(totalCols, 1), 12);
@@ -1402,89 +1060,33 @@ useEffect(() => {
     );
   });
 
-
-  
-
-
-  // Helper to extract chart IDs from a tab's rows:
-// const getChartIdsFromRows = (rows = []) => {
-//   const ids = new Set();
-//   rows.forEach(row => row.forEach(item => {
-//     if (item.chartId) ids.add(item.chartId);
-//   }));
-//   return ids;
-// };
-
+  // ── Render with layout ────────────────────────────────────
   const renderWithLayout = () => sections.map((section, sIdx) => {
     if (section.type === "rows")
       return <React.Fragment key={sIdx}>{renderRows(section.rows)}</React.Fragment>;
     if (section.type === "tabs")
       return (
-        // <TabGroup
-        //   key={sIdx}
-        //   tabs={section.tabs}
-        //   chartMap={chartMap} cardProps={cardProps}
-        //   isMobile={isMobile} renderRows={renderRows}
-        //   // onTabChange={() => setCrossFilters({})}
-
-        //   onTabChange={(tabId, tabRows) => {
-        //     setCrossFilters({});
-        //     setActiveTabId(tabId);
-        //     // setActiveTabChartIds(getChartIdsFromRows(tabRows));
-        //     setActiveFilters(prev => {
-        //       const inScope = new Set(
-        //         filterDefs
-        //           .filter(fd => !fd.tabsInScope?.length || fd.tabsInScope.includes(tabId))
-        //           .map(fd => fd.column)
-        //       );
-        //       return Object.fromEntries(Object.entries(prev).filter(([col]) => inScope.has(col)));
-        //     });
-        //   }}
-          
-        //             // onTabChange={(tabId) => {
-        //   //   setCrossFilters({});
-        //   //   setActiveTabId(tabId);
-        //   //   // Also clear filters that go out of scope
-        //   //   setActiveFilters(prev => {
-        //   //     const inScope = new Set(
-        //   //       filterDefs
-        //   //         .filter(fd => !fd.tabsInScope?.length || fd.tabsInScope.includes(tabId))
-        //   //         .map(fd => fd.column)
-        //   //     );
-        //   //     return Object.fromEntries(Object.entries(prev).filter(([col]) => inScope.has(col)));
-        //   //   });
-        //   // }}
-
-        //   pdfTabIdx={pdfTabIdx}
-        //   pdfNestedTabIdx={pdfNestedTabIdx}
-        // />
-
         <TabGroup
-            key={sIdx}
-            tabs={section.tabs}
-            chartMap={chartMap}
-            cardProps={cardProps}
-            isMobile={isMobile}
-            renderRows={renderRows}
-            onTabChange={(tabId, tabRows) => {
-              setCrossFilters({});
-              setActiveTabId(tabId);
-              setActiveFilters(prev => {
-                const inScope = new Set(
-                  filterDefs
-                    .filter(fd => !fd.tabsInScope?.length || fd.tabsInScope.includes(tabId))
-                    .map(fd => fd.column)
-                );
-                return Object.fromEntries(Object.entries(prev).filter(([col]) => inScope.has(col)));
-              });
-            }}
-            pdfTabIdx={pdfTabIdx}
-            pdfNestedTabIdx={pdfNestedTabIdx}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            setDateFrom={setDateFrom}
-            setDateTo={setDateTo}
-          />
+          key={sIdx}
+          tabs={section.tabs}
+          chartMap={chartMap}
+          cardProps={cardProps}
+          isMobile={isMobile}
+          renderRows={renderRows}
+          onTabChange={(tabId) => {
+            // Clear cross-filters on tab switch (click-based filters reset per tab)
+            // Panel filters (activeFilters) persist across tabs
+            setCrossFilters({});
+            setActiveTabId(tabId);
+          }}
+          pdfTabIdx={pdfTabIdx}
+          pdfNestedTabIdx={pdfNestedTabIdx}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          setDateFrom={setDateFrom}
+          setDateTo={setDateTo}
+          dataDateRange={dataDateRange}
+        />
       );
     return null;
   });
@@ -1495,45 +1097,1539 @@ useEffect(() => {
     </div>
   );
 
+  // ── Render ────────────────────────────────────────────────
   return (
     <div style={{ background: "#0d1117", minHeight: "100vh", padding: isMobile ? "10px" : "16px", position: "relative" }}>
-
-      {/* PDF progress overlay */}
       <PdfProgressOverlay progress={pdfProgress} />
-
       <CrossFilterPills crossFilters={crossFilters} onClear={clearCrossFilter} onClearAll={clearAllCrossFilters} />
-
       <FilterPanel
-          filterDefs={filterDefs.filter(fd => {
-            if (!fd.tabsInScope || fd.tabsInScope.length === 0) return true;
-            if (!activeTabId) return true;
-            return fd.tabsInScope.includes(activeTabId);
-          })}
-          activeFilters={activeFilters}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          onFilterChange={handleFilterChange}
-          onDateFromChange={setDateFrom}
-          onDateToChange={setDateTo}
-          onReset={handleReset}
-        />
+        filterDefs={filterDefs.filter(fd => {
+          if (!fd.tabsInScope || fd.tabsInScope.length === 0) return true;
+          if (!activeTabId) return true;
+          return fd.tabsInScope.includes(activeTabId);
+        })}
+        activeFilters={activeFilters}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onFilterChange={handleFilterChange}
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+        onReset={handleReset}
+      />
       <ActivePills
-        activeFilters={activeFilters} dateFrom={dateFrom} dateTo={dateTo}
-        // onRemove={col => setActiveFilters(p => ({ ...p, [col]: null }))}
+        activeFilters={activeFilters}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
         onRemove={(col, val) => handleFilterChange(col, val)}
         onRemoveDate={() => { setDateFrom(""); setDateTo(""); }}
       />
 
-      {/* Charts — captured for PDF */}
       <div ref={dashboardContentRef}>
         {sections ? renderWithLayout() : renderFallback()}
       </div>
-
-      {/* Charts */}
-      {/* <div >
-        {sections ? renderWithLayout() : renderFallback()}
-      </div> */}
-
     </div>
   );
 }
+
+
+
+// import React, { useState, useEffect, useCallback, useRef } from "react";
+// import api from "./api";
+// import ChartCard from "./ChartCard";
+// import { Loader2, SlidersHorizontal, RotateCcw, X, ChevronDown, Zap, Check } from "lucide-react";
+// import DashboardGrid from "./Dashboardgrid";
+
+// const BIGNUM_HEIGHT = 160;
+
+// function useWindowWidth() {
+//   const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
+//   useEffect(() => {
+//     const fn = () => setW(window.innerWidth);
+//     window.addEventListener("resize", fn);
+//     return () => window.removeEventListener("resize", fn);
+//   }, []);
+//   return w;
+// }
+
+// // ── PDF progress overlay ────────────────────────────────────
+// function PdfProgressOverlay({ progress }) {
+//   if (!progress) return null;
+//   const pct = progress.total > 0
+//     ? Math.round((progress.current / progress.total) * 100)
+//     : 0;
+//   return (
+//     <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.82)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+//       <style>{`
+//         @keyframes pdf-spin    { to { transform: rotate(360deg); } }
+//         @keyframes pdf-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+//       `}</style>
+//       <div style={{ background: "#1a1d26", border: "1px solid rgba(31,168,201,0.25)", borderRadius: 16, padding: "36px 44px", width: 400, display: "flex", flexDirection: "column", alignItems: "center", gap: 22, boxShadow: "0 24px 60px rgba(0,0,0,0.6)" }}>
+//         <div style={{ position: "relative", width: 56, height: 56 }}>
+//           <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px solid rgba(31,168,201,0.12)" }} />
+//           <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px solid transparent", borderTopColor: "#1FA8C9", animation: "pdf-spin 1s linear infinite" }} />
+//           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>📄</div>
+//         </div>
+//         <div style={{ textAlign: "center" }}>
+//           <div style={{ fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 8 }}>Generating PDF</div>
+//           <div style={{ fontSize: 12, color: "#64748b" }}>Processing: <span style={{ color: "#1FA8C9", fontWeight: 600 }}>{progress.tabName}</span></div>
+//         </div>
+//         <div style={{ width: "100%" }}>
+//           <div style={{ width: "100%", height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 99, overflow: "hidden" }}>
+//             <div style={{ width: `${pct}%`, height: "100%", borderRadius: 99, background: "linear-gradient(90deg,#1FA8C9 0%,#A868B7 60%,#1FA8C9 100%)", backgroundSize: "200% 100%", animation: "pdf-shimmer 1.5s linear infinite", transition: "width 0.6s ease" }} />
+//           </div>
+//           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+//             <span style={{ fontSize: 11, color: "#374151" }}>Page {progress.current} of {progress.total}</span>
+//             <span style={{ fontSize: 11, color: "#1FA8C9", fontWeight: 700 }}>{pct}%</span>
+//           </div>
+//         </div>
+//         <div style={{ fontSize: 11, color: "#374151", letterSpacing: "0.03em" }}>Please keep this window open</div>
+//       </div>
+//     </div>
+//   );
+// }
+
+// // ── Simple markdown renderer ────────────────────────────────
+// function MarkdownBlock({ code }) {
+//   const hasHtml = /<[a-z][\s\S]*?>/i.test(code || "");
+//   const containerStyle = { background: "#1e2129", border: "1px solid rgba(255,255,255,0.065)", borderRadius: 10, padding: "20px 22px", height: "100%", boxSizing: "border-box", overflowY: "auto", position: "relative" };
+//   const topBar = <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg,#1FA8C9,#454E7C,#A868B7)", opacity: 0.75 }} />;
+//   if (hasHtml) {
+//     return (
+//       <div style={containerStyle}>
+//         {topBar}
+//         <style>{`.md-html-block{font-size:13px;color:#94a3b8;line-height:1.7}.md-html-block p{margin:0 0 8px}.md-html-block b,.md-html-block strong{color:#cbd5e1;font-weight:600}.md-html-block h1{font-size:16px;color:#f1f5f9;font-weight:700;margin:0 0 12px}.md-html-block h2{font-size:14px;color:#e2e8f0;font-weight:700;margin:0 0 10px}.md-html-block h3{font-size:12px;color:#1FA8C9;font-weight:700;margin:12px 0 4px;text-transform:uppercase}.md-html-block center{display:block;text-align:center}.md-html-block a{color:#1FA8C9}`}</style>
+//         <div className="md-html-block" dangerouslySetInnerHTML={{ __html: code }} />
+//       </div>
+//     );
+//   }
+//   const lines = (code || "").split("\n");
+//   return (
+//     <div style={containerStyle}>
+//       {topBar}
+//       {lines.map((line, i) => {
+//         if (line.startsWith("### ")) return <p key={i} style={{ fontSize: 12, fontWeight: 700, color: "#1FA8C9", margin: "12px 0 4px", letterSpacing: "0.04em", textTransform: "uppercase" }}>{line.slice(4)}</p>;
+//         if (line.startsWith("## "))  return <h4 key={i} style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0", margin: "0 0 10px", lineHeight: 1.4 }}>{line.slice(3)}</h4>;
+//         if (line.startsWith("# "))   return <h3 key={i} style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9", margin: "0 0 12px", lineHeight: 1.3 }}>{line.slice(2)}</h3>;
+//         if (line.trim() === "")      return <div key={i} style={{ height: 10 }} />;
+//         const parts = line.split(/(\*\*.*?\*\*)/g).map((p, j) =>
+//           p.startsWith("**") && p.endsWith("**")
+//             ? <strong key={j} style={{ color: "#cbd5e1", fontWeight: 600 }}>{p.slice(2, -2)}</strong>
+//             : p
+//         );
+//         return <p key={i} style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.7, margin: "0 0 8px" }}>{parts}</p>;
+//       })}
+//     </div>
+//   );
+// }
+
+// // ── Layout parser ───────────────────────────────────────────
+// function parseSupersetLayout(positionJson) {
+//   if (!positionJson || typeof positionJson !== "object") return null;
+//   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, Number.isFinite(Number(v)) ? Number(v) : lo));
+
+//   function parseRowItems(rowComp) {
+//     const items = [];
+//     for (const childId of rowComp.children || []) {
+//       const child = positionJson[childId];
+//       if (!child) continue;
+//       if (child.type === "CHART" && child.meta?.chartId) {
+//         items.push({ chartId: child.meta.chartId, width: clamp(child.meta.width || 6, 1, 12), heightUnits: child.meta.height || 50 });
+//       } else if (child.type === "MARKDOWN") {
+//         items.push({ type: "markdown", code: child.meta?.code || "", width: clamp(child.meta?.width || 4, 1, 12), heightUnits: child.meta?.height || 50 });
+//       } else if (child.type === "HEADER") {
+//         items.push({ type: "header", text: child.meta?.text || "", width: 12, heightUnits: 20 });
+//       } else if (child.type === "COLUMN") {
+//         const colW = clamp(child.meta?.width || 6, 1, 12);
+//         for (const innerId of child.children || []) {
+//           const inner = positionJson[innerId];
+//           if (!inner) continue;
+//           if (inner.type === "CHART" && inner.meta?.chartId) {
+//             items.push({ chartId: inner.meta.chartId, width: colW, heightUnits: inner.meta.height || 50 });
+//           } else if (inner.type === "MARKDOWN") {
+//             items.push({ type: "markdown", code: inner.meta?.code || "", width: colW, heightUnits: inner.meta?.height || 50 });
+//           } else if (inner.type === "HEADER") {
+//             items.push({ type: "header", text: inner.meta?.text || "", width: colW, heightUnits: 20 });
+//           } else if (inner.type === "ROW") {
+//             items.push(...parseRowItems(inner));
+//           }
+//         }
+//       }
+//     }
+//     return items;
+//   }
+
+//   function idsToRows(childIds) {
+//     const rows = [];
+//     for (const id of childIds || []) {
+//       const comp = positionJson[id];
+//       if (!comp) continue;
+//       if (comp.type === "ROW") {
+//         const items = parseRowItems(comp);
+//         if (items.length) rows.push(items);
+//       } else if (comp.type === "COLUMN") {
+//         for (const innerId of comp.children || []) {
+//           const inner = positionJson[innerId];
+//           if (inner?.type === "ROW") { const items = parseRowItems(inner); if (items.length) rows.push(items); }
+//         }
+//       }
+//     }
+//     return rows;
+//   }
+
+//   function processTabChildren(childIds) {
+//     const rows = [];
+//     let nestedTabsSection = null;
+//     for (const id of childIds || []) {
+//       const comp = positionJson[id];
+//       if (!comp) continue;
+//       if (comp.type === "ROW") {
+//         const items = parseRowItems(comp);
+//         if (items.length) rows.push(items);
+//       } else if (comp.type === "COLUMN") {
+//         for (const innerId of comp.children || []) {
+//           const inner = positionJson[innerId];
+//           if (inner?.type === "ROW") { const items = parseRowItems(inner); if (items.length) rows.push(items); }
+//         }
+//       } else if (comp.type === "TABS" || comp.type === "TABS_V2") {
+//         const nestedTabs = processTabsComp(comp);
+//         if (nestedTabs.length) nestedTabsSection = { type: "tabs", tabs: nestedTabs };
+//       }
+//     }
+//     return { rows, nestedTabsSection };
+//   }
+
+//   function processTabsComp(tabsComp) {
+//     const tabs = [];
+//     for (const tabId of tabsComp.children || []) {
+//       const tab = positionJson[tabId];
+//       if (!tab || !tab.type?.startsWith("TAB")) continue;
+//       const name = tab.meta?.text || tab.meta?.defaultText || tab.meta?.tabTextContent || `Tab ${tabs.length + 1}`;
+//       const { rows, nestedTabsSection } = processTabChildren(tab.children || []);
+//       tabs.push({ id: tabId, name, rows, nestedTabsSection });
+//     }
+//     return tabs;
+//   }
+
+//   const sections = [];
+//   let pendingRowIds = [];
+//   function flushRows() {
+//     const rows = idsToRows(pendingRowIds);
+//     if (rows.length) sections.push({ type: "rows", rows });
+//     pendingRowIds = [];
+//   }
+
+//   const grid     = positionJson["GRID_ID"] || positionJson["ROOT_ID"];
+//   const gridKids = grid?.children || [];
+//   for (const childId of gridKids) {
+//     const comp = positionJson[childId];
+//     if (!comp) continue;
+//     if (comp.type === "TABS" || comp.type === "TABS_V2") {
+//       flushRows();
+//       const tabs = processTabsComp(comp);
+//       if (tabs.length) sections.push({ type: "tabs", tabs });
+//     } else if (comp.type === "ROW") {
+//       pendingRowIds.push(childId);
+//     }
+//   }
+//   flushRows();
+
+//   if (!sections.length) {
+//     const tabsEntries = Object.entries(positionJson).filter(([, v]) => v?.type === "TABS" || v?.type === "TABS_V2");
+//     for (const [, tabsComp] of tabsEntries) {
+//       const tabs = processTabsComp(tabsComp);
+//       if (tabs.length) { sections.push({ type: "tabs", tabs }); break; }
+//     }
+//     if (!sections.length) {
+//       const rowEntries = Object.entries(positionJson)
+//         .filter(([k, v]) => v?.type === "ROW" && (gridKids.includes(k) || (v.parents || []).some(p => p === "GRID_ID" || p === "ROOT_ID")));
+//       const rows = rowEntries.map(([, v]) => parseRowItems(v)).filter(i => i.length > 0);
+//       if (rows.length) sections.push({ type: "rows", rows });
+//     }
+//   }
+//   return sections.length > 0 ? sections : null;
+// }
+
+// const unitsToPx = (u) => Math.max(220, (u || 50) * 8);
+
+// // ── Cross-filter pills ──────────────────────────────────────
+// function CrossFilterPills({ crossFilters, onClear, onClearAll }) {
+//   const entries = Object.entries(crossFilters).filter(([, f]) => f.value);
+//   if (!entries.length) return null;
+//   return (
+//     <div style={{ background: "rgba(31,168,201,0.07)", border: "1px solid rgba(31,168,201,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+//       <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 4 }}>
+//         <Zap size={13} style={{ color: "#1FA8C9" }} />
+//         <span style={{ fontSize: 11, fontWeight: 700, color: "#1FA8C9", letterSpacing: "0.07em", textTransform: "uppercase" }}>Cross-filters active</span>
+//       </div>
+//       {entries.map(([col, f]) => (
+//         <span key={col} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, background: "rgba(31,168,201,0.15)", color: "#67c5d8", border: "1px solid rgba(31,168,201,0.3)", padding: "3px 10px 3px 12px", borderRadius: 16 }}>
+//           <span style={{ color: "#4a8fa8", fontSize: 9, fontWeight: 600 }}>{f.sourceChartTitle || "Chart"}:</span>
+//           <span style={{ color: "#e2e8f0", fontWeight: 600 }}>{f.value}</span>
+//           <button onClick={() => onClear(col)} style={{ background: "none", border: "none", color: "#4a8fa8", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
+//             onMouseEnter={e => e.currentTarget.style.color = "#1FA8C9"}
+//             onMouseLeave={e => e.currentTarget.style.color = "#4a8fa8"}>
+//             <X size={11} />
+//           </button>
+//         </span>
+//       ))}
+//       {entries.length > 1 && (
+//         <button onClick={onClearAll} style={{ fontSize: 10, color: "#4a8fa8", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+//           onMouseEnter={e => e.currentTarget.style.color = "#1FA8C9"}
+//           onMouseLeave={e => e.currentTarget.style.color = "#4a8fa8"}>
+//           Clear all
+//         </button>
+//       )}
+//     </div>
+//   );
+// }
+
+// // ── Date Range Picker ───────────────────────────────────────
+// function DateRangePicker({ dateFrom, dateTo, onFromChange, onToChange, onClear, dataDateRange }) {
+//   const [draftFrom, setDraftFrom] = useState(dateFrom || "");
+//   const [draftTo,   setDraftTo]   = useState(dateTo   || "");
+
+//   useEffect(() => {
+//     setDraftFrom(dateFrom || "");
+//     setDraftTo(dateTo     || "");
+//   }, [dateFrom, dateTo]);
+
+//   const hasDate = dateFrom || dateTo;
+
+//   const handleSearch = () => {
+//     onFromChange(draftFrom || null);
+//     onToChange(draftTo     || null);
+//   };
+
+//   const handleClear = () => {
+//     setDraftFrom("");
+//     setDraftTo("");
+//     onClear();
+//   };
+
+//   const fmtDisplay = (isoDate) => {
+//     if (!isoDate) return null;
+//     try {
+//       return new Date(isoDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+//     } catch { return isoDate; }
+//   };
+
+//   const inputStyle = (hasVal) => ({
+//     background: "#12151f",
+//     border: `1px solid ${hasVal ? "#1FA8C9" : "rgba(255,255,255,0.1)"}`,
+//     borderRadius: 6, padding: "4px 8px",
+//     color: hasVal ? "#e2e8f0" : "#64748b",
+//     fontSize: 11, cursor: "pointer", outline: "none", colorScheme: "dark",
+//   });
+
+//   return (
+//     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+//       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+//         <span style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>📅 Date</span>
+//         <input type="date" value={draftFrom}
+//           min={dataDateRange?.min || undefined}
+//           max={draftTo || dataDateRange?.max || undefined}
+//           onChange={e => setDraftFrom(e.target.value)}
+//           style={inputStyle(draftFrom)} />
+//         <span style={{ color: "#64748b", fontSize: 11 }}>→</span>
+//         <input type="date" value={draftTo}
+//           min={draftFrom || dataDateRange?.min || undefined}
+//           max={dataDateRange?.max || undefined}
+//           onChange={e => setDraftTo(e.target.value)}
+//           style={inputStyle(draftTo)} />
+//         <button onClick={handleSearch} disabled={!draftFrom || !draftTo}
+//           style={{
+//             display: "flex", alignItems: "center", gap: 4,
+//             background: (draftFrom && draftTo) ? "rgba(31,168,201,0.15)" : "rgba(255,255,255,0.03)",
+//             border: `1px solid ${(draftFrom && draftTo) ? "rgba(31,168,201,0.4)" : "rgba(255,255,255,0.08)"}`,
+//             borderRadius: 6, padding: "4px 12px",
+//             color: (draftFrom && draftTo) ? "#1FA8C9" : "#374151",
+//             fontSize: 11, fontWeight: 600,
+//             cursor: (draftFrom && draftTo) ? "pointer" : "not-allowed",
+//             whiteSpace: "nowrap", transition: "all 0.15s",
+//           }}>
+//           🔍 Search
+//         </button>
+//         {hasDate && (
+//           <button onClick={handleClear}
+//             style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 6, padding: "4px 8px", color: "#f87171", fontSize: 11, cursor: "pointer" }}>
+//             ✕
+//           </button>
+//         )}
+//       </div>
+//       {dataDateRange?.min && dataDateRange?.max && (
+//         <div style={{ fontSize: 10, color: "#475569", paddingLeft: 24, letterSpacing: "0.02em" }}>
+//           {/* Data available: {fmtDisplay(dataDateRange.min)} → {fmtDisplay(dataDateRange.max)} */}
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+// // ── Tab group ───────────────────────────────────────────────
+// function TabGroup({ tabs = [], chartMap, cardProps, isMobile, renderRows, onTabChange, pdfTabIdx, pdfNestedTabIdx, dateFrom, dateTo, setDateFrom, setDateTo, dataDateRange }) {
+//   const [activeIdx, setActiveIdx] = useState(0);
+
+//   useEffect(() => {
+//     if (tabs.length > 0 && onTabChange) onTabChange(tabs[0].id);
+//   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+//   const displayIdx = (pdfTabIdx !== null && pdfTabIdx !== undefined) ? Math.min(pdfTabIdx, tabs.length - 1) : activeIdx;
+//   const activeTab  = tabs[displayIdx];
+//   const hasContent = activeTab?.rows?.length > 0 || activeTab?.nestedTabsSection != null;
+
+//   return (
+//     <div style={{ marginBottom: 12 }}>
+//       <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "#12151f", minHeight: 42, marginBottom: 14 }}>
+//         <style>{`
+//           .tabs-scroll-container::-webkit-scrollbar { height: 3px; }
+//           .tabs-scroll-container::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 10px; }
+//           .tabs-scroll-container::-webkit-scrollbar-thumb { background: rgba(31,168,201,0.4); border-radius: 10px; transition: background 0.2s; }
+//           .tabs-scroll-container::-webkit-scrollbar-thumb:hover { background: rgba(31,168,201,0.8); }
+//           .tabs-scroll-container { scrollbar-width: thin; scrollbar-color: rgba(31,168,201,0.4) rgba(255,255,255,0.04); }
+//         `}</style>
+
+//         {tabs.length > 0 && (
+//           <div className="tabs-scroll-container"
+//             onWheel={(e) => { if (e.deltaY !== 0) { e.currentTarget.scrollLeft += e.deltaY; e.preventDefault(); } }}
+//             style={{ flex: 1, display: "flex", alignItems: "center", overflowX: "auto", overflowY: "hidden", gap: 2, padding: "4px 8px 8px 8px", minWidth: 0, cursor: "grab" }}>
+//             {tabs.map((tab, i) => (
+//               <button key={tab.id}
+//                 onClick={() => { setActiveIdx(i); if (onTabChange) onTabChange(tab.id); }}
+//                 style={{ flexShrink: 0, padding: "10px 18px", fontSize: 13, fontWeight: displayIdx === i ? 600 : 400, color: displayIdx === i ? "#1FA8C9" : "#64748b", background: "transparent", border: "none", borderBottom: displayIdx === i ? "2px solid #1FA8C9" : "2px solid transparent", cursor: "pointer", whiteSpace: "nowrap", transition: "color 0.15s, border-color 0.15s" }}>
+//                 {tab.name}
+//               </button>
+//             ))}
+//           </div>
+//         )}
+
+//         <div style={{ marginLeft: "auto", flexShrink: 0, borderLeft: "1px solid rgba(255,255,255,0.07)", padding: "0 12px", display: "flex", alignItems: "center", gap: 8, height: "100%", minHeight: 42 }}>
+//           <DateRangePicker
+//             dateFrom={dateFrom} dateTo={dateTo}
+//             onFromChange={setDateFrom} onToChange={setDateTo}
+//             onClear={() => { setDateFrom(null); setDateTo(null); }}
+//             dataDateRange={dataDateRange}
+//           />
+//         </div>
+//       </div>
+
+//       {activeTab?.rows?.length > 0 && renderRows(activeTab.rows)}
+
+//       {activeTab?.nestedTabsSection && (
+//         <TabGroup
+//           tabs={activeTab.nestedTabsSection.tabs}
+//           chartMap={chartMap} cardProps={cardProps} isMobile={isMobile} renderRows={renderRows}
+//           onTabChange={onTabChange} pdfTabIdx={pdfNestedTabIdx} pdfNestedTabIdx={null}
+//           dateFrom={dateFrom} dateTo={dateTo} setDateFrom={setDateFrom} setDateTo={setDateTo}
+//           dataDateRange={dataDateRange}
+//         />
+//       )}
+
+//       {tabs.length > 0 && !hasContent && (
+//         <div style={{ padding: "40px 0", textAlign: "center", color: "#374151", fontSize: 13 }}>No charts in this tab</div>
+//       )}
+//     </div>
+//   );
+// }
+
+// // ── Filter dropdown ─────────────────────────────────────────
+// function FilterDropdown({ fd, activeFilters, dateFrom, dateTo, onFilterChange, onDateFromChange, onDateToChange }) {
+//   const [open,   setOpen]   = useState(false);
+//   const [search, setSearch] = useState("");
+//   const ref = useRef(null);
+
+//   useEffect(() => {
+//     if (!open) return;
+//     const fn = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setSearch(""); } };
+//     document.addEventListener("mousedown", fn);
+//     return () => document.removeEventListener("mousedown", fn);
+//   }, [open]);
+
+//   const rawVal       = activeFilters[fd.column];
+//   const selectedVals = Array.isArray(rawVal) ? rawVal : (rawVal ? [rawVal] : []);
+//   const hasSelection = fd.type === "date" ? !!dateFrom : selectedVals.length > 0;
+//   const selCount     = selectedVals.length;
+//   const displayed    = fd.type === "select" ? (fd.values || []).filter(v => !search.trim() || String(v).toLowerCase().includes(search.toLowerCase())) : [];
+
+//   const handleClearAll = (e) => {
+//     e?.stopPropagation();
+//     if (fd.type === "date") { onDateFromChange?.(""); onDateToChange?.(""); }
+//     else selectedVals.forEach(v => onFilterChange?.(fd.column, v));
+//   };
+//   const handleToggle    = (val) => onFilterChange?.(fd.column, val);
+//   const handleSelectAll = () => displayed.forEach(v => { if (!selectedVals.includes(v)) onFilterChange?.(fd.column, v); });
+//   const isAllSelected   = displayed.length > 0 && displayed.every(v => selectedVals.includes(v));
+
+//   return (
+//     <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
+//       <button onClick={() => { setOpen(p => !p); setSearch(""); }}
+//         style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: hasSelection ? 700 : 500, border: `1px solid ${hasSelection ? "rgba(31,168,201,0.55)" : open ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.09)"}`, background: hasSelection ? "rgba(31,168,201,0.13)" : open ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)", color: hasSelection ? "#1FA8C9" : "#94a3b8", cursor: "pointer", outline: "none", whiteSpace: "nowrap", userSelect: "none", transition: "all .15s" }}>
+//         <span>{fd.name}</span>
+//         {selCount > 0 && <span style={{ fontSize: 9, background: "#1FA8C9", color: "#fff", borderRadius: 8, padding: "1px 6px", fontWeight: 700, lineHeight: 1.5, flexShrink: 0 }}>{selCount}</span>}
+//         {hasSelection
+//           ? <X size={11} onClick={handleClearAll} style={{ color: "#1FA8C9", cursor: "pointer", flexShrink: 0 }} />
+//           : <ChevronDown size={11} style={{ color: open ? "#94a3b8" : "#475569", transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .15s", flexShrink: 0 }} />}
+//       </button>
+
+//       {open && (
+//         <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, minWidth: 240, maxWidth: 380, background: "#181b24", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, boxShadow: "0 16px 48px rgba(0,0,0,0.65)", zIndex: 500, overflow: "hidden" }}>
+//           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+//             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+//               <span style={{ fontSize: 11, fontWeight: 700, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.07em" }}>{fd.name}</span>
+//               {selCount > 0 && <span style={{ fontSize: 10, color: "#1FA8C9", fontWeight: 600 }}>{selCount} selected</span>}
+//             </div>
+//             <div style={{ display: "flex", gap: 10 }}>
+//               {fd.type === "select" && <button onClick={isAllSelected ? handleClearAll : handleSelectAll} style={{ fontSize: 10, color: "#64748b", background: "none", border: "none", cursor: "pointer", padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = "#1FA8C9"} onMouseLeave={e => e.currentTarget.style.color = "#64748b"}>{isAllSelected ? "Deselect all" : "Select all"}</button>}
+//               {hasSelection && <button onClick={handleClearAll} style={{ fontSize: 10, color: "#64748b", background: "none", border: "none", cursor: "pointer", padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = "#f87171"} onMouseLeave={e => e.currentTarget.style.color = "#64748b"}>Clear</button>}
+//             </div>
+//           </div>
+
+//           {fd.type === "date" && (
+//             <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+//               {[["From", dateFrom, onDateFromChange], ["To", dateTo, onDateToChange]].map(([label, val, setter]) => (
+//                 <div key={label}>
+//                   <p style={{ fontSize: 10, color: "#475569", marginBottom: 5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</p>
+//                   <input type="date" value={val} onChange={e => setter?.(e.target.value)} style={{ background: "#0d1117", border: "1px solid #2d3748", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#94a3b8", width: "100%", outline: "none", cursor: "pointer" }} />
+//                 </div>
+//               ))}
+//             </div>
+//           )}
+
+//           {fd.type === "select" && (
+//             <>
+//               {fd.values.length > 8 && (
+//                 <div style={{ padding: "8px 12px 6px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+//                   <input autoFocus placeholder={`Search ${fd.name.toLowerCase()}…`} value={search} onChange={e => setSearch(e.target.value)} style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 6, padding: "5px 10px", fontSize: 11, color: "#e2e8f0", outline: "none" }} />
+//                 </div>
+//               )}
+//               {selCount > 0 && !search && (
+//                 <div style={{ padding: "8px 12px 6px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", flexWrap: "wrap", gap: 4 }}>
+//                   {selectedVals.map(v => (
+//                     <span key={v} style={{ display: "flex", alignItems: "center", gap: 3, padding: "3px 8px", borderRadius: 14, fontSize: 10, fontWeight: 700, background: "rgba(31,168,201,0.2)", color: "#1FA8C9", border: "1px solid rgba(31,168,201,0.4)" }}>
+//                       {v}<X size={9} style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => handleToggle(v)} />
+//                     </span>
+//                   ))}
+//                 </div>
+//               )}
+//               <div style={{ padding: "8px 12px 10px", maxHeight: 200, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#2d3748 transparent", display: "flex", flexWrap: "wrap", gap: 5 }}>
+//                 {displayed.length === 0 && <span style={{ fontSize: 11, color: "#374151", padding: "4px 2px" }}>No results</span>}
+//                 {displayed.map(val => {
+//                   const active = selectedVals.includes(val);
+//                   return (
+//                     <button key={val} onClick={() => handleToggle(val)} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer", border: `1px solid ${active ? "#1FA8C9" : "rgba(31,168,201,0.2)"}`, background: active ? "#1FA8C9" : "rgba(31,168,201,0.07)", color: active ? "#fff" : "#5ba8b9", outline: "none", transition: "all .12s ease" }}>
+//                       {active && <Check size={9} />}{val}
+//                     </button>
+//                   );
+//                 })}
+//               </div>
+//               <div style={{ padding: "5px 14px 8px", fontSize: 10, color: "#374151", borderTop: "1px solid rgba(255,255,255,0.04)", display: "flex", justifyContent: "space-between" }}>
+//                 <span>{fd.values.length} option{fd.values.length !== 1 ? "s" : ""}{search ? ` · ${displayed.length} matching` : ""}</span>
+//                 {selCount > 0 && <span style={{ color: "#1FA8C9", fontWeight: 600 }}>{selCount} selected</span>}
+//               </div>
+//             </>
+//           )}
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+// // ── Filter panel ────────────────────────────────────────────
+// function FilterPanel({ filterDefs, activeFilters, dateFrom, dateTo, onFilterChange, onDateFromChange, onDateToChange, onReset }) {
+//   if (!filterDefs?.length) return null;
+//   const activeCount = Object.values(activeFilters).reduce((acc, v) => acc + (Array.isArray(v) ? v.length : (v ? 1 : 0)), 0) + (dateFrom ? 1 : 0);
+//   const hasActive   = activeCount > 0;
+//   return (
+//     <div style={{ background: "#12151f", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, marginBottom: 14, padding: "10px 14px" }}>
+//       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+//         <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+//           <SlidersHorizontal size={13} style={{ color: "#475569" }} />
+//           <span style={{ fontSize: 11, fontWeight: 700, color: "#475569", letterSpacing: "0.09em", textTransform: "uppercase" }}>Filters</span>
+//           {hasActive && <span style={{ fontSize: 9, background: "#1FA8C9", color: "#fff", borderRadius: 8, padding: "1px 6px", fontWeight: 700 }}>{activeCount}</span>}
+//         </div>
+//         <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+//         {filterDefs.map(fd => (
+//           <FilterDropdown key={fd.id} fd={fd} activeFilters={activeFilters} dateFrom={dateFrom} dateTo={dateTo} onFilterChange={onFilterChange} onDateFromChange={onDateFromChange} onDateToChange={onDateToChange} />
+//         ))}
+//         {hasActive && (
+//           <>
+//             <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+//             <button onClick={onReset} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: 7, fontSize: 11, fontWeight: 600, border: "1px solid rgba(239,68,68,0.28)", color: "#f87171", background: "rgba(239,68,68,0.06)", cursor: "pointer", flexShrink: 0, outline: "none", transition: "all .15s" }} onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.5)"; }} onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.06)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.28)"; }}>
+//               <RotateCcw size={10} /> Reset
+//             </button>
+//           </>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+// // ── Active pills ────────────────────────────────────────────
+// function ActivePills({ activeFilters, dateFrom, dateTo, onRemove, onRemoveDate }) {
+//   const pills = [];
+//   for (const [col, val] of Object.entries(activeFilters)) {
+//     if (!val) continue;
+//     const vals = Array.isArray(val) ? val : [val];
+//     vals.forEach(v => pills.push({ col, val: v }));
+//   }
+//   if (!pills.length && !dateFrom) return null;
+//   return (
+//     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14, alignItems: "center" }}>
+//       <span style={{ fontSize: 9, color: "#374151", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase" }}>Active:</span>
+//       {pills.map(({ col, val }) => (
+//         <span key={`${col}:${val}`} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, background: "rgba(31,168,201,0.12)", color: "#67c5d8", border: "1px solid rgba(31,168,201,0.22)", padding: "3px 8px 3px 10px", borderRadius: 16 }}>
+//           <span style={{ color: "#4a5568", fontSize: 9 }}>{col}:</span>&nbsp;{val}
+//           <button onClick={() => onRemove(col, val)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}><X size={10} /></button>
+//         </span>
+//       ))}
+//       {dateFrom && dateTo && (
+//         <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, background: "rgba(139,92,246,0.12)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.22)", padding: "3px 8px 3px 10px", borderRadius: 16 }}>
+//           {dateFrom} → {dateTo}
+//           <button onClick={onRemoveDate} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}><X size={10} /></button>
+//         </span>
+//       )}
+//     </div>
+//   );
+// }
+
+// // ══════════════════════════════════════════════════════════════
+// //  MAIN COMPONENT
+// // ══════════════════════════════════════════════════════════════
+// export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) {
+
+//   // ── All state ─────────────────────────────────────────────
+//   const [charts,          setCharts]          = useState([]);
+//   const [sections,        setSections]        = useState(null);
+//   const [filterDefs,      setFilterDefs]      = useState([]);
+//   const [activeFilters,   setActiveFilters]   = useState({});
+//   const [loading,         setLoading]         = useState(true);
+//   const [error,           setError]           = useState(null);
+//   const [crossFilters,    setCrossFilters]    = useState({});
+//   const [dataDateRange,   setDataDateRange]   = useState({ min: null, max: null });
+//   const [dateFrom,        setDateFrom]        = useState(null);
+//   const [dateTo,          setDateTo]          = useState(null);
+//   const [activeTabId,     setActiveTabId]     = useState(null);
+//   const [isPdfLoading,    setIsPdfLoading]    = useState(false);  // eslint-disable-line no-unused-vars
+//   const [pdfTabIdx,       setPdfTabIdx]       = useState(null);
+//   const [pdfNestedTabIdx, setPdfNestedTabIdx] = useState(null);
+//   const [pdfProgress,     setPdfProgress]     = useState(null);
+
+//   // ── All refs ──────────────────────────────────────────────
+//   const dashboardContentRef = useRef(null);
+//   const pdfResolveRef       = useRef(null);
+//   const isPdfLoadingRef     = useRef(false);
+//   const sectionsRef         = useRef(null);
+//   const downloadRef         = useRef(null);
+
+//   const windowWidth = useWindowWidth();
+//   const isMobile    = windowWidth < 768;
+
+
+//   // ── PDF — tenant logo + filter refs ──────────────────────
+//   const [tenantLogoUrl,   setTenantLogoUrl]   = useState(null);
+//   const tenantLogoRef    = useRef(null);
+//   const activeFiltersRef = useRef({});
+//   const dateFromRef      = useRef(null);
+//   const dateToRef        = useRef(null);
+//   const pdfCurrentTabIdRef = useRef(null);
+//   const filterDefsRef = useRef([]);
+
+//   // ── Keep sectionsRef in sync ──────────────────────────────
+//   useEffect(() => { sectionsRef.current = sections; }, [sections]);
+//   useEffect(() => { tenantLogoRef.current    = tenantLogoUrl;   }, [tenantLogoUrl]);
+//   useEffect(() => { activeFiltersRef.current = activeFilters;   }, [activeFilters]);
+//   useEffect(() => { dateFromRef.current      = dateFrom;        }, [dateFrom]);
+//   useEffect(() => { dateToRef.current        = dateTo;          }, [dateTo]);
+//   useEffect(() => { filterDefsRef.current = filterDefs; }, [filterDefs]);
+
+//   // Fetch The Tenant Logo for PDF header (if available)
+//   useEffect(() => {
+//   api.get("/branding")
+//     .then(r => {
+//       if (r.data?.logo_url) setTenantLogoUrl(r.data.logo_url);
+//     })
+//     .catch(() => {});
+// }, []);
+
+//   // ── Callbacks ─────────────────────────────────────────────
+//   const handleDateRangeDetected = useCallback((minDate, maxDate) => {
+//     setDataDateRange(prev => ({
+//       min: !prev.min || minDate < prev.min ? minDate : prev.min,
+//       max: !prev.max || maxDate > prev.max ? maxDate : prev.max,
+//     }));
+//   }, []);
+
+//   const handleFilterChange = useCallback((col, val) => {
+//     setActiveFilters(prev => {
+//       const current = Array.isArray(prev[col]) ? prev[col] : (prev[col] ? [prev[col]] : []);
+//       const exists  = current.includes(val);
+//       const updated = exists ? current.filter(v => v !== val) : [...current, val];
+//       if (updated.length === 0) { const next = { ...prev }; delete next[col]; return next; }
+//       return { ...prev, [col]: updated };
+//     });
+//   }, []);
+
+//   const handleReset = useCallback(() => {
+//     setActiveFilters({});
+//     setDateFrom("");
+//     setDateTo("");
+//   }, []);
+
+//   const handleCrossFilter = useCallback((column, value, sourceChartId, sourceChartTitle, fromTable = false, chartsInScope = null) => {
+//     const normalizedScope = chartsInScope ? chartsInScope.map(Number) : null;
+//     setCrossFilters(prev => {
+//       if (!value) { const next = { ...prev }; delete next[column]; return next; }
+//       return { ...prev, [column]: { value, sourceChartId, sourceChartTitle, fromTable, chartsInScope: normalizedScope } };
+//     });
+//   }, []);
+
+//   const clearCrossFilter     = useCallback((col) => setCrossFilters(prev => { const n = { ...prev }; delete n[col]; return n; }), []);
+//   const clearAllCrossFilters = useCallback(() => setCrossFilters({}), []);
+
+//   // ── Fetch accurate date range from Superset ───────────────
+ 
+// // useEffect(() => {
+// //   if (!dashboardNumericId) return;
+
+// //   // Use fetch directly to avoid api interceptor issues
+// //   fetch(`http://localhost:5000/api/dashboard-date-range?dashboardId=${dashboardNumericId}`, {
+// //     credentials: "include",   // ← sends session cookie
+// //   })
+// //     .then(res => {
+// //       if (!res.ok) {
+// //         console.warn("Date range API returned:", res.status, res.statusText);
+// //         return null;
+// //       }
+// //       return res.json();
+// //     })
+// //     .then(data => {
+// //       if (data?.success && data.min_date && data.max_date) {
+// //         setDataDateRange({ min: data.min_date, max: data.max_date });
+// //         console.log("Date range set:", data.min_date, "→", data.max_date);
+// //       }
+// //     })
+// //     .catch(err => {
+// //       console.warn("Date range fetch silently failed:", err.message);
+// //       // ← swallow error — don't rethrow, don't affect dashboard
+// //     });
+
+// // }, [dashboardNumericId]);
+
+//   // ── PDF tab change resolver ───────────────────────────────
+//   useEffect(() => {
+//     if (pdfResolveRef.current) {
+//       const resolve = pdfResolveRef.current;
+//       pdfResolveRef.current = null;
+//       setTimeout(resolve, 8000);
+//     }
+//   }, [pdfTabIdx, pdfNestedTabIdx]);
+
+//   // ── PDF download ──────────────────────────────────────────
+//   const downloadDashboardPDF = useCallback(async () => {
+//   if (isPdfLoadingRef.current || !dashboardContentRef.current) return;
+//   isPdfLoadingRef.current = true;
+//   setIsPdfLoading(true);
+
+//   try {
+//     const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+//       import("jspdf"),
+//       import("html2canvas"),
+//     ]);
+
+//     const pdf    = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+//     const pageW  = pdf.internal.pageSize.getWidth();
+//     const pageH  = pdf.internal.pageSize.getHeight();
+//     const HDR    = 18;
+//     const FTR    = 10;
+//     const WAIT_MS = 8000;  // ← 8 seconds for charts to load
+
+//     // ── Save original filters before PDF starts ───────────────
+//     const originalFilters = { ...activeFiltersRef.current };
+//     const originalDateFrom = dateFromRef.current;
+//     const originalDateTo   = dateToRef.current;
+
+
+//     // ── Helper: apply only filters scoped to current tab ──────
+//     // const applyTabScopedFilters = (tabId) => {
+//     //   if (!tabId) return;
+
+//     //   const af           = originalFilters;  // always use original, not modified
+//     //   const scopedFilters = {};
+
+//     //   for (const [col, val] of Object.entries(af)) {
+//     //     const filterDef = filterDefsRef.current.find(fd => fd.column === col);
+
+//     //     const inScope = (
+//     //       !filterDef ||                                        // no def → include
+//     //       !filterDef.tabsInScope?.length ||                   // no scoping → global
+//     //       filterDef.tabsInScope.includes(tabId)               // explicitly in scope
+//     //     );
+
+//     //     if (inScope) scopedFilters[col] = val;
+//     //   }
+
+//     //   setActiveFilters(scopedFilters);
+//     // };
+
+
+
+
+
+//     // ── NEW (uses chartsInScope — same logic as buildFilterText) ──
+// // const applyTabScopedFilters = (tabId) => {
+// //   if (!tabId) return;
+
+// //   const af          = originalFilters;
+// //   const scopedFilters = {};
+
+// //   // Get all chart IDs that belong to this tab
+// //   // (reuses the same getChartIdsInTab function used by buildFilterText)
+// //   const tabChartIds = getChartIdsInTab(tabId);
+
+// //   console.log(
+// //     `PDF applyTabScopedFilters(${tabId}):`,
+// //     "tabChartIds:", [...tabChartIds],
+// //     "filters:", Object.keys(af)
+// //   );
+
+// //   for (const [col, val] of Object.entries(af)) {
+// //     const filterDef = filterDefsRef.current.find(fd => fd.column === col);
+
+// //     let inScope;
+
+// //     if (!filterDef) {
+// //       // No definition found → include (safe default)
+// //       inScope = true;
+
+// //     } else if (!filterDef.chartsInScope?.length) {
+// //       // No chartsInScope defined → global filter, include in ALL tabs
+// //       inScope = true;
+
+// //     } else {
+// //       // ✅ Include ONLY if a chart on THIS tab is in the filter's chartsInScope
+// //       // Exact same logic as buildFilterText
+// //       const scopedCharts = new Set(filterDef.chartsInScope.map(Number));
+// //       inScope = [...tabChartIds].some(id => scopedCharts.has(id));
+
+// //       console.log(`  Filter "${col}": tabChartIds=${[...tabChartIds]}, scopedCharts=${[...scopedCharts]}, inScope=${inScope}`);
+// //     }
+
+// //     if (inScope) scopedFilters[col] = val;
+// //   }
+
+// //   setActiveFilters(scopedFilters);
+// // };
+
+
+// const applyTabScopedFilters = (tabId) => {
+//   if (!tabId) return;
+
+//   const scopedFilters = {};
+
+//   // Get chart IDs for this specific tab
+//   const tabChartIds = getChartIdsInTab(tabId);
+
+//   console.log(`applyTabScopedFilters(${tabId}):`,
+//     "tabChartIds:", [...tabChartIds],
+//     "originalFilters:", Object.keys(originalFilters)
+//   );
+
+//   for (const [col, val] of Object.entries(originalFilters)) {
+//     const filterDef = filterDefsRef.current.find(fd => fd.column === col);
+
+//     let inScope;
+
+//     if (!filterDef) {
+//       // No filter definition → include as global
+//       inScope = true;
+
+//     } else if (!filterDef.chartsInScope?.length) {
+//       // No chartsInScope set → treat as global filter (all tabs)
+//       inScope = true;
+
+//     } else {
+//       // Check if ANY chart on this tab is in the filter's chartsInScope
+//       const scopedCharts = new Set(filterDef.chartsInScope.map(Number));
+//       inScope = [...tabChartIds].some(id => scopedCharts.has(id));
+
+//       console.log(
+//         `  Filter "${col}":`,
+//         `tabChartIds=[${[...tabChartIds]}]`,
+//         `scopedCharts=[${[...scopedCharts]}]`,
+//         `inScope=${inScope}`
+//       );
+//     }
+
+//     if (inScope) scopedFilters[col] = val;
+//   }
+
+//   console.log(`applyTabScopedFilters result:`, Object.keys(scopedFilters));
+//   setActiveFilters(scopedFilters);
+// };
+
+
+
+//     // ── Helper: load image URL → base64 ──────────────────────
+//     const loadImg = (url) => new Promise((resolve) => {
+//       if (!url) return resolve(null);
+//       const img       = new Image();
+//       img.crossOrigin = "anonymous";
+//       img.onload = () => {
+//         try {
+//           const c  = document.createElement("canvas");
+//           c.width  = img.naturalWidth;
+//           c.height = img.naturalHeight;
+//           c.getContext("2d").drawImage(img, 0, 0);
+//           resolve(c.toDataURL("image/png"));
+//         } catch { resolve(null); }
+//       };
+//       img.onerror = () => resolve(null);
+//       img.src     = url;
+//     });
+
+//     // ── Pre-load logos ────────────────────────────────────────
+//     const tenantLogoB64  = await loadImg(tenantLogoRef.current);
+//     // ← Replace with your actual Speegile logo path or base64
+//     const SPEEGILE_LOGO  = "/speegile-logo.png";
+//     const speegileLogoB64 = await loadImg(SPEEGILE_LOGO);
+
+//     const downloadDate = new Date().toLocaleDateString("en-IN", {
+//       day: "2-digit", month: "short", year: "numeric"
+//     });
+
+
+//     // ── Get all chart IDs that belong to the current tab ──────
+// // const getChartIdsInTab = (tabId) => {
+// //   const ids = new Set();
+// //   if (!tabId || !sectionsRef.current) return ids;
+
+// //   const collectRows = (rows) => {
+// //     (rows || []).forEach(row =>
+// //       (row || []).forEach(item => {
+// //         if (item.chartId) ids.add(Number(item.chartId));
+// //       })
+// //     );
+// //   };
+
+// //   const searchTabs = (tabs) => {
+// //     for (const tab of (tabs || [])) {
+// //       // Match top-level tab
+// //       if (tab.id === tabId) {
+// //         collectRows(tab.rows);
+// //         tab.nestedTabsSection?.tabs?.forEach(nt => collectRows(nt.rows));
+// //         return true;
+// //       }
+// //       // Match nested tab
+// //       if (tab.nestedTabsSection?.tabs) {
+// //         for (const nt of tab.nestedTabsSection.tabs) {
+// //           if (nt.id === tabId) {
+// //             collectRows(nt.rows);
+// //             return true;
+// //           }
+// //         }
+// //       }
+// //     }
+// //     return false;
+// //   };
+
+// //   for (const section of sectionsRef.current) {
+// //     if (section.type === "tabs") {
+// //       if (searchTabs(section.tabs)) break;
+// //     }
+// //   }
+
+// //   console.log(`PDF getChartIdsInTab(${tabId}):`, [...ids]);
+// //   return ids;
+// // };
+
+
+// const getChartIdsInTab = (tabId) => {
+//   const ids = new Set();
+//   if (!tabId || !sectionsRef.current) return ids;
+
+//   const collectRows = (rows) => {
+//     (rows || []).forEach(row =>
+//       (row || []).forEach(item => {
+//         if (item.chartId) ids.add(Number(item.chartId));
+//       })
+//     );
+//   };
+
+//   const searchTabs = (tabs) => {
+//     for (const tab of (tabs || [])) {
+//       // Match top-level tab
+//       if (tab.id === tabId) {
+//         collectRows(tab.rows);
+//         // Also collect nested tabs' charts
+//         tab.nestedTabsSection?.tabs?.forEach(nt => collectRows(nt.rows));
+//         return true;
+//       }
+//       // Match nested tab specifically
+//       if (tab.nestedTabsSection?.tabs) {
+//         for (const nt of tab.nestedTabsSection.tabs) {
+//           if (nt.id === tabId) {
+//             collectRows(nt.rows);  // ← only THIS nested tab's charts
+//             return true;
+//           }
+//         }
+//       }
+//     }
+//     return false;
+//   };
+
+//   for (const section of sectionsRef.current) {
+//     if (section.type === "tabs") {
+//       if (searchTabs(section.tabs)) break;
+//     }
+//   }
+
+//   console.log(`getChartIdsInTab(${tabId}):`, [...ids]);
+//   return ids;
+// };
+
+
+//     // ── Build filter text ─────────────────────────────────────
+// //     const buildFilterText = () => {
+// //   const parts      = [];
+// //   const af         = activeFiltersRef.current || {};
+// //   const df         = dateFromRef.current;
+// //   const dt         = dateToRef.current;
+// //   const currentTab = pdfCurrentTabIdRef.current;
+// //   const tabChartIds = getChartIdsInTab(currentTab);
+
+// //   console.log("PDF buildFilterText:", {
+// //     currentTab,
+// //     tabChartIds: [...tabChartIds],
+// //     activeFilters: af,
+// //     filterDefs: filterDefsRef.current.map(fd => ({
+// //       col: fd.column,
+// //       chartsInScope: fd.chartsInScope
+// //     }))
+// //   });
+
+// //   for (const [col, val] of Object.entries(af)) {
+// //     if (!val) continue;
+
+// //     const filterDef = filterDefsRef.current.find(fd => fd.column === col);
+// //     let shouldShow  = false;
+
+// //     if (!filterDef) {
+// //       // No definition found — show to be safe
+// //       shouldShow = true;
+
+// //     } else if (!filterDef.chartsInScope || filterDef.chartsInScope.length === 0) {
+// //       // No chartsInScope defined — global filter, show on all tabs
+// //       shouldShow = true;
+
+// //     } else {
+// //       // ✅ Show ONLY if a chart on THIS tab is in the filter's chartsInScope
+// //       const scopedCharts = new Set(filterDef.chartsInScope.map(Number));
+// //       shouldShow = [...tabChartIds].some(id => scopedCharts.has(id));
+
+// //       console.log(`Filter "${col}" on tab ${currentTab}:`, {
+// //         tabChartIds:  [...tabChartIds],
+// //         scopedCharts: [...scopedCharts],
+// //         shouldShow,
+// //       });
+// //     }
+
+// //     if (shouldShow) {
+// //       const vals = Array.isArray(val) ? val : [val];
+// //       if (vals.length) parts.push(`${col}: ${vals.join(", ")}`);
+// //     }
+// //   }
+
+// //   if (df && dt)  parts.push(`Date: ${df} → ${dt}`);
+// //   else if (df)   parts.push(`From: ${df}`);
+// //   else if (dt)   parts.push(`To: ${dt}`);
+
+// //   return parts.length ? `Filters: ${parts.join("  |  ")}` : "";
+// // };
+
+
+//     // ── Capture ───────────────────────────────────────────────
+//     // const capture = () => html2canvas(dashboardContentRef.current, {
+//     //   scale:           3,
+//     //   useCORS:         true,
+//     //   allowTaint:      true,
+//     //   backgroundColor: "#0d1117",
+//     //   logging:         false,
+//     //   imageTimeout:    0,
+//     //   onclone: (doc) => {
+//     //     doc.querySelectorAll("svg").forEach(s => {
+//     //       s.style.overflow = "visible";
+//     //     });
+//     //   },
+//     // });
+
+//     const capture = () => html2canvas(dashboardContentRef.current, {
+//   scale:           3,
+//   useCORS:         true,
+//   allowTaint:      true,
+//   backgroundColor: "#0d1117",
+//   logging:         false,
+//   imageTimeout:    0,
+//   onclone: (doc) => {
+//     // Fix SVG overflow
+//     doc.querySelectorAll("svg").forEach(s => {
+//       s.style.overflow = "visible";
+//     });
+
+//     // ── Replace date inputs with visible styled spans ──────
+//     doc.querySelectorAll('input[type="date"]').forEach(input => {
+//       const val = input.value;
+//       const span = doc.createElement("span");
+//       span.style.cssText = `
+//         display: inline-block;
+//         background: #12151f;
+//         border: 1px solid ${val ? "#1FA8C9" : "rgba(255,255,255,0.1)"};
+//         border-radius: 6px;
+//         padding: 4px 10px;
+//         color: ${val ? "#e2e8f0" : "#64748b"};
+//         font-size: 11px;
+//         font-family: inherit;
+//         min-width: 90px;
+//       `;
+//       if (val) {
+//         try {
+//           span.textContent = new Date(val).toLocaleDateString("en-IN", {
+//             day: "2-digit", month: "short", year: "numeric"
+//           });
+//         } catch { span.textContent = val; }
+//       } else {
+//         span.textContent = "dd-mm-yyyy";
+//       }
+//       input.parentNode?.replaceChild(span, input);
+//     });
+//   },
+// });
+
+//     // ── Add page ──────────────────────────────────────────────
+//     const addPage = (canvas, tabName, isFirst, pageNum, totalPages) => {
+//         if (!isFirst) pdf.addPage();
+
+//         // const filterText = buildFilterText();
+//         // const filterH    = filterText ? 7 : 0;
+
+//         const topOffset  = HDR;
+//         const margin     = 2;
+//         const availW     = pageW - margin * 2;
+//         const availH     = pageH - topOffset - FTR - margin;
+//         const aspect     = canvas.width / canvas.height;
+//         const img        = canvas.toDataURL("image/jpeg", 0.98);
+
+//         // ── 1. Fill page background ───────────────────────────
+//         pdf.setFillColor(13, 17, 23);
+//         pdf.rect(0, 0, pageW, pageH, "F");
+
+//         // ── 2. Add chart screenshot — ONE TIME ONLY ───────────
+//         let w, h, x, y;
+//         if (aspect > availW / availH) {
+//           w = availW; h = availW / aspect;
+//           x = margin;  y = topOffset + margin;
+//         } else {
+//           h = availH; w = availH * aspect;
+//           x = margin + (availW - w) / 2; y = topOffset + margin;
+//         }
+//         pdf.addImage(img, "JPEG", x, y, w, h);  // ← ONLY ONE addImage
+
+//         // ── 3. Header strip on top ────────────────────────────
+//         pdf.setFillColor(18, 21, 31);
+//         pdf.rect(0, 0, pageW, HDR, "F");
+//         pdf.setDrawColor(45, 55, 72);
+//         pdf.setLineWidth(0.3);
+//         pdf.line(0, HDR, pageW, HDR);
+
+//         // Tenant logo left
+//         let logoDrawn = false;
+//         if (tenantLogoB64) {
+//           try { pdf.addImage(tenantLogoB64, "PNG", 6, 3, 0, 12); logoDrawn = true; }
+//           catch { logoDrawn = false; }
+//         }
+//         if (!logoDrawn) {
+//           pdf.setFont("helvetica", "bold"); pdf.setFontSize(11);
+//           pdf.setTextColor(255, 255, 255);
+//           pdf.text("Dashboard", 8, 11.5);
+//         }
+
+//         // Tab name right
+//         if (tabName) {
+//           pdf.setFont("helvetica", "normal"); pdf.setFontSize(9);
+//           pdf.setTextColor(203, 213, 225);
+//           pdf.text(tabName, pageW - 8, 11.5, { align: "right" });
+//         }
+
+//         // ── 4. Filter strip ───────────────────────────────────
+//         // if (filterText) {
+//         //   pdf.setFillColor(15, 20, 30);
+//         //   pdf.rect(0, HDR, pageW, filterH, "F");
+//         //   pdf.setDrawColor(31, 50, 70);
+//         //   pdf.setLineWidth(0.2);
+//         //   pdf.line(0, HDR + filterH, pageW, HDR + filterH);
+//         //   pdf.setFont("helvetica", "normal"); pdf.setFontSize(7);
+//         //   pdf.setTextColor(100, 148, 180);
+//         //   const txt = filterText.length > 160 ? filterText.slice(0, 160) + "..." : filterText;
+//         //   pdf.text(txt, 8, HDR + filterH - 1.5);
+//         // }
+
+//         // ── 5. Footer strip on top ────────────────────────────
+//         const footerY = pageH - FTR;
+//         pdf.setFillColor(18, 21, 31);
+//         pdf.rect(0, footerY, pageW, FTR, "F");
+//         pdf.setDrawColor(45, 55, 72);
+//         pdf.setLineWidth(0.3);
+//         pdf.line(0, footerY, pageW, footerY);
+
+//         // Footer left: Speegile logo
+//         let footerLogoDrawn = false;
+//         if (speegileLogoB64) {
+//           try { pdf.addImage(speegileLogoB64, "PNG", 6, footerY + 1.5, 0, 6); footerLogoDrawn = true; }
+//           catch { footerLogoDrawn = false; }
+//         }
+//         if (!footerLogoDrawn) {
+//           pdf.setFont("helvetica", "bold"); pdf.setFontSize(7);
+//           pdf.setTextColor(31, 168, 201);
+//           pdf.text("Speegile Analytics", 6, footerY + 6.5);
+//         }
+
+//         // Footer center: date
+//         pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.5);
+//         pdf.setTextColor(100, 116, 139);
+//         pdf.text(`Downloaded: ${downloadDate}`, pageW / 2, footerY + 6.5, { align: "center" });
+
+//         // Footer right: page number
+//         pdf.text(`Page ${pageNum} of ${totalPages}`, pageW - 8, footerY + 6.5, { align: "right" });
+//       };
+
+//     // ── Build tab list ────────────────────────────────────────
+//     const currentSections = sectionsRef.current;
+//     const tabSection      = currentSections?.find(s => s.type === "tabs");
+//     const topLevelTabs    = tabSection?.tabs || [];
+//     const totalPages      = topLevelTabs.length === 0 ? 1 :
+//       topLevelTabs.reduce((acc, tab) =>
+//         acc + ((tab.nestedTabsSection?.tabs?.length || 0) > 1
+//           ? tab.nestedTabsSection.tabs.length : 1), 0);
+
+//     // const switchAndWait = (ti, ni, tabName, pageNum) =>
+//     //   new Promise(resolve => {
+//     //     setPdfProgress({ current: pageNum, total: totalPages, tabName });
+//     //     pdfResolveRef.current = resolve;
+//     //     setPdfTabIdx(ti);
+//     //     setPdfNestedTabIdx(ni);
+//     //   });
+
+//     // const switchAndWait = (ti, ni, tabName, pageNum) =>
+//     //   new Promise(resolve => {
+//     //     const tab = topLevelTabs[ti];
+//     //     pdfCurrentTabIdRef.current = tab?.id || null;
+
+//     //     // ← KEY FIX: Apply only filters scoped to this tab
+//     //     applyTabScopedFilters(tab?.id);
+
+//     //     setPdfProgress({ current: pageNum, total: totalPages, tabName });
+//     //     pdfResolveRef.current = resolve;
+//     //     setPdfTabIdx(ti);
+//     //     setPdfNestedTabIdx(ni);
+//     //   });
+
+//     const switchAndWait = (ti, ni, tabName, pageNum) =>
+//     new Promise(resolve => {
+//     const tab        = topLevelTabs[ti];
+//     const nestedTabs = tab?.nestedTabsSection?.tabs || [];
+
+//     // ── KEY FIX ───────────────────────────────────────────────────
+//     // If we're rendering a nested tab (ni is a number, not null),
+//     // use the nested tab's ID — not the top-level tab's ID.
+//     // This ensures getChartIdsInTab returns ONLY that nested tab's
+//     // charts, giving correct filter scoping per nested tab.
+//     const isNested     = ni !== null && ni !== undefined && nestedTabs[ni];
+//     const currentTabId = isNested
+//       ? nestedTabs[ni].id   // ← nested tab ID
+//       : tab?.id;            // ← top-level tab ID
+
+//     console.log(
+//       `switchAndWait: ti=${ti} ni=${ni}`,
+//       `tab.id=${tab?.id}`,
+//       `currentTabId=${currentTabId}`,
+//       `isNested=${!!isNested}`
+//     );
+
+//     pdfCurrentTabIdRef.current = currentTabId || null;
+
+//     // Apply only filters that belong to this specific tab
+//     applyTabScopedFilters(currentTabId);
+
+//     setPdfProgress({ current: pageNum, total: totalPages, tabName });
+//     pdfResolveRef.current = resolve;
+//     setPdfTabIdx(ti);
+//     setPdfNestedTabIdx(isNested ? ni : null);
+//   });
+
+
+  
+//     let isFirst = true, pagesDone = 0;
+
+//     if (topLevelTabs.length === 0) {
+//       setPdfProgress({ current: 0, total: 1, tabName: "Dashboard" });
+//       await new Promise(r => setTimeout(r, WAIT_MS));
+//       addPage(await capture(), "Dashboard", true, 1, 1);
+//     } else {
+//       for (let ti = 0; ti < topLevelTabs.length; ti++) {
+//         const topTab     = topLevelTabs[ti];
+//         const nestedTabs = topTab.nestedTabsSection?.tabs || [];
+
+//         if (nestedTabs.length <= 1) {
+//           const label = nestedTabs.length === 1
+//             ? `${topTab.name}  ›  ${nestedTabs[0].name}`
+//             : topTab.name;
+//           await switchAndWait(ti, null, label, pagesDone + 1);
+//           addPage(await capture(), label, isFirst, pagesDone + 1, totalPages);
+//           isFirst = false; pagesDone++;
+//         } else {
+//           for (let ni = 0; ni < nestedTabs.length; ni++) {
+//             const label = `${topTab.name}  ›  ${nestedTabs[ni].name}`;
+//             await switchAndWait(ti, ni, label, pagesDone + 1);
+//             addPage(await capture(), label, isFirst, pagesDone + 1, totalPages);
+//             isFirst = false; pagesDone++;
+//           }
+//         }
+//       }
+//     }
+
+//     setPdfTabIdx(null); setPdfNestedTabIdx(null); setPdfProgress(null);
+//     setActiveFilters(originalFilters);  // ← restore original filters
+//     pdf.save("speegile_dashboard.pdf");
+    
+//   } catch (err) {
+//     console.error("PDF generation failed:", err);
+    
+//   } finally {
+//     isPdfLoadingRef.current = false;
+//     setIsPdfLoading(false);
+//     setPdfTabIdx(null); setPdfNestedTabIdx(null); setPdfProgress(null);
+    
+//   }
+// }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+//   downloadRef.current = downloadDashboardPDF;
+
+//   // ── Register PDF with parent ──────────────────────────────
+//   useEffect(() => {
+//     if (onPdfReady) onPdfReady(() => () => downloadRef.current?.());
+//   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+//   // ── Load dashboard data ───────────────────────────────────
+//   useEffect(() => {
+//     if (!dashboardNumericId) return;
+//     setLoading(true);
+//     setError(null);
+//     setActiveFilters({});
+//     setDateFrom("");
+//     setDateTo("");
+//     setSections(null);
+//     setCrossFilters({});
+//     setDataDateRange({ min: null, max: null });
+
+//     Promise.all([
+//       api.get("/dashboard-charts", { params: { dashboardId: dashboardNumericId } }),
+//       api.get("/dashboard-layout",  { params: { dashboardId: dashboardNumericId } }).catch(() => null),
+//       api.get("/filter-options",    { params: { dashboardId: dashboardNumericId } }).catch(() => null),
+//     ]).then(([cR, lR, fR]) => {
+//       if (cR.data.success) setCharts(cR.data.charts.filter(c => c.viz_type !== "filter_box"));
+//       if (lR?.data?.success) { const p = parseSupersetLayout(lR.data.layout); setSections(p); }
+//       if (fR?.data?.success) setFilterDefs(fR.data.filters || []);
+//     }).catch(() => setError("Failed to load dashboard."))
+//       .finally(() => setLoading(false));
+//   }, [dashboardNumericId]);
+
+//   // ── Early returns ─────────────────────────────────────────
+//   if (loading) return (
+//     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "64px 0" }}>
+//       <Loader2 size={20} style={{ color: "#1FA8C9", animation: "spin .9s linear infinite" }} />
+//       <span style={{ marginLeft: 10, color: "#64748b", fontSize: 14 }}>Loading dashboard…</span>
+//       <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
+//     </div>
+//   );
+//   if (error)          return <div style={{ textAlign: "center", padding: "64px 0", color: "#f87171",  fontSize: 13 }}>⚠ {error}</div>;
+//   if (!charts.length) return <div style={{ textAlign: "center", padding: "64px 0", color: "#374151", fontSize: 13 }}>No charts found.</div>;
+
+//   const chartMap = Object.fromEntries(charts.map(c => [c.slice_id, c]));
+
+//   // ── cardProps ─────────────────────────────────────────────
+//   const cardProps = (chart, chartHeightPx = 320) => {
+//     const applicableCrossFilters = Object.fromEntries(
+//       Object.entries(crossFilters).filter(([, f]) => {
+//         if (!f.chartsInScope) return true;
+//         return f.chartsInScope.map(Number).includes(Number(chart.slice_id));
+//       })
+//     );
+//     return {
+//       sliceId:             chart.slice_id,
+//       title:               chart.slice_name,
+//       vizType:             chart.viz_type,
+//       xAxis:               chart.x_axis,
+//       height:              (chart.viz_type || "").toLowerCase().includes("big_number") ? BIGNUM_HEIGHT : chartHeightPx,
+//       activeFilters,
+//       dateFrom:            dateFrom || null,
+//       dateTo:              dateTo   || null,
+//       crossFilters:        applicableCrossFilters,
+//       onCrossFilter:       handleCrossFilter,
+//       onDrillDown:         handleFilterChange,
+//       metrics:             chart.metrics             || [],
+//       groupby:             chart.groupby             || [],
+//       groupbyRows:         chart.groupby_rows        || [],
+//       groupbyColumns:      chart.groupby_cols        || [],
+//       zoomable:            chart.zoomable            || false,
+//       fontColor:           chart.font_color          || null,
+//       conditionalColors:   chart.conditional_colors  || [],
+//       crossFilterScope:    chart.cross_filter_scope  ?? null,
+//       percentageThreshold: chart.percentage_threshold || 0,
+//       otherThreshold:      chart.other_threshold      || 0,
+//       onDateRangeDetected: handleDateRangeDetected,
+//     };
+//   };
+
+//   // ── renderRows ────────────────────────────────────────────
+//   const renderRows = (rows) => rows.map((row, rIdx) => {
+//     const totalCols = row.reduce((sum, item) => sum + (item.width || 6), 0);
+//     const gridCols  = Math.min(Math.max(totalCols, 1), 12);
+//     return (
+//       <div key={rIdx} style={{ marginBottom: 20 }}>
+//         <DashboardGrid columns={gridCols} gap={12}>
+//           {row.map((item, cIdx) => {
+//             if (item.type === "markdown") return (
+//               <div key={cIdx} style={{ gridColumn: isMobile ? "span 1" : `span ${item.width}`, height: unitsToPx(item.heightUnits) }}>
+//                 <MarkdownBlock code={item.code} />
+//               </div>
+//             );
+//             if (item.type === "header") return (
+//               <div key={cIdx} style={{ gridColumn: "span 12", padding: "4px 0" }}>
+//                 <h2 style={{ fontSize: 16, fontWeight: 600, color: "#cbd5e1", margin: 0 }}>{item.text}</h2>
+//               </div>
+//             );
+//             const chart = chartMap[item.chartId];
+//             if (!chart) return null;
+//             return (
+//               <div key={cIdx} style={{ gridColumn: isMobile ? "span 1" : `span ${item.width}` }}>
+//                 <ChartCard {...cardProps(chart, unitsToPx(item.heightUnits))} />
+//               </div>
+//             );
+//           })}
+//         </DashboardGrid>
+//       </div>
+//     );
+//   });
+
+//   // ── renderWithLayout ──────────────────────────────────────
+//   const renderWithLayout = () => sections.map((section, sIdx) => {
+//     if (section.type === "rows")
+//       return <React.Fragment key={sIdx}>{renderRows(section.rows)}</React.Fragment>;
+//     if (section.type === "tabs")
+//       return (
+//         <TabGroup
+//           key={sIdx}
+//           tabs={section.tabs}
+//           chartMap={chartMap}
+//           cardProps={cardProps}
+//           isMobile={isMobile}
+//           renderRows={renderRows}
+//           // onTabChange={(tabId) => {
+//           //   setCrossFilters({});
+//           //   setActiveTabId(tabId);
+//           //   setActiveFilters(prev => {
+//           //     const inScope = new Set(filterDefs.filter(fd => !fd.tabsInScope?.length || fd.tabsInScope.includes(tabId)).map(fd => fd.column));
+//           //     return Object.fromEntries(Object.entries(prev).filter(([col]) => inScope.has(col)));
+//           //   });
+//           // }}
+//           onTabChange={(tabId) => {
+//           setCrossFilters({});
+//           setActiveTabId(tabId);
+//           setActiveFilters(prev => {
+//             // Get chart IDs for this tab from the layout
+//             const tabChartIds = (() => {
+//               const ids = new Set();
+//               if (!sectionsRef.current) return ids;
+//               const collectRows = (rows) =>
+//                 (rows || []).forEach(row =>
+//                   (row || []).forEach(item => { if (item.chartId) ids.add(Number(item.chartId)); })
+//                 );
+//               const searchTabs = (tabs) => {
+//                 for (const tab of (tabs || [])) {
+//                   if (tab.id === tabId) { collectRows(tab.rows); tab.nestedTabsSection?.tabs?.forEach(nt => collectRows(nt.rows)); return true; }
+//                   if (tab.nestedTabsSection?.tabs) {
+//                     for (const nt of tab.nestedTabsSection.tabs) {
+//                       if (nt.id === tabId) { collectRows(nt.rows); return true; }
+//                     }
+//                   }
+//                 }
+//                 return false;
+//               };
+//               for (const section of sectionsRef.current) {
+//                 if (section.type === "tabs" && searchTabs(section.tabs)) break;
+//               }
+//               return ids;
+//             })();
+
+//             return Object.fromEntries(
+//               Object.entries(prev).filter(([col]) => {
+//                 const fd = filterDefs.find(f => f.column === col);
+//                 if (!fd || !fd.chartsInScope?.length) return true;  // global → keep
+//                 const scopedCharts = new Set(fd.chartsInScope.map(Number));
+//                 return [...tabChartIds].some(id => scopedCharts.has(id));  // keep if in scope
+//               })
+//             );
+//           });
+//         }}
+
+//           pdfTabIdx={pdfTabIdx}
+//           pdfNestedTabIdx={pdfNestedTabIdx}
+//           dateFrom={dateFrom}
+//           dateTo={dateTo}
+//           setDateFrom={setDateFrom}
+//           setDateTo={setDateTo}
+//           dataDateRange={dataDateRange}
+//         />
+//       );
+//     return null;
+//   });
+
+//   const renderFallback = () => (
+//     <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(min(100%,480px),1fr))", gap: 12 }}>
+//       {charts.map(chart => <ChartCard key={chart.slice_id} {...cardProps(chart, 320)} />)}
+//     </div>
+//   );
+
+//   // ── Render ────────────────────────────────────────────────
+//   return (
+//     <div style={{ background: "#0d1117", minHeight: "100vh", padding: isMobile ? "10px" : "16px", position: "relative" }}>
+//       <PdfProgressOverlay progress={pdfProgress} />
+      
+//       <FilterPanel
+//         filterDefs={filterDefs.filter(fd => {
+//           if (!fd.tabsInScope || fd.tabsInScope.length === 0) return true;
+//           if (!activeTabId) return true;
+//           return fd.tabsInScope.includes(activeTabId);
+//         })}
+//         activeFilters={activeFilters}
+//         dateFrom={dateFrom}
+//         dateTo={dateTo}
+//         onFilterChange={handleFilterChange}
+//         onDateFromChange={setDateFrom}
+//         onDateToChange={setDateTo}
+//         onReset={handleReset}
+//       />
+      
+//       <div ref={dashboardContentRef}>
+//       <CrossFilterPills crossFilters={crossFilters} onClear={clearCrossFilter} onClearAll={clearAllCrossFilters} />
+//       <ActivePills
+//         activeFilters={activeFilters}
+//         dateFrom={dateFrom}
+//         dateTo={dateTo}
+//         onRemove={(col, val) => handleFilterChange(col, val)}
+//         onRemoveDate={() => { setDateFrom(""); setDateTo(""); }}
+//       />
+
+//         {sections ? renderWithLayout() : renderFallback()}
+//       </div>
+//     </div>
+//   );
+// }

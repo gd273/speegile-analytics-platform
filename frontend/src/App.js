@@ -4,6 +4,8 @@ import SupersetChart from "./SupersetChart";
 import Login from "./Login";
 import UploadExcel from "./UploadExcel";
 import OrientationWarning from "./Orientationwarning";
+import UploadProgressPopup from "./UploadProgressPopup";
+
 
 import {
   LogOut,
@@ -359,7 +361,9 @@ function App() {
                   <UploadCloud className="w-4 h-4" />
                   Upload Data
                 </Link>
+                
               )}
+              <UploadProgressPopup />
             </div>
           </div>
 

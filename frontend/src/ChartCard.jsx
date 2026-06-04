@@ -1096,6 +1096,7 @@ export default function ChartCard({
   crossFilterScope  = null,    // ← ADD
   percentageThreshold = 0,
   otherThreshold      = 0,
+  onDateRangeDetected = null,
 }) {
   const [data,         setData]         = useState([]);
   const [keys,         setKeys]         = useState([]);
@@ -1167,6 +1168,34 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
               ? sk
               : Object.keys(rows[0]).filter(k => k !== xk && k !== "__seq__").slice(0, 8);
             setData(rows);
+
+            // ── Detect min/max date from data and report to parent ──
+              if (onDateRangeDetected && rows.length > 0) {
+                const xk = detectXKey(rows, xAxis, extractMetricLabels(metricsProp), groupbyProp);
+                
+                const dates = rows
+                  .map(r => r[xk])
+                  .filter(v => v != null)
+                  .map(v => {
+                    // Handle timestamp ms
+                    if (isTimestampMs(Number(v))) return new Date(Number(v));
+                    // Handle date string
+                    const d = new Date(v);
+                    return isNaN(d.getTime()) ? null : d;
+                  })
+                  .filter(Boolean);
+
+                if (dates.length > 0) {
+                  const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+                  const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+                  // Format as YYYY-MM-DD for input[type=date]
+                  const fmt = (d) => d.toISOString().split("T")[0];
+                  onDateRangeDetected(fmt(minDate), fmt(maxDate));
+                }
+              }
+
+
             setColnames(res.data.colnames || []);
             setComputedXKey(xk);
             setKeys(finalKeys);

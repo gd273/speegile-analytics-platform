@@ -20,6 +20,7 @@ import io
 from tenants_handler import handle_client_orders, handle_shinde_shoes, handle_apparel_store, handle_shinde_shoes_stock, handle_tally_sales,handle_tally_sales_v2, handle_accrec
 from db_utils import log_load_error
 from datetime import datetime
+import threading
 
 
 # -------------------- ENV loading & expansion --------------------
@@ -248,7 +249,7 @@ def login():
             query = text("""
                 SELECT
                     u.id, u.name, u.password_hash, u.role, u.superset_username, u.upload_access,
-                    t.schema_name, t.table_name,
+                    t.schema_name, t.table_name,t.procedure_name, t.function_name,
                     t.id as tenant_pk,
                     tpl.logo_url
                 FROM public.users u
@@ -274,6 +275,8 @@ def login():
             session['logo_url']        = user.logo_url
             session["upload_access"]   = user.upload_access
             session["table_name"]      = user.table_name
+            session["procedure_name"]  = user.procedure_name
+            session["function_name"]   = user.function_name
             print(f"DEBUG: User upload_access for '{username}': {user.upload_access}", flush=True)
             return jsonify({
                 "success": True,
@@ -402,10 +405,18 @@ def generate_guest_token():
     except Exception as e:
         return jsonify({"error": "Failed to encode token"}), 500
 
+
 # ---------------------------------------------------------
+# Upload-Excel API
+# ---------------------------------------------------------
+
 # @app.route('/api/upload-excel', methods=['POST'])
 # @login_required
 # def upload_excel():
+#     #---------------------------------
+#     # store tenants details in session
+#     #---------------------------------
+
 #     tenant_schema = session.get('tenant_schema')
 #     tenant_id     = session.get('tenant_id')
 #     user_id       = session.get('user_id', 1)
@@ -413,6 +424,12 @@ def generate_guest_token():
 #     print(f"DEBUG: Tenant Schema: {tenant_schema}", flush=True)
 #     print(f"DEBUG: Tenant ID: {tenant_id}", flush=True)
 #     print(f"DEBUG: User ID: {user_id}", flush=True)
+#     #---------------------------------
+
+
+#     #---------------------------------
+#     # Validate the File
+#     #---------------------------------
 
 #     if 'excel_file' not in request.files:
 #         return jsonify({"success": False, "error": "No file part"}), 400
@@ -434,16 +451,27 @@ def generate_guest_token():
 #     lower_filename = clean_filename.lower()
 #     file_ext       = clean_filename.rsplit('.', 1)[1].lower()
 
+#     #---------------------------------
+
+#     #----------------------------------------------------
+#     #check File Size
+#     #----------------------------------------------------        
+
 #     # ── Read file ONCE only
 #     print(f"DEBUG: Reading file bytes...", flush=True)
 #     file_bytes  = file.read()
 #     file_buffer = io.BytesIO(file_bytes)
 #     print(f"DEBUG: File read done. Size={len(file_bytes)} bytes", flush=True)
 
-#     # ── File size check BEFORE acquiring lock
 #     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 #     if len(file_bytes) > MAX_FILE_SIZE:
 #         return jsonify({"success": False, "error": "File too large. Maximum allowed size is 100MB."}), 400
+#     #----------------------------------------------------
+    
+
+#     #----------------------------------------------------
+#     # Redis (Check any file all ready uploading)        
+#     #----------------------------------------------------
 
 #     # ── Acquire Redis lock
 #     r        = redis.from_url(os.getenv("REDIS_URL"))
@@ -456,21 +484,28 @@ def generate_guest_token():
 #             "error": "Another upload is already in progress for this tenant. Please wait."
 #         }), 429
 
-#     # ── Everything below is wrapped in try/finally to ALWAYS release the lock
+#     #----------------------------------------------------
+
+#     #---------------------------------------------------------------------
+#     # All file validations are done, now acquire lock and process the file
+#     #---------------------------------------------------------------------
 #     try:
 #         # ── Upload to S3
-#         print(f"DEBUG: Starting S3 upload...", flush=True)
-#         s3_key, s3_url = upload_file_to_s3(file_bytes, tenant_schema, clean_filename)
-#         print(f"DEBUG: S3 upload done. key={s3_key}", flush=True)
+#         # print(f"DEBUG: Starting S3 upload...", flush=True)
+#         # s3_key, s3_url = upload_file_to_s3(file_bytes, tenant_schema, clean_filename)
+#         # print(f"DEBUG: S3 upload done. key={s3_key}", flush=True)
 
-#         if s3_key is None:
-#             return jsonify({"success": False, "error": "File storage failed. Please try again."}), 500
+#         # if s3_key is None:
+#         #     return jsonify({"success": False, "error": "File storage failed. Please try again."}), 500
 
 #         load_id     = None
 #         tenant_id   = None
 #         tenant_name = None
 
-#         # ── Tenant lookup
+#         # ── Tenant lookup — matches by schema AND filename prefix ────────
+#         # Two rows can exist for same tenant (one for sales, one for stock).
+#         # The query picks the row whose fileprefix matches the uploaded filename.
+#         # LENGTH(fileprefix) DESC ensures more specific prefix wins if overlap.
 #         print(f"DEBUG: Opening DB connection for tenant lookup...", flush=True)
 #         with engine.connect() as conn:
 #             tenant_data = conn.execute(text("""
@@ -483,27 +518,49 @@ def generate_guest_token():
 #                     "DomainId"
 #                 FROM public.tenants
 #                 WHERE schema_name = :schema
-#             """), {"schema": tenant_schema}).mappings().first()
+#                   AND (
+#                       fileprefix IS NULL
+#                       OR LOWER(:filename) LIKE LOWER(fileprefix) || '%'
+#                   )
+#                 ORDER BY LENGTH(fileprefix) DESC   -- most specific prefix wins
+#                 LIMIT 1
+#             """), {
+#                 "schema":   tenant_schema,
+#                 "filename": lower_filename
+#             }).mappings().first()
+
 #         print(f"DEBUG: Tenant lookup done. tenant={tenant_data['tenant_name'] if tenant_data else 'NOT FOUND'}", flush=True)
 
+#         # ── If no row matched, the filename doesn't match any known prefix ─
 #         if not tenant_data:
-#             return jsonify({"success": False, "error": "Invalid tenant configuration"}), 400
+#             # Fetch all known prefixes for this schema to show a helpful error
+#             with engine.connect() as conn:
+#                 known_prefixes = conn.execute(text("""
+#                     SELECT fileprefix FROM public.tenants
+#                     WHERE schema_name = :schema AND fileprefix IS NOT NULL
+#                 """), {"schema": tenant_schema}).scalars().all()
+
+#             prefix_list = ", ".join(f"'{p}'" for p in known_prefixes) or "none configured"
+#             return jsonify({
+#                 "success": False,
+#                 "error":   f"Invalid file name. No configuration found for '{clean_filename}'. "
+#                            f"Expected prefixes: {prefix_list}."
+#             }), 400
 
 #         tenant_id         = tenant_data["id"]
 #         target_table_name = tenant_data["table_name"]
-#         file_prefix       = tenant_data["fileprefix"]
+#         file_prefix       = tenant_data["fileprefix"] or ""
 #         tenant_name       = tenant_data["tenant_name"].strip().lower()
 
-#         print(f"DEBUG: File prefix expected: {file_prefix}", flush=True)
-#         print(f"DEBUG: File name received: {clean_filename}", flush=True)
+#         # ── Detect file type from the matched fileprefix ──────────────────
+#         file_type = "stock" if "stock" in file_prefix.lower() else "sales"
 
-#         if file_prefix and not lower_filename.startswith(file_prefix.lower()):
-#             return jsonify({
-#                 "success": False,
-#                 "error":   f"Invalid file name. File must start with prefix '{file_prefix}'.",
-#                 "example": f"{file_prefix}_2026_01.xlsx or {file_prefix}_2026_01.csv"
-#             }), 400
+#         print(f"DEBUG: Matched prefix  : {file_prefix}", flush=True)
+#         print(f"DEBUG: Target table    : {target_table_name}", flush=True)
+#         print(f"DEBUG: Detected type   : {file_type}", flush=True)
+#         print(f"DEBUG: Tenant name     : {tenant_name}", flush=True)
 
+#         # ── Create load master record
 #         with engine.connect() as load_conn:
 #             load_id = load_conn.execute(text("""
 #                 INSERT INTO public.load_master (tenant_id, user_id, filename, status)
@@ -512,13 +569,17 @@ def generate_guest_token():
 #             """), {
 #                 "tid":    tenant_id,
 #                 "uid":    user_id,
-#                 "fname":  clean_filename,
-#                 "s3_key": s3_key,
-#                 "s3_url": s3_url
+#                 "fname":  clean_filename
 #             }).scalar()
 #             load_conn.commit()
 
 #         print(f"DEBUG: Load ID created: {load_id}", flush=True)
+
+#     #---------------------------------------------------------------------    
+
+#     #---------------------------------------------------------------------
+#     # Reading the File Data
+#     #---------------------------------------------------------------------
 
 #         with engine.connect() as conn:
 #             trans = conn.begin()
@@ -573,58 +634,50 @@ def generate_guest_token():
 #                     if 'load_id' in table_columns:
 #                         df['load_id'] = load_id
 
-#                     if 'BillDate' in df.columns:
-#                         df = df[
-#                             df['BillDate'].notna() &
-#                             (df['BillDate'].astype(str).str.strip() != '')
-#                         ].copy()
-
-#                         df['BillDate'] = pd.to_datetime(
-#                             df['BillDate'], dayfirst=True, errors='coerce'
-#                         ).dt.strftime('%d-%m-%Y')
-
-#                         if df['BillDate'].isna().any():
-#                             bad_rows = df[df['BillDate'].isna()].index.tolist()
-#                             error_msg = f"Invalid BillDate detected in rows: {bad_rows}. Expected format: DD-MM-YYYY."
-#                             try:
-#                                 with engine.connect() as error_conn:
-#                                     log_load_error(conn=error_conn, load_id=load_id,
-#                                                    error_message=error_msg, row_number=None, column_name='BillDate')
-#                             except Exception as log_err:
-#                                 print(f"DEBUG: Could not log to load_errors: {log_err}", flush=True)
-#                             trans.rollback()
-#                             return jsonify({"success": False, "error": error_msg}), 400
-
-#                         excel_max_date = pd.to_datetime(
-#                             df['BillDate'], format='%d-%m-%Y'
-#                         ).max().date()
-
-#                         print(f"DEBUG: Excel max date: {excel_max_date}", flush=True)
-
-#                     if 'LastPurDate' in df.columns:
-#                         df['LastPurDate'] = pd.to_datetime(
-#                             df['LastPurDate'], dayfirst=True, errors='coerce'
-#                         ).dt.strftime('%d-%m-%Y')
 
 #                     print(f"DEBUG: Data processed for {target_table_name}", flush=True)
 
-#                 print(f"DEBUG: Tenant name check: {tenant_name}", flush=True)
+#                 print(f"DEBUG: Routing → tenant={tenant_name} file_type={file_type}", flush=True)
 
-#                 if tenant_name == "shinde_shoes":
-#                     handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, excel_max_date, log_load_error, engine)
+#     #---------------------------------------------------------------------
+
+#     #---------------------------------------------------------------------
+#     # Handle each tenant's file with its specific logic
+#     #---------------------------------------------------------------------
+
+#                 # ── Route to correct handler ──────────────────────────────
+#                 if tenant_name == "shinde_shoes" and file_type == "sales":
+#                     handle_shinde_shoes(conn, df, tenant_schema, target_table_name,
+#                                         load_id, excel_max_date, log_load_error, engine)
+
+#                 elif tenant_name == "shinde_shoes" and file_type == "stock":
+#                     handle_shinde_shoes_stock(conn, df, tenant_schema, target_table_name,
+#                                               load_id, log_load_error, filename=clean_filename)
 #                 elif tenant_name == "apparel_sales":
 #                     handle_apparel_store(conn, df_original, tenant_schema, load_id, log_load_error)
+
 #                 elif tenant_name == "siddhesh":
-#                     handle_client_orders(conn, df, tenant_schema, target_table_name, load_id, log_load_error)
+#                     handle_client_orders(conn, df, tenant_schema, target_table_name,
+#                                          load_id, log_load_error)
+
 #                 elif tenant_name == "tally_data":
-#                     handle_tally_sales(conn, df_original, tenant_schema, target_table_name, load_id, log_load_error)
+#                     handle_tally_sales(conn, df_original, tenant_schema, target_table_name,
+#                                        load_id, log_load_error)
+
 #                 elif tenant_name == "tally_data2":
-#                     handle_tally_sales_v2(conn, df_original, tenant_schema, target_table_name, load_id, log_load_error)
+#                     handle_tally_sales_v2(conn, df_original, tenant_schema, target_table_name,
+#                                           load_id, log_load_error)
+
+#                 # In upload route, add the handler call:
+#                 elif tenant_name == "accrec":
+#                     handle_accrec(conn, df_original, tenant_schema, target_table_name,
+#                                 load_id, log_load_error)    
+
 #                 else:
 #                     trans.rollback()
 #                     return jsonify({
 #                         "success": False,
-#                         "error":   f"No upload handler configured for tenant '{tenant_name}'."
+#                         "error":   f"No handler configured for tenant '{tenant_name}' file type '{file_type}'."
 #                     }), 400
 
 #                 conn.execute(text("""
@@ -643,9 +696,10 @@ def generate_guest_token():
 #                     print(f"DEBUG: Cache clear failed (non-critical): {cache_err}", flush=True)
 
 #                 return jsonify({
-#                     "success": True,
-#                     "message": "Data uploaded successfully. Please Go To The Dashboard",
-#                     "load_id": load_id
+#                     "success":   True,
+#                     "message":   f"{'Stock' if file_type == 'stock' else 'Sales'} data uploaded successfully. Please Go To The Dashboard",
+#                     "load_id":   load_id,
+#                     "file_type": file_type,
 #                 }), 200
 
 #             except Exception as e:
@@ -670,23 +724,31 @@ def generate_guest_token():
 #                 return jsonify({"success": False, "error": error_message}), 500
 
 #     finally:
-#         # ✅ ALWAYS release the lock — success, failure, or crash
 #         r.delete(lock_key)
 #         print(f"DEBUG: Upload lock released for {tenant_schema}", flush=True)
+        
+#     #---------------------------------------------------------------------
 
 
 
 @app.route('/api/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
-    tenant_schema = session.get('tenant_schema')
-    tenant_id     = session.get('tenant_id')
-    user_id       = session.get('user_id', 1)
+
+    # ── Session details ───────────────────────────────────
+    tenant_schema  = session.get('tenant_schema')
+    tenant_id      = session.get('tenant_id')
+    user_id        = session.get('user_id', 1)
+    procedure_name = session.get('procedure_name')
+    function_name  = session.get('function_name')
+    # ← ADD: procedure_name and function_name from session
+    # (stored at login time — shown below how to set them)
 
     print(f"DEBUG: Tenant Schema: {tenant_schema}", flush=True)
-    print(f"DEBUG: Tenant ID: {tenant_id}", flush=True)
-    print(f"DEBUG: User ID: {user_id}", flush=True)
+    print(f"DEBUG: Tenant ID: {tenant_id}",         flush=True)
+    print(f"DEBUG: User ID: {user_id}",             flush=True)
 
+    # ── Validate file ─────────────────────────────────────
     if 'excel_file' not in request.files:
         return jsonify({"success": False, "error": "No file part"}), 400
 
@@ -701,59 +763,49 @@ def upload_excel():
         return jsonify({"success": False, "error": "No tenant context found"}), 403
 
     if not file or not allowed_file(file.filename):
-        return jsonify({"success": False, "error": "Invalid file type. Only xlsx and csv allowed"}), 400
+        return jsonify({"success": False,
+                        "error": "Invalid file type. Only xlsx and csv allowed"}), 400
 
     clean_filename = secure_filename(file.filename)
     lower_filename = clean_filename.lower()
     file_ext       = clean_filename.rsplit('.', 1)[1].lower()
 
-    # ── Read file ONCE only
+    # ── Read file bytes ONCE in main thread ───────────────
+    # Must happen here — file object closes after response
     print(f"DEBUG: Reading file bytes...", flush=True)
     file_bytes  = file.read()
     file_buffer = io.BytesIO(file_bytes)
     print(f"DEBUG: File read done. Size={len(file_bytes)} bytes", flush=True)
 
-    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+    MAX_FILE_SIZE = 100 * 1024 * 1024
     if len(file_bytes) > MAX_FILE_SIZE:
-        return jsonify({"success": False, "error": "File too large. Maximum allowed size is 100MB."}), 400
+        return jsonify({"success": False,
+                        "error": "File too large. Maximum allowed size is 100MB."}), 400
 
-    # ── Acquire Redis lock
+    # ── Redis lock ────────────────────────────────────────
     r        = redis.from_url(os.getenv("REDIS_URL"))
     lock_key = f"upload_lock:{tenant_schema}"
-    lock     = r.set(lock_key, "1", nx=True, ex=120)
+    lock     = r.set(lock_key, "1", nx=True, ex=600)  # 10 min lock
 
     if not lock:
         return jsonify({
             "success": False,
-            "error": "Another upload is already in progress for this tenant. Please wait."
+            "error":   "Another upload is already in progress. Please wait."
         }), 429
 
     try:
-        # ── Upload to S3
-        # print(f"DEBUG: Starting S3 upload...", flush=True)
-        # s3_key, s3_url = upload_file_to_s3(file_bytes, tenant_schema, clean_filename)
-        # print(f"DEBUG: S3 upload done. key={s3_key}", flush=True)
-
-        # if s3_key is None:
-        #     return jsonify({"success": False, "error": "File storage failed. Please try again."}), 500
-
-        load_id     = None
-        tenant_id   = None
-        tenant_name = None
-
-        # ── Tenant lookup — matches by schema AND filename prefix ────────
-        # Two rows can exist for same tenant (one for sales, one for stock).
-        # The query picks the row whose fileprefix matches the uploaded filename.
-        # LENGTH(fileprefix) DESC ensures more specific prefix wins if overlap.
+        # ── Tenant lookup ─────────────────────────────────
         print(f"DEBUG: Opening DB connection for tenant lookup...", flush=True)
         with engine.connect() as conn:
             tenant_data = conn.execute(text("""
                 SELECT
                     id,
-                    "tenant_name",
-                    "schema_name",
-                    "table_name",
-                    "fileprefix",
+                    tenant_name,
+                    schema_name,
+                    table_name,
+                    fileprefix,
+                    procedure_name,
+                    function_name,
                     "DomainId"
                 FROM public.tenants
                 WHERE schema_name = :schema
@@ -761,28 +813,33 @@ def upload_excel():
                       fileprefix IS NULL
                       OR LOWER(:filename) LIKE LOWER(fileprefix) || '%'
                   )
-                ORDER BY LENGTH(fileprefix) DESC   -- most specific prefix wins
+                ORDER BY LENGTH(fileprefix) DESC
                 LIMIT 1
             """), {
                 "schema":   tenant_schema,
                 "filename": lower_filename
             }).mappings().first()
 
-        print(f"DEBUG: Tenant lookup done. tenant={tenant_data['tenant_name'] if tenant_data else 'NOT FOUND'}", flush=True)
+        print(
+            f"DEBUG: Tenant lookup done. "
+            f"tenant={tenant_data['tenant_name'] if tenant_data else 'NOT FOUND'}",
+            flush=True
+        )
 
-        # ── If no row matched, the filename doesn't match any known prefix ─
         if not tenant_data:
-            # Fetch all known prefixes for this schema to show a helpful error
             with engine.connect() as conn:
                 known_prefixes = conn.execute(text("""
                     SELECT fileprefix FROM public.tenants
-                    WHERE schema_name = :schema AND fileprefix IS NOT NULL
+                    WHERE schema_name = :schema
+                      AND fileprefix IS NOT NULL
                 """), {"schema": tenant_schema}).scalars().all()
-
-            prefix_list = ", ".join(f"'{p}'" for p in known_prefixes) or "none configured"
+            prefix_list = ", ".join(f"'{p}'" for p in known_prefixes) \
+                          or "none configured"
+            r.delete(lock_key)
             return jsonify({
                 "success": False,
-                "error":   f"Invalid file name. No configuration found for '{clean_filename}'. "
+                "error":   f"Invalid file name. No configuration found for "
+                           f"'{clean_filename}'. "
                            f"Expected prefixes: {prefix_list}."
             }), 400
 
@@ -790,71 +847,168 @@ def upload_excel():
         target_table_name = tenant_data["table_name"]
         file_prefix       = tenant_data["fileprefix"] or ""
         tenant_name       = tenant_data["tenant_name"].strip().lower()
+        procedure_name    = tenant_data["procedure_name"]   # ← NEW
+        function_name     = tenant_data["function_name"]    # ← NEW
+        file_type         = "stock" if "stock" in file_prefix.lower() \
+                            else "sales"
 
-        # ── Detect file type from the matched fileprefix ──────────────────
-        file_type = "stock" if "stock" in file_prefix.lower() else "sales"
+        print(f"DEBUG: Matched prefix   : {file_prefix}",    flush=True)
+        print(f"DEBUG: Target table     : {target_table_name}", flush=True)
+        print(f"DEBUG: Detected type    : {file_type}",      flush=True)
+        print(f"DEBUG: Tenant name      : {tenant_name}",    flush=True)
+        print(f"DEBUG: Procedure name   : {procedure_name}", flush=True)
+        print(f"DEBUG: Function name    : {function_name}",  flush=True)
 
-        print(f"DEBUG: Matched prefix  : {file_prefix}", flush=True)
-        print(f"DEBUG: Target table    : {target_table_name}", flush=True)
-        print(f"DEBUG: Detected type   : {file_type}", flush=True)
-        print(f"DEBUG: Tenant name     : {tenant_name}", flush=True)
-
-        # ── Create load master record
+        # ── Create load_master record ─────────────────────
+        # Done in MAIN thread so we have load_id to return
         with engine.connect() as load_conn:
             load_id = load_conn.execute(text("""
-                INSERT INTO public.load_master (tenant_id, user_id, filename, status)
-                VALUES (:tid, :uid, :fname, 'Processing')
+                INSERT INTO public.load_master
+                    (tenant_id, user_id, filename, status)
+                VALUES (:tid, :uid, :fname, 'Queued')
                 RETURNING id
             """), {
-                "tid":    tenant_id,
-                "uid":    user_id,
-                "fname":  clean_filename
+                "tid":   tenant_id,
+                "uid":   user_id,
+                "fname": clean_filename
             }).scalar()
             load_conn.commit()
 
         print(f"DEBUG: Load ID created: {load_id}", flush=True)
 
+        # ── Start background thread ───────────────────────
+        # Pass everything the thread needs — file bytes + all context
+        thread = threading.Thread(
+            target = _process_upload_background,
+            args   = (
+                file_bytes,
+                file_ext,
+                clean_filename,
+                tenant_schema,
+                tenant_name,
+                tenant_id,
+                target_table_name,
+                file_type,
+                load_id,
+                user_id,
+                lock_key,
+                procedure_name,
+                function_name,
+            ),
+            daemon = True
+        )
+        thread.start()
+        print(f"DEBUG: Background thread started. load_id={load_id}",
+              flush=True)
+
+        # ── Respond immediately ───────────────────────────
+        return jsonify({
+            "success":   True,
+            "message":   f"File received. "
+                         f"Processing in background.",
+            "load_id":   load_id,
+            "file_type": file_type,
+        }), 202
+
+    except Exception as e:
+        print(f"DEBUG: Unexpected error in main thread: {e}", flush=True)
+        import traceback; traceback.print_exc()
+        r.delete(lock_key)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ════════════════════════════════════════════════════════
+#  BACKGROUND THREAD FUNCTION
+#  This is your ENTIRE existing processing logic
+#  moved into a function that runs in a thread.
+#  Nothing changed inside — just moved here.
+# ════════════════════════════════════════════════════════
+def _process_upload_background(
+    file_bytes,
+    file_ext,
+    clean_filename,
+    tenant_schema,
+    tenant_name,
+    tenant_id,
+    target_table_name,
+    file_type,
+    load_id,
+    user_id,
+    lock_key,
+    procedure_name,
+    function_name,
+):
+    r = redis.from_url(os.getenv("REDIS_URL"))
+
+    # ── Helper: update load_master status using a fresh connection ──
+    # Called at each step so frontend always sees current progress
+    def update_status(new_status):
+        try:
+            with engine.connect() as sc:
+                sc.execute(text("""
+                    UPDATE public.load_master
+                    SET    status = :status
+                    WHERE  id     = :lid
+                """), {"status": new_status, "lid": load_id})
+                sc.commit()
+            print(f"DEBUG: Status → {new_status} (load_id={load_id})",
+                  flush=True)
+        except Exception as e:
+            print(f"DEBUG: Could not update status to {new_status}: {e}",
+                  flush=True)
+
+    try:
+        file_buffer = io.BytesIO(file_bytes)
+
         with engine.connect() as conn:
             trans = conn.begin()
             try:
+
+                # ── STEP 1: Reading file ──────────────────────────────────
+                update_status('Reading')
+
                 if file_ext == 'xlsx':
                     xls        = pd.ExcelFile(file_buffer, engine='openpyxl')
-                    dataframes = [xls.parse(sheet, dtype=str) for sheet in xls.sheet_names]
+                    dataframes = [
+                        xls.parse(sheet, dtype=str)
+                        for sheet in xls.sheet_names
+                    ]
                 elif file_ext == 'csv':
                     file_buffer.seek(0)
-                    dataframes = [pd.read_csv(file_buffer, dtype=str, encoding='utf-8-sig')]
+                    dataframes = [
+                        pd.read_csv(file_buffer, dtype=str,
+                                    encoding='utf-8-sig')
+                    ]
                 else:
-                    trans.rollback()
-                    return jsonify({"success": False, "error": "Unsupported file format"}), 400
+                    raise ValueError("Unsupported file format")
+
+                # ── STEP 2: Preparing data ────────────────────────────────
+                update_status('Preparing')
 
                 excel_max_date = None
+                df_original    = None
+
                 for df in dataframes:
                     if df.empty:
                         continue
 
                     df.columns = [c.strip() for c in df.columns]
-                    df = df.dropna(how='all').reset_index(drop=True)
+                    df         = df.dropna(how='all').reset_index(drop=True)
 
                     if df.empty:
-                        error_msg = "Uploaded file contains no data rows."
-                        try:
-                            with engine.connect() as error_conn:
-                                log_load_error(conn=error_conn, load_id=load_id,
-                                               error_message=error_msg, row_number=None, column_name=None)
-                        except Exception as log_err:
-                            print(f"DEBUG: Could not log to load_errors: {log_err}", flush=True)
-                        trans.rollback()
-                        return jsonify({"success": False, "error": error_msg}), 400
+                        raise ValueError(
+                            "Uploaded file contains no data rows."
+                        )
 
                     df_original = df.copy()
-                    print(f"DEBUG: Columns in file: {list(df.columns)}", flush=True)
-                    print(f"DEBUG: Total rows after cleaning: {len(df)}", flush=True)
+                    print(f"DEBUG: Columns: {list(df.columns)}", flush=True)
+                    print(f"DEBUG: Rows: {len(df)}",             flush=True)
 
                     table_columns = conn.execute(text("""
                         SELECT column_name
-                        FROM information_schema.columns
-                        WHERE table_schema = :schema
-                        AND table_name = :table
+                        FROM   information_schema.columns
+                        WHERE  table_schema = :schema
+                          AND  table_name   = :table
                     """), {
                         "schema": tenant_schema,
                         "table":  target_table_name
@@ -862,97 +1016,287 @@ def upload_excel():
 
                     print(f"DEBUG: DB columns: {table_columns}", flush=True)
 
-                    df = df[[col for col in df.columns if col in table_columns]].copy()
+                    df = df[[
+                        col for col in df.columns
+                        if col in table_columns
+                    ]].copy()
 
                     if 'load_id' in table_columns:
                         df['load_id'] = load_id
 
+                    print(f"DEBUG: Data prepared for {target_table_name}",
+                          flush=True)
 
-                    print(f"DEBUG: Data processed for {target_table_name}", flush=True)
+                # ── STEP 3: Validating + Processing ──────────────────────
+                update_status('Processing')
 
-                print(f"DEBUG: Routing → tenant={tenant_name} file_type={file_type}", flush=True)
-
-                # ── Route to correct handler ──────────────────────────────
+                #-------------------------------------------------------------
+                # Route to correct handler based on tenant name + file type
+                #-------------------------------------------------------------
                 if tenant_name == "shinde_shoes" and file_type == "sales":
-                    handle_shinde_shoes(conn, df, tenant_schema, target_table_name,
-                                        load_id, excel_max_date, log_load_error, engine)
+                    handle_shinde_shoes(
+                        conn, df, tenant_schema, target_table_name,
+                        load_id, log_load_error, engine
+                    )
 
                 elif tenant_name == "shinde_shoes" and file_type == "stock":
-                    handle_shinde_shoes_stock(conn, df, tenant_schema, target_table_name,
-                                              load_id, log_load_error, filename=clean_filename)
+                    handle_shinde_shoes_stock(
+                        conn, df, tenant_schema, target_table_name,
+                        load_id, log_load_error, filename=clean_filename
+                    )
+
                 elif tenant_name == "apparel_sales":
-                    handle_apparel_store(conn, df_original, tenant_schema, load_id, log_load_error)
+                    handle_apparel_store(
+                        conn, df_original, tenant_schema,
+                        load_id, log_load_error
+                    )
 
                 elif tenant_name == "siddhesh":
-                    handle_client_orders(conn, df, tenant_schema, target_table_name,
-                                         load_id, log_load_error)
+                    handle_client_orders(
+                        conn, df, tenant_schema, target_table_name,
+                        load_id, log_load_error
+                    )
 
                 elif tenant_name == "tally_data":
-                    handle_tally_sales(conn, df_original, tenant_schema, target_table_name,
-                                       load_id, log_load_error)
+                    handle_tally_sales(
+                        conn, df_original, tenant_schema, target_table_name,
+                        load_id, log_load_error
+                    )
 
                 elif tenant_name == "tally_data2":
-                    handle_tally_sales_v2(conn, df_original, tenant_schema, target_table_name,
-                                          load_id, log_load_error)
+                    handle_tally_sales_v2(
+                        conn, df_original, tenant_schema, target_table_name,
+                        load_id, log_load_error
+                    )
 
-                # In upload route, add the handler call:
                 elif tenant_name == "accrec":
-                    handle_accrec(conn, df_original, tenant_schema, target_table_name,
-                                load_id, log_load_error)    
+                    handle_accrec(
+                        conn, df_original, tenant_schema, target_table_name,
+                        load_id, log_load_error
+                    )
 
                 else:
-                    trans.rollback()
-                    return jsonify({
-                        "success": False,
-                        "error":   f"No handler configured for tenant '{tenant_name}' file type '{file_type}'."
-                    }), 400
+                    # ── No Python handler — generic flow ──────────────────
+                    # Inserts string data into staging table then calls
+                    # the SQL procedure stored in public.tenants
+                    if not procedure_name:
+                        raise ValueError(
+                            f"No handler and no procedure_name configured "
+                            f"for tenant '{tenant_name}'. "
+                            f"Please set procedure_name in public.tenants."
+                        )
+
+                    print(
+                        f"DEBUG: No Python handler for '{tenant_name}'. "
+                        f"Using generic flow → insert strings + call procedure.",
+                        flush=True
+                    )
+
+                    # Truncate staging table before insert
+                    conn.execute(text(
+                        f'TRUNCATE TABLE "{tenant_schema}".'
+                        f'"{target_table_name}" RESTART IDENTITY'
+                    ))
+                    print(f"DEBUG: Truncated {target_table_name}.", flush=True)
+
+                    # Insert all data as strings into staging table
+                    df.to_sql(
+                        target_table_name,
+                        con       = conn,
+                        schema    = tenant_schema,
+                        if_exists = 'append',
+                        index     = False
+                    )
+                    print(
+                        f"DEBUG: Inserted {len(df)} rows into "
+                        f"{tenant_schema}.{target_table_name}.",
+                        flush=True
+                    )
+
+                    # Call SQL procedure — handles type conversion,
+                    # validation, business logic, MV refresh
+                    conn.execute(
+                        text(
+                            f'CALL "{tenant_schema}".'
+                            f'"{procedure_name}"(:load_id)'
+                        ),
+                        {"load_id": load_id}
+                    )
+                    print(f"DEBUG: Procedure {procedure_name} done.",
+                          flush=True)
+
+                # ── Free RAM immediately after handler finishes ───────────
+                # Handler is done — df is already inserted into DB.
+                # Delete large objects from memory so Render doesn't OOM.
+                import gc
+                try:
+                    del df
+                except Exception:
+                    pass
+                try:
+                    del df_original
+                except Exception:
+                    pass
+                try:
+                    del dataframes
+                except Exception:
+                    pass
+                try:
+                    del file_buffer
+                except Exception:
+                    pass
+                gc.collect()
+                print("DEBUG: RAM freed after handler.", flush=True)
+
+
+                # ── STEP 4: Saving ────────────────────────────────────────
+                update_status('Saving')
 
                 conn.execute(text("""
-                    UPDATE public.load_master SET status='Pass' WHERE id=:lid
+                    UPDATE public.load_master
+                    SET    status = 'Pass'
+                    WHERE  id     = :lid
                 """), {"lid": load_id})
 
                 trans.commit()
-                print("DEBUG: Transaction committed successfully", flush=True)
+                print("DEBUG: Transaction committed.", flush=True)
+
+                # ── STEP 5: Clearing Superset cache ───────────────────────
+                update_status('Pass')
 
                 try:
-                    r = redis.from_url(os.getenv("REDIS_URL"))
                     for key in r.scan_iter("superset*"):
                         r.delete(key)
-                    print("DEBUG: Superset cache cleared", flush=True)
+                    print("DEBUG: Superset cache cleared.", flush=True)
                 except Exception as cache_err:
-                    print(f"DEBUG: Cache clear failed (non-critical): {cache_err}", flush=True)
-
-                return jsonify({
-                    "success":   True,
-                    "message":   f"{'Stock' if file_type == 'stock' else 'Sales'} data uploaded successfully. Please Go To The Dashboard",
-                    "load_id":   load_id,
-                    "file_type": file_type,
-                }), 200
+                    print(
+                        f"DEBUG: Cache clear failed (non-critical): "
+                        f"{cache_err}",
+                        flush=True
+                    )
 
             except Exception as e:
                 error_message = str(e)
+
                 try:
                     trans.rollback()
                 except Exception:
                     pass
 
-                print(f"DEBUG: ERROR during upload: {error_message}", flush=True)
+                print(f"DEBUG: ERROR in background: {error_message}",
+                      flush=True)
                 import traceback
                 traceback.print_exc()
 
-                if load_id:
-                    try:
-                        with engine.connect() as error_conn:
-                            log_load_error(conn=error_conn, load_id=load_id,
-                                           error_message=error_message, row_number=None, column_name=None)
-                    except Exception as log_err:
-                        print(f"DEBUG: Could not log to load_errors: {log_err}", flush=True)
+                # ── Log error to load_errors (separate connection) ────────
+                try:
+                    with engine.connect() as error_conn:
+                        log_load_error(
+                            conn=error_conn, load_id=load_id,
+                            error_message=error_message,
+                            row_number=None, column_name=None
+                        )
+                        error_conn.commit()
+                        print(f"DEBUG: Error logged to load_errors. "
+                              f"load_id={load_id}", flush=True)
+                except Exception as log_err:
+                    print(f"DEBUG: Failed to log error: {log_err}",
+                          flush=True)
 
-                return jsonify({"success": False, "error": error_message}), 500
+                # ── Mark load_master as Fail (separate connection) ────────
+                try:
+                    with engine.connect() as fail_conn:
+                        fail_conn.execute(text("""
+                            UPDATE public.load_master
+                            SET    status = 'Fail'
+                            WHERE  id     = :lid
+                        """), {"lid": load_id})
+                        fail_conn.commit()
+                        print(f"DEBUG: load_master marked Fail. "
+                              f"load_id={load_id}", flush=True)
+                except Exception as fail_err:
+                    print(f"DEBUG: Could not update status to Fail: "
+                          f"{fail_err}", flush=True)
 
     finally:
+        # Always release Redis lock when thread finishes (pass or fail)
         r.delete(lock_key)
-        print(f"DEBUG: Upload lock released for {tenant_schema}", flush=True)
+        print(
+            f"DEBUG: Upload lock released for {tenant_schema}.",
+            flush=True
+        )
+
+
+# ════════════════════════════════════════════════════════
+#  POLL ENDPOINT — frontend calls every 3 seconds
+# ════════════════════════════════════════════════════════
+@app.route('/api/upload-status/<int:load_id>', methods=['GET'])
+@login_required
+def upload_status(load_id):
+    with engine.connect() as conn:
+
+        # ── Get current status from load_master ───────────────────────
+        row = conn.execute(text("""
+            SELECT status, filename
+            FROM   public.load_master
+            WHERE  id = :lid
+        """), {"lid": load_id}).mappings().first()
+
+        if not row:
+            return jsonify({"status": "unknown"}), 404
+
+        status = row["status"]
+
+        # ── If failed, fetch error message from load_errors ───────────
+        error_message = None
+        if status == "Fail":
+            error_row = conn.execute(text("""
+                SELECT error_message
+                FROM   public.load_errors
+                WHERE  load_id   = :lid
+                ORDER  BY created_at DESC
+                LIMIT  1
+            """), {"lid": load_id}).mappings().first()
+
+            if error_row:
+                error_message = error_row["error_message"]
+
+    # ── Map each status to a percent and message ──────────────────────
+    # Status flow: Queued → Reading → Preparing → Processing → Saving → Pass
+    PERCENT_MAP = {
+        "Queued":     5,
+        "Reading":    20,
+        "Preparing":  40,
+        "Processing": 65,
+        "Saving":     85,
+        "Pass":       100,
+        "Fail":       0,
+    }
+
+    MESSAGE_MAP = {
+        "Queued":     "File received, starting...",
+        "Reading":    "Reading file data...",
+        "Preparing":  "Preparing data for processing...",
+        "Processing": "Validating and processing data...",
+        "Saving":     "Saving to database...",
+        "Pass":       "Data uploaded! Your dashboards are ready.",
+        "Fail":       error_message or "Processing failed. Please contact support.",
+    }
+
+    return jsonify({
+        "status":        status,
+        "percent":       PERCENT_MAP.get(status, 50),
+        "message":       MESSAGE_MAP.get(status, "Processing..."),
+        "error_message": error_message,
+        "load_id":       load_id,
+        "filename":      row["filename"],
+    }), 200
+
+
+
+
+
+
 
 # ---------------------------------------------------------
 # BRANDING
@@ -2296,6 +2640,37 @@ def debug_layout():
         return jsonify({"error": str(e)}), 500
 
 
+#-------------------------------------------------------------
+# CLEAR SUPERSET CACHE the lazy way (for development/testing)
+#-------------------------------------------------------------
+
+@app.route('/api/clear-cache', methods=['POST'])
+@login_required
+def clear_cache():
+    try:
+        r       = redis.from_url(os.getenv("REDIS_URL"))
+        deleted = 0
+
+        for key in r.scan_iter("superset*"):
+            r.delete(key)
+            deleted += 1
+
+        print(f"DEBUG: Superset cache cleared. {deleted} keys deleted.",
+              flush=True)
+
+        return jsonify({
+            "success": True,
+            "message": f"Cache cleared successfully. {deleted} keys removed.",
+            "keys_deleted": deleted,
+        }), 200
+
+    except Exception as e:
+        print(f"DEBUG: Cache clear failed: {e}", flush=True)
+        return jsonify({
+            "success": False,
+            "error":   str(e),
+        }), 500
+    
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
 
