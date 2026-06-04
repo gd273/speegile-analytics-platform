@@ -91,26 +91,26 @@ s3_client = boto3.client(
     region_name= AWS_REGION
 )
 
-# def upload_file_to_s3(file_bytes, tenant_schema, filename):
-#     s3_key = f"speegile-tenant-upload-file/{tenant_schema}/{filename}"
-#     s3_url = f"https://{S3_BUCKET}.s3.{os.getenv('AWS_REGION', 'ap-south-1')}.amazonaws.com/{s3_key}"
-#     try:
-#         from io import BytesIO
-#         s3_client.upload_fileobj(
-#             BytesIO(file_bytes),
-#             S3_BUCKET,
-#             s3_key,
-#             ExtraArgs={'ContentType': 'application/octet-stream'},
-#             Config=boto3.s3.transfer.TransferConfig(
-#                 multipart_threshold=10 * 1024 * 1024,
-#                 max_concurrency=5
-#             )
-#         )
-#         print(f"DEBUG: File uploaded to S3 → {s3_url}", flush=True)
-#         return s3_key, s3_url
-#     except Exception as e:
-#         print(f"DEBUG: S3 upload failed: {e}", flush=True)
-#         return None, None
+def upload_file_to_s3(file_bytes, tenant_schema, filename):
+    s3_key = f"speegile-tenant-upload-file/{tenant_schema}/{filename}"
+    s3_url = f"https://{S3_BUCKET}.s3.{os.getenv('AWS_REGION', 'ap-south-1')}.amazonaws.com/{s3_key}"
+    try:
+        from io import BytesIO
+        s3_client.upload_fileobj(
+            BytesIO(file_bytes),
+            S3_BUCKET,
+            s3_key,
+            ExtraArgs={'ContentType': 'application/octet-stream'},
+            Config=boto3.s3.transfer.TransferConfig(
+                multipart_threshold=10 * 1024 * 1024,
+                max_concurrency=5
+            )
+        )
+        print(f"DEBUG: File uploaded to S3 → {s3_url}", flush=True)
+        return s3_key, s3_url
+    except Exception as e:
+        print(f"DEBUG: S3 upload failed: {e}", flush=True)
+        return None, None
 
 # ---------------------------------------------------------
 # DATABASE ENGINE
@@ -410,327 +410,6 @@ def generate_guest_token():
 # Upload-Excel API
 # ---------------------------------------------------------
 
-# @app.route('/api/upload-excel', methods=['POST'])
-# @login_required
-# def upload_excel():
-#     #---------------------------------
-#     # store tenants details in session
-#     #---------------------------------
-
-#     tenant_schema = session.get('tenant_schema')
-#     tenant_id     = session.get('tenant_id')
-#     user_id       = session.get('user_id', 1)
-
-#     print(f"DEBUG: Tenant Schema: {tenant_schema}", flush=True)
-#     print(f"DEBUG: Tenant ID: {tenant_id}", flush=True)
-#     print(f"DEBUG: User ID: {user_id}", flush=True)
-#     #---------------------------------
-
-
-#     #---------------------------------
-#     # Validate the File
-#     #---------------------------------
-
-#     if 'excel_file' not in request.files:
-#         return jsonify({"success": False, "error": "No file part"}), 400
-
-#     file = request.files['excel_file']
-#     if file.filename == '':
-#         return jsonify({"success": False, "error": "No selected file"}), 400
-
-#     if engine is None:
-#         return jsonify({"success": False, "error": "Database unavailable"}), 503
-
-#     if not tenant_schema:
-#         return jsonify({"success": False, "error": "No tenant context found"}), 403
-
-#     if not file or not allowed_file(file.filename):
-#         return jsonify({"success": False, "error": "Invalid file type. Only xlsx and csv allowed"}), 400
-
-#     clean_filename = secure_filename(file.filename)
-#     lower_filename = clean_filename.lower()
-#     file_ext       = clean_filename.rsplit('.', 1)[1].lower()
-
-#     #---------------------------------
-
-#     #----------------------------------------------------
-#     #check File Size
-#     #----------------------------------------------------        
-
-#     # ── Read file ONCE only
-#     print(f"DEBUG: Reading file bytes...", flush=True)
-#     file_bytes  = file.read()
-#     file_buffer = io.BytesIO(file_bytes)
-#     print(f"DEBUG: File read done. Size={len(file_bytes)} bytes", flush=True)
-
-#     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
-#     if len(file_bytes) > MAX_FILE_SIZE:
-#         return jsonify({"success": False, "error": "File too large. Maximum allowed size is 100MB."}), 400
-#     #----------------------------------------------------
-    
-
-#     #----------------------------------------------------
-#     # Redis (Check any file all ready uploading)        
-#     #----------------------------------------------------
-
-#     # ── Acquire Redis lock
-#     r        = redis.from_url(os.getenv("REDIS_URL"))
-#     lock_key = f"upload_lock:{tenant_schema}"
-#     lock     = r.set(lock_key, "1", nx=True, ex=120)
-
-#     if not lock:
-#         return jsonify({
-#             "success": False,
-#             "error": "Another upload is already in progress for this tenant. Please wait."
-#         }), 429
-
-#     #----------------------------------------------------
-
-#     #---------------------------------------------------------------------
-#     # All file validations are done, now acquire lock and process the file
-#     #---------------------------------------------------------------------
-#     try:
-#         # ── Upload to S3
-#         # print(f"DEBUG: Starting S3 upload...", flush=True)
-#         # s3_key, s3_url = upload_file_to_s3(file_bytes, tenant_schema, clean_filename)
-#         # print(f"DEBUG: S3 upload done. key={s3_key}", flush=True)
-
-#         # if s3_key is None:
-#         #     return jsonify({"success": False, "error": "File storage failed. Please try again."}), 500
-
-#         load_id     = None
-#         tenant_id   = None
-#         tenant_name = None
-
-#         # ── Tenant lookup — matches by schema AND filename prefix ────────
-#         # Two rows can exist for same tenant (one for sales, one for stock).
-#         # The query picks the row whose fileprefix matches the uploaded filename.
-#         # LENGTH(fileprefix) DESC ensures more specific prefix wins if overlap.
-#         print(f"DEBUG: Opening DB connection for tenant lookup...", flush=True)
-#         with engine.connect() as conn:
-#             tenant_data = conn.execute(text("""
-#                 SELECT
-#                     id,
-#                     "tenant_name",
-#                     "schema_name",
-#                     "table_name",
-#                     "fileprefix",
-#                     "DomainId"
-#                 FROM public.tenants
-#                 WHERE schema_name = :schema
-#                   AND (
-#                       fileprefix IS NULL
-#                       OR LOWER(:filename) LIKE LOWER(fileprefix) || '%'
-#                   )
-#                 ORDER BY LENGTH(fileprefix) DESC   -- most specific prefix wins
-#                 LIMIT 1
-#             """), {
-#                 "schema":   tenant_schema,
-#                 "filename": lower_filename
-#             }).mappings().first()
-
-#         print(f"DEBUG: Tenant lookup done. tenant={tenant_data['tenant_name'] if tenant_data else 'NOT FOUND'}", flush=True)
-
-#         # ── If no row matched, the filename doesn't match any known prefix ─
-#         if not tenant_data:
-#             # Fetch all known prefixes for this schema to show a helpful error
-#             with engine.connect() as conn:
-#                 known_prefixes = conn.execute(text("""
-#                     SELECT fileprefix FROM public.tenants
-#                     WHERE schema_name = :schema AND fileprefix IS NOT NULL
-#                 """), {"schema": tenant_schema}).scalars().all()
-
-#             prefix_list = ", ".join(f"'{p}'" for p in known_prefixes) or "none configured"
-#             return jsonify({
-#                 "success": False,
-#                 "error":   f"Invalid file name. No configuration found for '{clean_filename}'. "
-#                            f"Expected prefixes: {prefix_list}."
-#             }), 400
-
-#         tenant_id         = tenant_data["id"]
-#         target_table_name = tenant_data["table_name"]
-#         file_prefix       = tenant_data["fileprefix"] or ""
-#         tenant_name       = tenant_data["tenant_name"].strip().lower()
-
-#         # ── Detect file type from the matched fileprefix ──────────────────
-#         file_type = "stock" if "stock" in file_prefix.lower() else "sales"
-
-#         print(f"DEBUG: Matched prefix  : {file_prefix}", flush=True)
-#         print(f"DEBUG: Target table    : {target_table_name}", flush=True)
-#         print(f"DEBUG: Detected type   : {file_type}", flush=True)
-#         print(f"DEBUG: Tenant name     : {tenant_name}", flush=True)
-
-#         # ── Create load master record
-#         with engine.connect() as load_conn:
-#             load_id = load_conn.execute(text("""
-#                 INSERT INTO public.load_master (tenant_id, user_id, filename, status)
-#                 VALUES (:tid, :uid, :fname, 'Processing')
-#                 RETURNING id
-#             """), {
-#                 "tid":    tenant_id,
-#                 "uid":    user_id,
-#                 "fname":  clean_filename
-#             }).scalar()
-#             load_conn.commit()
-
-#         print(f"DEBUG: Load ID created: {load_id}", flush=True)
-
-#     #---------------------------------------------------------------------    
-
-#     #---------------------------------------------------------------------
-#     # Reading the File Data
-#     #---------------------------------------------------------------------
-
-#         with engine.connect() as conn:
-#             trans = conn.begin()
-#             try:
-#                 if file_ext == 'xlsx':
-#                     xls        = pd.ExcelFile(file_buffer, engine='openpyxl')
-#                     dataframes = [xls.parse(sheet, dtype=str) for sheet in xls.sheet_names]
-#                 elif file_ext == 'csv':
-#                     file_buffer.seek(0)
-#                     dataframes = [pd.read_csv(file_buffer, dtype=str, encoding='utf-8-sig')]
-#                 else:
-#                     trans.rollback()
-#                     return jsonify({"success": False, "error": "Unsupported file format"}), 400
-
-#                 excel_max_date = None
-#                 for df in dataframes:
-#                     if df.empty:
-#                         continue
-
-#                     df.columns = [c.strip() for c in df.columns]
-#                     df = df.dropna(how='all').reset_index(drop=True)
-
-#                     if df.empty:
-#                         error_msg = "Uploaded file contains no data rows."
-#                         try:
-#                             with engine.connect() as error_conn:
-#                                 log_load_error(conn=error_conn, load_id=load_id,
-#                                                error_message=error_msg, row_number=None, column_name=None)
-#                         except Exception as log_err:
-#                             print(f"DEBUG: Could not log to load_errors: {log_err}", flush=True)
-#                         trans.rollback()
-#                         return jsonify({"success": False, "error": error_msg}), 400
-
-#                     df_original = df.copy()
-#                     print(f"DEBUG: Columns in file: {list(df.columns)}", flush=True)
-#                     print(f"DEBUG: Total rows after cleaning: {len(df)}", flush=True)
-
-#                     table_columns = conn.execute(text("""
-#                         SELECT column_name
-#                         FROM information_schema.columns
-#                         WHERE table_schema = :schema
-#                         AND table_name = :table
-#                     """), {
-#                         "schema": tenant_schema,
-#                         "table":  target_table_name
-#                     }).scalars().all()
-
-#                     print(f"DEBUG: DB columns: {table_columns}", flush=True)
-
-#                     df = df[[col for col in df.columns if col in table_columns]].copy()
-
-#                     if 'load_id' in table_columns:
-#                         df['load_id'] = load_id
-
-
-#                     print(f"DEBUG: Data processed for {target_table_name}", flush=True)
-
-#                 print(f"DEBUG: Routing → tenant={tenant_name} file_type={file_type}", flush=True)
-
-#     #---------------------------------------------------------------------
-
-#     #---------------------------------------------------------------------
-#     # Handle each tenant's file with its specific logic
-#     #---------------------------------------------------------------------
-
-#                 # ── Route to correct handler ──────────────────────────────
-#                 if tenant_name == "shinde_shoes" and file_type == "sales":
-#                     handle_shinde_shoes(conn, df, tenant_schema, target_table_name,
-#                                         load_id, excel_max_date, log_load_error, engine)
-
-#                 elif tenant_name == "shinde_shoes" and file_type == "stock":
-#                     handle_shinde_shoes_stock(conn, df, tenant_schema, target_table_name,
-#                                               load_id, log_load_error, filename=clean_filename)
-#                 elif tenant_name == "apparel_sales":
-#                     handle_apparel_store(conn, df_original, tenant_schema, load_id, log_load_error)
-
-#                 elif tenant_name == "siddhesh":
-#                     handle_client_orders(conn, df, tenant_schema, target_table_name,
-#                                          load_id, log_load_error)
-
-#                 elif tenant_name == "tally_data":
-#                     handle_tally_sales(conn, df_original, tenant_schema, target_table_name,
-#                                        load_id, log_load_error)
-
-#                 elif tenant_name == "tally_data2":
-#                     handle_tally_sales_v2(conn, df_original, tenant_schema, target_table_name,
-#                                           load_id, log_load_error)
-
-#                 # In upload route, add the handler call:
-#                 elif tenant_name == "accrec":
-#                     handle_accrec(conn, df_original, tenant_schema, target_table_name,
-#                                 load_id, log_load_error)    
-
-#                 else:
-#                     trans.rollback()
-#                     return jsonify({
-#                         "success": False,
-#                         "error":   f"No handler configured for tenant '{tenant_name}' file type '{file_type}'."
-#                     }), 400
-
-#                 conn.execute(text("""
-#                     UPDATE public.load_master SET status='Pass' WHERE id=:lid
-#                 """), {"lid": load_id})
-
-#                 trans.commit()
-#                 print("DEBUG: Transaction committed successfully", flush=True)
-
-#                 try:
-#                     r = redis.from_url(os.getenv("REDIS_URL"))
-#                     for key in r.scan_iter("superset*"):
-#                         r.delete(key)
-#                     print("DEBUG: Superset cache cleared", flush=True)
-#                 except Exception as cache_err:
-#                     print(f"DEBUG: Cache clear failed (non-critical): {cache_err}", flush=True)
-
-#                 return jsonify({
-#                     "success":   True,
-#                     "message":   f"{'Stock' if file_type == 'stock' else 'Sales'} data uploaded successfully. Please Go To The Dashboard",
-#                     "load_id":   load_id,
-#                     "file_type": file_type,
-#                 }), 200
-
-#             except Exception as e:
-#                 error_message = str(e)
-#                 try:
-#                     trans.rollback()
-#                 except Exception:
-#                     pass
-
-#                 print(f"DEBUG: ERROR during upload: {error_message}", flush=True)
-#                 import traceback
-#                 traceback.print_exc()
-
-#                 if load_id:
-#                     try:
-#                         with engine.connect() as error_conn:
-#                             log_load_error(conn=error_conn, load_id=load_id,
-#                                            error_message=error_message, row_number=None, column_name=None)
-#                     except Exception as log_err:
-#                         print(f"DEBUG: Could not log to load_errors: {log_err}", flush=True)
-
-#                 return jsonify({"success": False, "error": error_message}), 500
-
-#     finally:
-#         r.delete(lock_key)
-#         print(f"DEBUG: Upload lock released for {tenant_schema}", flush=True)
-        
-#     #---------------------------------------------------------------------
-
-
-
 @app.route('/api/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
@@ -981,6 +660,36 @@ def _process_upload_background(
                     ]
                 else:
                     raise ValueError("Unsupported file format")
+
+
+                # ── S3 Backup — store original file for audit/history ────
+                # Non-critical: if S3 fails, processing still continues
+                try:
+                    s3_key, s3_url = upload_file_to_s3(
+                        file_bytes, tenant_schema, clean_filename
+                    )
+                    if s3_url:
+                        print(f"DEBUG: File backed up to S3 → {s3_url}", flush=True)
+                        # Store S3 URL in load_master if column exists
+                        try:
+                            with engine.connect() as s3_conn:
+                                s3_conn.execute(text("""
+                                    UPDATE public.load_master
+                                    SET    s3_url = :url
+                                    WHERE  id     = :lid
+                                """), {"url": s3_url, "lid": load_id})
+                                s3_conn.commit()
+                        except Exception as s3_db_err:
+                            # Column may not exist yet — non-critical
+                            print(
+                                f"DEBUG: Could not store S3 URL in load_master "
+                                f"(non-critical): {s3_db_err}",
+                                flush=True
+                            )
+                    else:
+                        print("DEBUG: S3 upload returned no URL.", flush=True)
+                except Exception as s3_err:
+                    print(f"DEBUG: S3 upload failed (non-critical): {s3_err}", flush=True)
 
                 # ── STEP 2: Preparing data ────────────────────────────────
                 update_status('Preparing')
@@ -2369,167 +2078,6 @@ def debug_dashboard_meta():
 #---------------------------------------------------------------------------------
 # dashboard-date-range
 #---------------------------------------------------------------------------------
-
-# @app.route("/api/dashboard-date-range", methods=["GET"])
-# @login_required
-# def get_dashboard_date_range():
-#     dashboard_id = request.args.get("dashboardId")
-#     if not dashboard_id:
-#         return jsonify({"error": "dashboardId required"}), 400
-
-#     try:
-#         access_token = get_superset_access_token()
-#         if not access_token:
-#             return jsonify({"error": "Superset auth failed"}), 500
-
-#         headers = {"Authorization": f"Bearer {access_token}"}
-
-#         # ── Step 1: Get all charts in this dashboard ──────────────
-#         charts_resp = requests.get(
-#             f"{SUPERSET_URL}/api/v1/dashboard/{dashboard_id}/charts",
-#             headers=headers, timeout=15
-#         )
-#         charts = charts_resp.json().get("result", [])
-
-#         # ── Step 2: Find first chart with a temporal column ───────
-#         temporal_slice_id  = None
-#         temporal_col       = None
-#         datasource_id      = None
-#         datasource_type    = None
-
-#         for chart in charts:
-#             chart_id    = chart.get("id")
-#             detail_resp = requests.get(
-#                 f"{SUPERSET_URL}/api/v1/chart/{chart_id}",
-#                 headers=headers, timeout=10
-#             )
-#             detail    = detail_resp.json().get("result", {})
-#             form_data = detail.get("form_data", {})
-
-#             # fallback to params
-#             if not form_data:
-#                 try:
-#                     form_data = json.loads(detail.get("params", "{}") or "{}")
-#                 except Exception:
-#                     form_data = {}
-
-#             # Look for a temporal column (x_axis or granularity_sqla)
-#             x_axis = (
-#                 form_data.get("x_axis") or
-#                 form_data.get("granularity_sqla") or ""
-#             )
-#             if isinstance(x_axis, dict):
-#                 x_axis = x_axis.get("column_name") or x_axis.get("label") or ""
-
-#             x_axis = str(x_axis).strip()
-
-#             if x_axis and any(k in x_axis.lower() for k in
-#                 ["date", "time", "month", "day", "year", "period"]):
-#                 temporal_slice_id = chart_id
-#                 temporal_col      = x_axis
-
-#                 # Get datasource info
-#                 ds = form_data.get("datasource", "")  # e.g. "42__table"
-#                 if ds and "__" in str(ds):
-#                     parts             = str(ds).split("__")
-#                     datasource_id     = parts[0]
-#                     datasource_type   = parts[1]
-#                 break
-
-#         if not temporal_slice_id or not temporal_col:
-#             return jsonify({"success": False, "error": "No temporal column found"}), 200
-
-#         print(f"DEBUG date-range: chart={temporal_slice_id} col={temporal_col} ds={datasource_id}", flush=True)
-
-#         # ── Step 3: Query Superset for MIN and MAX date ───────────
-#         query_payload = {
-#             "datasource": {
-#                 "id":   int(datasource_id),
-#                 "type": datasource_type or "table"
-#             },
-#             "force": False,
-#             "queries": [{
-#                 "metrics": [
-#                     {
-#                         "expressionType": "SIMPLE",
-#                         "aggregate":      "MIN",
-#                         "column": { "column_name": temporal_col },
-#                         "label":  f"MIN({temporal_col})",
-#                     },
-#                     {
-#                         "expressionType": "SIMPLE",
-#                         "aggregate":      "MAX",
-#                         "column": { "column_name": temporal_col },
-#                         "label":  f"MAX({temporal_col})",
-#                     },
-#                 ],
-#                 "columns":       [],
-#                 "groupby":       [],
-#                 "adhoc_filters": [],
-#                 "row_limit":     1,
-#                 "time_range":    "No filter",
-#             }],
-#             "result_format": "json",
-#             "result_type":   "full",
-#         }
-
-#         data_resp = requests.post(
-#             f"{SUPERSET_URL}/api/v1/chart/data",
-#             headers={**headers, "Content-Type": "application/json"},
-#             json=query_payload,
-#             timeout=30
-#         )
-
-#         result = data_resp.json()
-#         print(f"DEBUG date-range result: {result}", flush=True)
-
-#         # ── Step 4: Extract min/max from response ─────────────────
-#         rows = result.get("result", [{}])[0].get("data", [])
-#         if not rows:
-#             return jsonify({"success": False, "error": "No data returned"}), 200
-
-#         row     = rows[0]
-#         min_key = f"MIN({temporal_col})"
-#         max_key = f"MAX({temporal_col})"
-
-#         raw_min = row.get(min_key)
-#         raw_max = row.get(max_key)
-
-#         def to_iso(val):
-#             if not val:
-#                 return None
-#             try:
-#                 # Handle timestamp in ms
-#                 n = float(val)
-#                 if n > 1e10:
-#                     return datetime.fromtimestamp(n / 1000).strftime("%Y-%m-%d")
-#             except (TypeError, ValueError):
-#                 pass
-#             try:
-#                 # Handle date string
-#                 d = datetime.fromisoformat(str(val)[:10])
-#                 return d.strftime("%Y-%m-%d")
-#             except Exception:
-#                 pass
-#             return str(val)[:10]
-
-#         min_date = to_iso(raw_min)
-#         max_date = to_iso(raw_max)
-
-#         print(f"DEBUG date-range: min={min_date} max={max_date}", flush=True)
-
-#         return jsonify({
-#             "success":  True,
-#             "min_date": min_date,
-#             "max_date": max_date,
-#             "column":   temporal_col,
-#         }), 200
-
-#     except Exception as e:
-#         print(f"DEBUG date-range error: {e}", flush=True)
-#         return jsonify({"error": str(e)}), 500    
-
-
 
 @app.route("/api/debug-layout", methods=["GET"])
 @login_required
