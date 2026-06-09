@@ -1090,6 +1090,9 @@ export default function ChartCard({
   groupby:        groupbyProp     = [],
   groupbyRows:    groupbyRowsProp = [],
   groupbyColumns: groupbyColsProp = [],
+  columnOrder:             columnOrderProp            = [],
+  showCellBars = false,    // ← ADD to destructured props
+  conditionalFormatting:   conditionalFormattingProp  = [],
   zoomable = false,    // ← ADD THIS
   fontColor = null,
   conditionalColors  = [],
@@ -1520,8 +1523,11 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
           metricKeys={metricLabels}
           colnames={colnames}
           crossFilterValue={selectedValue}
-          title={title} 
-          onRowClick={(col, val) => {
+          title={title}
+          columnOrder={columnOrderProp}
+          showCellBars={showCellBars}    // ← ADD
+          conditionalFormatting={conditionalFormattingProp}
+          onRowClick={(col, val) =>  {
             if (!onCrossFilter) return;
             onCrossFilter(col, val, sliceId, title, true, crossFilterScope);  // ← true = fromTable
           }

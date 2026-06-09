@@ -80,6 +80,45 @@ CORS(app,
      supports_credentials=True
 )
 
+#---------------------------------------------------------------------
+# Help to get exact Colour to superset tableau colour scheme
+#---------------------------------------------------------------------
+
+def resolve_color_scheme(raw):
+    """
+    Resolves a Superset colorScheme value to a hex string.
+    Handles: direct hex, rgb(), rgba(), named schemes.
+    """
+    COLOR_SCHEME_MAP = {
+        "success":         "#439066",
+        "alert":           "#ffa700",
+        "error":           "#e04355",
+        "colorsuccessbg":  "#439066",
+        "colorwarningbg":  "#ffa700",
+        "colorerrorbg":    "#e04355",
+    }
+    if not raw:
+        return None
+    s = str(raw).strip()
+    if s.startswith("#"):
+        return s
+    if s.startswith("rgb("):
+        try:
+            parts = s.replace("rgb(", "").replace(")", "").split(",")
+            r, g, b = [int(p.strip()) for p in parts]
+            return f"#{r:02x}{g:02x}{b:02x}"
+        except Exception:
+            pass
+    if s.startswith("rgba("):
+        try:
+            parts = s.replace("rgba(", "").replace(")", "").split(",")
+            r, g, b = [int(p.strip()) for p in parts[:3]]
+            return f"#{r:02x}{g:02x}{b:02x}"
+        except Exception:
+            pass
+    return COLOR_SCHEME_MAP.get(s.lower())
+
+
 ## ---------------------------------------------------------
 # AWS S3 client setup
 # ---------------------------------------------------------
@@ -1255,6 +1294,57 @@ def get_dashboard_charts():
             groupby_rows = _col_names(groupby_rows_raw)
             groupby_cols = _col_names(groupby_cols_raw)
 
+            conditional_formatting = []
+            is_table = viz_type and ("table" in viz_type.lower() or "pivot" in viz_type.lower())
+            column_order = []
+            if is_table:
+                col_config = form_data.get("column_config") or {}
+                # col_config is a dict like { "tags": {"index": 0}, "CBC": {"index": 1} }
+                if isinstance(col_config, dict) and col_config:
+                    column_order = sorted(col_config.keys(),
+                                          key=lambda k: col_config[k].get("index", 999))
+                    
+            if is_table:
+                raw_cf = (
+                    form_data.get("conditional_formatting")
+                    or form_data.get("conditionalFormatting")
+                    or []
+                )
+                for rule in (raw_cf or []):
+                    if not isinstance(rule, dict):
+                        continue
+                    col      = rule.get("column") or rule.get("col") or ""
+                    operator = rule.get("operator") or rule.get("op") or ""
+                    target   = rule.get("targetValue")
+                    if target is None:
+                        target = rule.get("target_value")
+ 
+                    raw_color = (
+                        rule.get("colorScheme")
+                        or rule.get("color")
+                        or (rule.get("colorScheme", {}) or {}).get("value")
+                        or (rule.get("style", {}) or {}).get("color")
+                    )
+                    color = resolve_color_scheme(raw_color)
+                    if color and col and operator:
+                        conditional_formatting.append({
+                            "column":   col,
+                            "operator": operator,
+                            "value":    float(target) if target is not None else None,
+                            "color":    color,
+                        })
+ 
+            print(
+                f"DEBUG chart {chart_id}: conditional_formatting rules = {conditional_formatting}",
+                flush=True
+            )
+
+
+            # ── show_cell_bars: magnitude-based cell colouring ────────
+            show_cell_bars = bool(form_data.get("show_cell_bars", False)) if is_table else False
+            print(f"DEBUG chart {chart_id}: show_cell_bars = {show_cell_bars}", flush=True)
+            
+                
             # ── raw_x_axis_column ─────────────────────────────────────
             raw_x_axis_column = _extract_col_string(
                 form_data.get("x_axis") or form_data.get("granularity_sqla") or ""
@@ -1445,9 +1535,13 @@ def get_dashboard_charts():
                 "zoomable":             bool(form_data.get("zoomable", False)),
                 "font_color":           font_color,
                 "conditional_colors":   conditional_colors,
+                "conditional_formatting": conditional_formatting,   # ← ADD THIS
+                "column_order":            column_order, 
+                "show_cell_bars":          show_cell_bars,
                 "cross_filter_scope":   charts_in_scope,
                 "percentage_threshold": percentage_threshold,
                 "other_threshold":      other_threshold,
+                
             })
 
             print(f"DEBUG chart {chart_id}: zoomable = {form_data.get('zoomable')} | viz = {viz_type}", flush=True)
@@ -1824,17 +1918,22 @@ def get_chart_data():
             coltypes = first_result.get("coltypes", [])
 
         else:
-            print(
-                f"DEBUG chart {slice_id}: mixed chart with {len(all_results)} queries — merging",
-                flush=True
-            )
-            all_data_lists = [r.get("data", []) for r in all_results]
-            rows, colnames = merge_query_results(all_data_lists)
-            coltypes       = []
-            print(
-                f"DEBUG chart {slice_id}: merged → {len(rows)} rows, columns={colnames}",
-                flush=True
-            )
+            # For table/pivot charts with show_empty_columns, Superset returns 2 queries
+            # but both contain the same data — just use the first result directly
+            viz = (query_context.get("form_data", {}) or {}).get("viz_type", "")
+            is_table_viz = "table" in str(viz).lower() or "pivot" in str(viz).lower()
+
+            if is_table_viz:
+                # Take whichever query has more rows
+                best = max(all_results, key=lambda r: len(r.get("data", [])))
+                rows     = best.get("data", [])
+                colnames = best.get("colnames") or (list(rows[0].keys()) if rows else [])
+                coltypes = best.get("coltypes", [])
+                print(f"DEBUG chart {slice_id}: table chart — using best of {len(all_results)} queries → {len(rows)} rows", flush=True)
+            else:
+                print(f"DEBUG chart {slice_id}: mixed chart with {len(all_results)} queries — merging", flush=True)
+                all_data_lists = [r.get("data", []) for r in all_results]
+                rows, colnames = merge_query_results(all_data_lists)
 
         print(f"DEBUG chart {slice_id}: rows returned = {len(rows)}", flush=True)
 
@@ -1905,15 +2004,60 @@ def get_filter_options():
             return [row[column_name] for row in rows if row.get(column_name)]
 
         filter_options = []
+        # for f in native_filters:
+        #     filter_type = f.get("filterType")
+        #     target      = f.get("targets", [{}])[0]
+        #     col_name    = target.get("column", {}).get("name")
+        #     dataset_id  = target.get("datasetId")
+
+        #     # if not col_name or not dataset_id:
+        #         # continue
+
+        #     if filter_type == "filter_time":
+        #         scope_obj     = f.get("scope", {})
+        #         root_path     = scope_obj.get("rootPath", ["ROOT_ID"])
+        #         tabs_in_scope = f.get("tabsInScope") or []
+        #         if not tabs_in_scope:
+        #             tabs_in_scope = [p for p in root_path if p.startswith("TAB-")]
+
+        #         filter_options.append({
+        #             "id":           f.get("id"),
+        #             "name":         f.get("name"),
+        #             "type":         "date",
+        #             "column":       col_name,
+        #             "values":       [],
+        #             "tabsInScope":  tabs_in_scope,
+        #             "chartsInScope": f.get("chartsInScope", []),
+        #           })
+                
+        #     elif filter_type in ["filter_select", "filter_groupby"]:
+        #         values = get_distinct_values(dataset_id, col_name)
+
+        #         scope_obj     = f.get("scope", {})
+        #         root_path     = scope_obj.get("rootPath", ["ROOT_ID"])
+        #         tabs_in_scope = f.get("tabsInScope") or []
+        #         if not tabs_in_scope:
+        #             tabs_in_scope = [p for p in root_path if p.startswith("TAB-")]
+
+        #         filter_options.append({
+        #                 "id":           f.get("id"),
+        #                 "name":         f.get("name"),
+        #                 "type":         "select",
+        #                 "column":       col_name,
+        #                 "values":       values,
+        #                 "tabsInScope":  tabs_in_scope,
+        #                 "chartsInScope": f.get("chartsInScope", []),
+        #             })
+        # print(f"DEBUG filter '{f.get('name')}': scope={scope_obj}, tabs_in_scope={tabs_in_scope}, charts_in_scope={f.get('chartsInScope', [])}", flush=True)        
+
         for f in native_filters:
             filter_type = f.get("filterType")
             target      = f.get("targets", [{}])[0]
             col_name    = target.get("column", {}).get("name")
             dataset_id  = target.get("datasetId")
 
-            if not col_name or not dataset_id:
-                continue
-
+            # ── filter_time (date range) has no col_name or dataset_id
+            # ── so we only skip for select/groupby filters
             if filter_type == "filter_time":
                 scope_obj     = f.get("scope", {})
                 root_path     = scope_obj.get("rootPath", ["ROOT_ID"])
@@ -1922,16 +2066,20 @@ def get_filter_options():
                     tabs_in_scope = [p for p in root_path if p.startswith("TAB-")]
 
                 filter_options.append({
-                    "id":           f.get("id"),
-                    "name":         f.get("name"),
-                    "type":         "date",
-                    "column":       col_name,
-                    "values":       [],
-                    "tabsInScope":  tabs_in_scope,
+                    "id":            f.get("id"),
+                    "name":          f.get("name"),
+                    "type":          "date",
+                    "column":        col_name,
+                    "values":        [],
+                    "tabsInScope":   tabs_in_scope,
                     "chartsInScope": f.get("chartsInScope", []),
-                  })
-                
+                })
+
             elif filter_type in ["filter_select", "filter_groupby"]:
+                # Select filters DO need col_name and dataset_id
+                if not col_name or not dataset_id:   # ← moved here
+                    continue
+
                 values = get_distinct_values(dataset_id, col_name)
 
                 scope_obj     = f.get("scope", {})
@@ -1941,16 +2089,16 @@ def get_filter_options():
                     tabs_in_scope = [p for p in root_path if p.startswith("TAB-")]
 
                 filter_options.append({
-                        "id":           f.get("id"),
-                        "name":         f.get("name"),
-                        "type":         "select",
-                        "column":       col_name,
-                        "values":       values,
-                        "tabsInScope":  tabs_in_scope,
-                        "chartsInScope": f.get("chartsInScope", []),
-                    })
-        print(f"DEBUG filter '{f.get('name')}': scope={scope_obj}, tabs_in_scope={tabs_in_scope}, charts_in_scope={f.get('chartsInScope', [])}", flush=True)        
+                    "id":            f.get("id"),
+                    "name":          f.get("name"),
+                    "type":          "select",
+                    "column":        col_name,
+                    "values":        values,
+                    "tabsInScope":   tabs_in_scope,
+                    "chartsInScope": f.get("chartsInScope", []),
+                })
 
+        print(f"DEBUG filter '{f.get('name')}': scope={scope_obj}, tabs_in_scope={tabs_in_scope}, charts_in_scope={f.get('chartsInScope', [])}", flush=True)
         print(f"DEBUG filter_options: {filter_options}", flush=True)
         return jsonify({"success": True, "filters": filter_options}), 200
 
