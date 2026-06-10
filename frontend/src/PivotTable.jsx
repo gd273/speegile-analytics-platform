@@ -1,635 +1,3 @@
-// import React, { useState, useEffect, useRef, useMemo } from "react";
-
-// // ─────────────────────────────────────────────────────────────
-// //  Formatters (mirrors ChartCard)
-// // ─────────────────────────────────────────────────────────────
-// const isTimestampMs = (v) => {
-//   const n = Number(v);
-//   if (!Number.isFinite(n) || n < 0) return false;
-//   if (n < 9.46e11 || n > 2.52e12) return false;
-//   try { const yr = new Date(n).getFullYear(); return yr >= 2000 && yr <= 2050; }
-//   catch { return false; }
-// };
-// const fmtDateMs = (ms) => {
-//   try {
-//     return new Date(Number(ms)).toLocaleDateString("en-IN", {
-//       day: "2-digit", month: "short", year: "numeric",
-//     });
-//   } catch { return String(ms); }
-// };
-// const si3 = (n, div, sfx) => {
-//   const x = n / div, abs = Math.abs(x);
-//   const s = abs >= 100 ? x.toFixed(0) : abs >= 10 ? x.toFixed(1) : x.toFixed(2);
-//   return s.replace(/\.?0+$/, "") + sfx;
-// };
-
-// const ID_COL_PATTERN = /pincode|zip|postal|pin_code|pin|order_id|invoice|phone|mobile|contact|tel|fax|#|(_id|id)$/i;
-
-// const fmtNum = (v, colName = "") => {
-//   const n = Number(v);
-//   if (isNaN(n)) return String(v ?? "");
-//   if (isTimestampMs(n)) return fmtDateMs(n);
-//   if (colName && ID_COL_PATTERN.test(colName)) {
-//     return Number.isInteger(n) ? String(n) : n.toFixed(2);
-//   }
-//   const abs = Math.abs(n);
-//   if (abs === 0) return "0";
-//   if (abs >= 1e9) return si3(n, 1e9, "B");
-//   if (abs >= 1e6) return si3(n, 1e6, "M");
-//   if (abs >= 1e3) return si3(n, 1e3, "k");
-//   return parseFloat(n.toFixed(2)).toString();
-// };
-
-// const fmtCell = (v, colName = "") => {
-//   if (v === null || v === undefined) return "—";
-//   const n = Number(v);
-//   if (!isNaN(n) && v !== "") return fmtTableNum(v, colName);
-//   const s = String(v);
-//   if (s.match(/^\d{4}-\d{2}-\d{2}/) || s.includes("T00:00:00")) {
-//     try {
-//       const d = new Date(v);
-//       if (!isNaN(d.getTime()))
-//         return d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
-//     } catch { /**/ }
-//   }
-//   return s;
-// };
-
-// const isNumericKey = (rows, key) =>
-//   rows.some(r => r[key] !== null && r[key] !== undefined && !isNaN(Number(r[key])) && !isTimestampMs(Number(r[key])));
-
-// // ── Table number formatter — full value, no K/M abbreviation ──
-// const CURRENCY_COL_PATTERN = /amount|revenue|cost|price|mrp|earning|income|profit|loss|(^|\s|_)(net|value|sell)(\s|_|$)/i;
-// const QTY_COL_PATTERN      = /qty|quantity|count|units|pieces|pcs|no\.|nos|phone|mobile|contact|whatsapp|tel|fax|#/i;
-
-// function isCurrencyCol(colName) {
-//   if (!colName) return false;
-//   if (QTY_COL_PATTERN.test(colName)) return false;
-//   return CURRENCY_COL_PATTERN.test(colName);
-// }
-
-// function fmtTableNum(val, colName = "") {
-//   if (val === null || val === undefined || val === "") return "—";
-//   const n = Number(val);
-//   if (isNaN(n)) return String(val);
-//   if (isTimestampMs(n)) return fmtDateMs(n);
-
-//   // ID / phone columns — show raw, no formatting
-//   if (colName && ID_COL_PATTERN.test(colName)) {
-//     return Number.isInteger(n) ? String(n) : n.toFixed(2);
-//   }
-
-//   // Format with Indian locale commas: 89,52,612
-//   const formatted = new Intl.NumberFormat("en-IN", {
-//     maximumFractionDigits: 2,
-//     minimumFractionDigits: 0,
-//   }).format(n);
-
-//   // Add ₹ for currency columns only
-//   if (isCurrencyCol(colName)) {
-//     return `₹${formatted}`;
-//   }
-
-//   return formatted;
-// }
-
-// // ─────────────────────────────────────────────────────────────
-// //  useContainerWidth
-// // ─────────────────────────────────────────────────────────────
-// function useContainerWidth(ref) {
-//   const [width, setWidth] = useState(0);
-//   useEffect(() => {
-//     if (!ref.current) return;
-//     const ro = new ResizeObserver(([entry]) => {
-//       setWidth(entry.contentRect.width);
-//     });
-//     ro.observe(ref.current);
-//     setWidth(ref.current.offsetWidth);
-//     return () => ro.disconnect();
-//   }, [ref]);
-//   return width;
-// }
-
-// // ─────────────────────────────────────────────────────────────
-// //  Sort state hook
-// // ─────────────────────────────────────────────────────────────
-// function useSort(rows) {
-//   const [sortKey, setSortKey] = useState(null);
-//   const [sortDir, setSortDir] = useState("asc");
-
-//   const toggle = (key) => {
-//     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-//     else { setSortKey(key); setSortDir("asc"); }
-//   };
-
-//   const sorted = useMemo(() => {
-//     if (!sortKey) return rows;
-//     return [...rows].sort((a, b) => {
-//       const av = a[sortKey], bv = b[sortKey];
-//       const an = Number(av), bn = Number(bv);
-//       const numericCmp = !isNaN(an) && !isNaN(bn) ? an - bn : String(av ?? "").localeCompare(String(bv ?? ""));
-//       return sortDir === "asc" ? numericCmp : -numericCmp;
-//     });
-//   }, [rows, sortKey, sortDir]);
-
-//   return { sorted, sortKey, sortDir, toggle };
-// }
-
-// // ─────────────────────────────────────────────────────────────
-// //  Column derivation
-// // ─────────────────────────────────────────────────────────────
-// function deriveColumns(data, groupbyRows, groupbyColumns, metricKeys, colnames) {
-//   if (!data?.length) return { dimCols: [], metCols: [] };
-
-//   const allKeys = colnames?.length
-//     ? colnames
-//     : Object.keys(data[0]);
-
-//   const normalise = (arr) =>
-//     (arr || []).map(c =>
-//       typeof c === "string" ? c : c?.column_name || c?.column?.column_name || null
-//     ).filter(Boolean);
-
-//   const rowDims = normalise(groupbyRows);
-//   const colDims = normalise(groupbyColumns);
-//   const dimCols = [...new Set([...rowDims, ...colDims])].filter(k => allKeys.includes(k));
-//   const metCols = (metricKeys || []).filter(k => allKeys.includes(k));
-
-//   if (dimCols.length || metCols.length) {
-//     const idDimCols = allKeys.filter(k =>
-//       !dimCols.includes(k) &&
-//       !metCols.includes(k) &&
-//       ID_COL_PATTERN.test(k)
-//     );
-
-//     const remaining = allKeys.filter(k =>
-//       !dimCols.includes(k) &&
-//       !metCols.includes(k) &&
-//       isNumericKey(data, k) &&
-//       !ID_COL_PATTERN.test(k)
-//     );
-
-//     return {
-//       dimCols: [...dimCols, ...idDimCols],
-//       metCols: metCols.length ? metCols : remaining,
-//     };
-//   }
-
-//   const ID_DIM_PATTERN = /pincode|zip|postal|pin_code|pin|order_id|invoice|phone|mobile|(_id|id)$/i;
-//   const autoMet = allKeys.filter(k => isNumericKey(data, k) && !ID_DIM_PATTERN.test(k));
-//   const autoDim = allKeys.filter(k => !autoMet.includes(k));
-//   return { dimCols: autoDim, metCols: autoMet };
-// }
-
-// // ─────────────────────────────────────────────────────────────
-// //  Styles
-// // ─────────────────────────────────────────────────────────────
-// const S = {
-//   wrapper: {
-//     width: "100%",
-//     boxSizing: "border-box",
-//     overflowX: "auto",
-//     overflowY: "auto",
-//     WebkitOverflowScrolling: "touch",
-//     scrollbarWidth: "thin",
-//     scrollbarColor: "#2d3748 transparent",
-//   },
-//   table: {
-//     width: "100%",
-//     borderCollapse: "collapse",
-//     tableLayout: "auto",
-//     minWidth: 0,
-//   },
-//   th: (isNum, sorted) => ({
-//     padding: "8px 12px",
-//     fontSize: 11,
-//     fontWeight: 600,
-//     textAlign: isNum ? "right" : "left",
-//     color: sorted ? "#1FA8C9" : "#64748b",
-//     background: "#191c24",
-//     borderBottom: "1px solid rgba(255,255,255,0.07)",
-//     whiteSpace: "nowrap",
-//     cursor: "pointer",
-//     userSelect: "none",
-//     position: "sticky",
-//     top: 0,
-//     zIndex: 2,
-//     letterSpacing: "0.04em",
-//   }),
-//   td: (isNum, isEven) => ({
-//     padding: "7px 12px",
-//     fontSize: 12,
-//     textAlign: isNum ? "right" : "left",
-//     color: isNum ? "#e2e8f0" : "#94a3b8",
-//     fontWeight: isNum ? 500 : 400,
-//     borderBottom: "1px solid rgba(255,255,255,0.04)",
-//     background: isEven ? "rgba(255,255,255,0.015)" : "transparent",
-//     whiteSpace: "nowrap",
-//     maxWidth: 200,
-//     overflow: "hidden",
-//     textOverflow: "ellipsis",
-//   }),
-//   sortArrow: (dir, active) => ({
-//     marginLeft: 4,
-//     opacity: active ? 1 : 0.25,
-//     fontSize: 9,
-//     color: "#1FA8C9",
-//   }),
-//   card: (isEven) => ({
-//     background: isEven ? "#1a1d26" : "#191c24",
-//     border: "1px solid rgba(255,255,255,0.06)",
-//     borderRadius: 8,
-//     padding: "10px 12px",
-//     marginBottom: 8,
-//     width: "100%",
-//     boxSizing: "border-box",
-//   }),
-//   cardRow: {
-//     display: "flex",
-//     justifyContent: "space-between",
-//     alignItems: "baseline",
-//     padding: "3px 0",
-//     borderBottom: "1px solid rgba(255,255,255,0.04)",
-//     gap: 8,
-//   },
-//   cardLabel: {
-//     fontSize: 11,
-//     color: "#64748b",
-//     fontWeight: 500,
-//     flexShrink: 0,
-//     maxWidth: "55%",
-//     overflow: "hidden",
-//     textOverflow: "ellipsis",
-//     whiteSpace: "nowrap",
-//   },
-//   cardValue: (isNum) => ({
-//     fontSize: 12,
-//     color: isNum ? "#e2e8f0" : "#94a3b8",
-//     fontWeight: isNum ? 600 : 400,
-//     textAlign: "right",
-//     wordBreak: "break-word",
-//   }),
-//   empty: {
-//     display: "flex",
-//     flexDirection: "column",
-//     alignItems: "center",
-//     justifyContent: "center",
-//     gap: 8,
-//     color: "#374151",
-//   },
-//   searchWrap: {
-//     padding: "0 0 10px",
-//     display: "flex",
-//     alignItems: "center",
-//     gap: 6,
-//   },
-//   searchInput: {
-//     flex: 1,
-//     background: "#12151f",
-//     border: "1px solid rgba(255,255,255,0.08)",
-//     borderRadius: 6,
-//     padding: "5px 10px",
-//     color: "#e2e8f0",
-//     fontSize: 11,
-//     outline: "none",
-//     minWidth: 0,
-//   },
-// };
-
-// // ─────────────────────────────────────────────────────────────
-// //  PivotTable
-// // ─────────────────────────────────────────────────────────────
-// export default function PivotTable({
-//   data           = [],
-//   height         = 320,
-//   groupbyRows    = [],
-//   groupbyColumns = [],
-//   metricKeys     = [],
-//   colnames       = [],
-//   onRowClick,
-//   crossFilterValue,
-//   title          = "export",   // ← ADD
-// }) {
-//   const containerRef        = useRef(null);
-//   const containerWidth      = useContainerWidth(containerRef);
-//   const [search, setSearch] = useState("");
-
-//   useEffect(() => {
-//     setSearch("");
-//   }, [data]);
-
-//   const useCardView = false;
-
-//   const { dimCols, metCols } = useMemo(
-//     () => deriveColumns(data, groupbyRows, groupbyColumns, metricKeys, colnames),
-//     [data, groupbyRows, groupbyColumns, metricKeys, colnames]
-//   );
-
-//   const allCols = useMemo(() => {
-//     const allDataKeys = colnames?.length
-//       ? colnames
-//       : (data.length ? Object.keys(data[0]) : []);
-//     if (allDataKeys.length) return allDataKeys;
-//     const combined = [...dimCols, ...metCols];
-//     return combined.length ? combined : [];
-//   }, [dimCols, metCols, data, colnames]);
-
-//   const filteredData = useMemo(() => {
-//     if (!search.trim()) return data;
-//     const q = search.toLowerCase();
-//     return data.filter(row =>
-//       allCols.some(k => String(row[k] ?? "").toLowerCase().includes(q))
-//     );
-//   }, [data, allCols, search]);
-
-//   const { sorted, sortKey, sortDir, toggle } = useSort(filteredData);
-
-//   // ── Row click handler ─────────────────────────────────────────
-//   const handleRowClick = (row) => {
-//     if (!onRowClick) return;
-//     const dimKey = dimCols[0];
-//     if (!dimKey) return;
-
-//     const val = row[dimKey];
-//     if (val == null || val === "") return;
-
-//     const isDateCol = /^date$|time|timestamp/i.test(dimKey) || isTimestampMs(Number(val));
-//     if (isDateCol) return;
-
-//     const isSameValue = String(val) === String(crossFilterValue);
-//     onRowClick(dimKey, isSameValue ? null : String(val));
-//   };
-
-//   // ── Export to Excel ───────────────────────────────────────────
-//   const exportToExcel = () => {
-//     // Use sorted+filtered data so what user sees is what gets exported
-//     const rows = sorted;
-//     if (!rows.length) return;
-
-//     // Build CSV content with BOM for Excel to detect UTF-8 (₹ symbol support)
-//     const BOM = "\uFEFF";
-
-//     // Header row
-//     const header = allCols.map(k => `"${String(k).replace(/"/g, '""')}"`).join(",");
-
-//     // Data rows — export raw values (no ₹/commas) so Excel can treat as numbers
-//     const body = rows.map(row =>
-//           allCols.map(k => {
-//             const v = row[k];
-//             if (v === null || v === undefined) return "";
-
-//             const n = Number(v);
-
-//             // ── Timestamp → format as readable date string ──
-//             if (!isNaN(n) && isTimestampMs(n)) {
-//               try {
-//                 const d = new Date(n);
-//                 const dd = String(d.getDate()).padStart(2, "0");
-//                 const mm = String(d.getMonth() + 1).padStart(2, "0");
-//                 const yyyy = d.getFullYear();
-//                 return `"${dd}-${mm}-${yyyy}"`;   // → "22-05-2026"
-//               } catch { return `"${v}"`; }
-//             }
-
-//             // ── ID / phone columns → quoted string, no number formatting ──
-//             if (!isNaN(n) && v !== "" && ID_COL_PATTERN.test(k)) {
-//               return `"${String(v).replace(/"/g, '""')}"`;
-//             }
-
-//             // ── Regular numbers → plain number for Excel SUM/calculations ──
-//             if (!isNaN(n) && v !== "") return n;
-
-//             // ── Text values ──
-//             return `"${String(v).replace(/"/g, '""')}"`;
-//           }).join(",")
-//         ).join("\n");
-
-//     const csv     = BOM + header + "\n" + body;
-//     const blob    = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-//     const url     = URL.createObjectURL(blob);
-//     const link    = document.createElement("a");
-//     const ts      = new Date().toISOString().slice(0, 10);
-//     link.href     = url;
-//     // link.download = `export_${ts}.csv`;
-//     const safeName = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-//     link.download  = `${safeName}_${ts}.csv`;    
-//     document.body.appendChild(link);
-//     link.click();
-//     document.body.removeChild(link);
-//     URL.revokeObjectURL(url);
-//   };
-
-//   // ── Empty state ───────────────────────────────────────────────
-//   if (!data.length) {
-//     return (
-//       <div style={{ ...S.empty, height }}>
-//         <div style={{ fontSize: 28, opacity: 0.3 }}>◌</div>
-//         <span style={{ fontSize: 12 }}>No data</span>
-//       </div>
-//     );
-//   }
-
-//   const colLabel = (k) => {
-//     if (!k) return "";
-//     return k.length > 28 ? k.slice(0, 26) + "…" : k;
-//   };
-
-//   // ── Card view ─────────────────────────────────────────────────
-//   if (useCardView) {
-//     return (
-//       <div ref={containerRef} style={{ height, overflowY: "auto", WebkitOverflowScrolling: "touch", width: "100%", boxSizing: "border-box" }}>
-//         <div style={S.searchWrap}>
-//           <input
-//             style={S.searchInput}
-//             placeholder="Search…"
-//             value={search}
-//             onChange={e => setSearch(e.target.value)}
-//           />
-//         </div>
-//         {sorted.map((row, ri) => (
-//           <div key={ri} style={S.card(ri % 2 === 0)}>
-//             {allCols.map((k, ci) => {
-//               const isNum = metCols.includes(k) ||
-//                 (isNumericKey(data, k) && !ID_COL_PATTERN.test(k) && !dimCols.includes(k));
-//               return (
-//                 <div key={k} style={{
-//                   ...S.cardRow,
-//                   borderBottom: ci < allCols.length - 1 ? S.cardRow.borderBottom : "none",
-//                 }}>
-//                   <span style={S.cardLabel}>{colLabel(k)}</span>
-//                   <span style={S.cardValue(isNum)}>{fmtCell(row[k], k)}</span>
-//                 </div>
-//               );
-//             })}
-//           </div>
-//         ))}
-//         {sorted.length === 0 && (
-//           <div style={{ ...S.empty, height: 80 }}>
-//             <span style={{ fontSize: 12 }}>No results for "{search}"</span>
-//           </div>
-//         )}
-//       </div>
-//     );
-//   }
-
-//   // ── Table view ────────────────────────────────────────────────
-//   const isCompact = containerWidth > 0 && containerWidth < 600;
-//   const thStyle = (isNum, isSorted) => ({
-//     ...S.th(isNum, isSorted),
-//     padding: isCompact ? "6px 8px" : "8px 12px",
-//     fontSize: isCompact ? 10 : 11,
-//     textAlign: "center",
-//   });
-//   const tdStyle = (isNum, isEven) => ({
-//     ...S.td(isNum, isEven),
-//     padding: isCompact ? "5px 8px" : "7px 12px",
-//     fontSize: isCompact ? 11 : 12,
-//     textAlign: "center",
-//   });
-
-//   return (
-//     <div ref={containerRef} style={{ width: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column" }}>
-
-//       {/* Search + Export */}
-//       <div style={S.searchWrap}>
-//         <input
-//           style={S.searchInput}
-//           placeholder="Search…"
-//           value={search}
-//           onChange={e => setSearch(e.target.value)}
-//         />
-//         {search && (
-//           <span style={{ fontSize: 10, color: "#64748b", whiteSpace: "nowrap" }}>
-//             {sorted.length} / {data.length}
-//           </span>
-//         )}
-//         <button
-//           onClick={exportToExcel}
-//           title="Export to Excel"
-//           style={{
-//             display:     "flex",
-//             alignItems:  "center",
-//             gap:         5,
-//             background:  "rgba(31,168,201,0.1)",
-//             border:      "1px solid rgba(31,168,201,0.3)",
-//             borderRadius: 6,
-//             padding:     "4px 10px",
-//             color:       "#1FA8C9",
-//             fontSize:    11,
-//             fontWeight:  600,
-//             cursor:      "pointer",
-//             whiteSpace:  "nowrap",
-//             flexShrink:  0,
-//             transition:  "background 0.15s",
-//           }}
-//           onMouseEnter={e => e.currentTarget.style.background = "rgba(31,168,201,0.2)"}
-//           onMouseLeave={e => e.currentTarget.style.background = "rgba(31,168,201,0.1)"}
-//         >
-//           ⬇ Export
-//         </button>
-//       </div>
-
-//       {/* Scrollable table */}
-//       <div style={{ ...S.wrapper, height: height - 40 }}>
-//         <table style={S.table}>
-
-//           {/* ── Header ── */}
-//           <thead>
-//             <tr>
-//               {allCols.map(k => {
-//                 const isNum    = metCols.includes(k) || isNumericKey(data, k);
-//                 const isSorted = sortKey === k;
-//                 return (
-//                   <th
-//                     key={k}
-//                     style={thStyle(isNum, isSorted)}
-//                     onClick={() => toggle(k)}
-//                     title={k}
-//                   >
-//                     {colLabel(k)}
-//                     <span style={S.sortArrow(sortDir, isSorted)}>
-//                       {isSorted ? (sortDir === "asc" ? " ▲" : " ▼") : " ↕"}
-//                     </span>
-//                   </th>
-//                 );
-//               })}
-//             </tr>
-//           </thead>
-
-//           {/* ── Body ── */}
-//           <tbody>
-//             {sorted.length === 0 ? (
-//               <tr>
-//                 <td
-//                   colSpan={allCols.length}
-//                   style={{ textAlign: "center", padding: "20px", color: "#64748b", fontSize: 12 }}
-//                 >
-//                   No results for "{search}"
-//                 </td>
-//               </tr>
-//             ) : (
-//               sorted.map((row, ri) => {
-//                 const isSelected =
-//                   dimCols[0] != null &&
-//                   String(row[dimCols[0]]) === String(crossFilterValue);
-
-//                 return (
-//                   <tr
-//                     key={ri}
-//                     onClick={() => handleRowClick(row)}
-//                     style={{
-//                       cursor:     onRowClick ? "pointer" : "default",
-//                       background: isSelected ? "rgba(31,168,201,0.15)" : undefined,
-//                       transition: "background 0.15s",
-//                     }}
-//                     onMouseEnter={e => {
-//                       if (onRowClick && !isSelected)
-//                         e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-//                     }}
-//                     onMouseLeave={e => {
-//                       e.currentTarget.style.background = isSelected
-//                         ? "rgba(31,168,201,0.15)"
-//                         : "";
-//                     }}
-//                   >
-//                     {allCols.map((k, ki) => {
-//                       const isNum = metCols.includes(k) ||
-//                         (isNumericKey(data, k) && !ID_COL_PATTERN.test(k) && !dimCols.includes(k));
-//                       return (
-//                         <td
-//                           key={k}
-//                           style={{
-//                             ...tdStyle(isNum, ri % 2 === 0),
-//                             ...(ki === 0 && isSelected
-//                               ? { borderLeft: "3px solid #1FA8C9", paddingLeft: 9 }
-//                               : {}),
-//                           }}
-//                           title={String(row[k] ?? "")}
-//                         >
-//                           {fmtCell(row[k], k)}
-//                         </td>
-//                       );
-//                     })}
-//                   </tr>
-//                 );
-//               })
-//             )}
-//           </tbody>
-
-//         </table>
-//       </div>
-
-//       {/* Row count footer */}
-//       <div style={{ paddingTop: 6, fontSize: 10, color: "#374151", textAlign: "right" }}>
-//         {sorted.length} row{sorted.length !== 1 ? "s" : ""}
-//         {search ? ` (filtered from ${data.length})` : ""}
-//       </div>
-
-//     </div>
-//   );
-// }
-
-
 /**
  * PivotTable.jsx — v4
  * ─────────────────────────────────────────────────────────────────
@@ -1034,10 +402,11 @@ const S = {
 // ── PIVOT TABLE ───────────────────────────────────────────────────
 function ProperPivotTable({
   data, height, groupbyRows, groupbyColumns, metricKeys,
-  conditionalFormatting, columnOrder, showCellBars,
+  conditionalFormatting, columnOrder, showCellBars, onRowClick,
 }) {
   const [page, setPage]       = useState(0);
   const [search, setSearch]   = useState("");
+  const [hoveredRow, setHoveredRow] = useState(null);
   const rules = conditionalFormatting || [];
 
   const pivot = useMemo(
@@ -1234,7 +603,24 @@ function ProperPivotTable({
 
           <tbody>
             {pageRows.map((entry, ri) => (
-              <tr key={ri} style={{ background: ri % 2 === 0 ? "#0d1117" : "#111820" }}>
+              <tr
+                key={ri}
+                onClick={() => {
+                  if (!onRowClick) return;
+                  const col = pivot.rowDims[0];
+                  const val = entry.dimValues[0];
+                  if (col && val) onRowClick(col, val);
+                }}
+                onMouseEnter={() => setHoveredRow(ri)}
+                onMouseLeave={() => setHoveredRow(null)}
+                style={{
+                  background: hoveredRow === ri
+                    ? "rgba(31,168,201,0.08)"
+                    : ri % 2 === 0 ? "#0d1117" : "#111820",
+                  cursor: onRowClick ? "pointer" : "default",
+                  transition: "background .1s",
+                }}
+              >
                 {entry.dimValues.map((val, di) => (
                   <td key={`d-${di}`} style={S.tdRowDim}>{val}</td>
                 ))}
@@ -1272,9 +658,10 @@ function ProperPivotTable({
 }
 
 // ── FLAT TABLE ────────────────────────────────────────────────────
-function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditionalFormatting, showCellBars }) {
+function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditionalFormatting, showCellBars, onRowClick }) {
   const [page,   setPage]   = useState(0);
   const [search, setSearch] = useState("");
+  const [hoveredRow, setHoveredRow] = useState(null);
   const rules   = conditionalFormatting || [];
   const allRows = data || [];
 
@@ -1284,7 +671,7 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
   // 3. Object.keys(rows[0]) -- last resort
   const columns = useMemo(() => {
     if (!allRows.length) return [];
-    const dataKeys = Object.keys(allRows[0]);
+    const dataKeys = Object.keys(allRows[0]).filter(k => k !== "__summary__");
     const preferred = columnOrder?.length ? columnOrder
                     : colnames?.length    ? colnames
                     : [];
@@ -1362,8 +749,25 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
             </tr>
           </thead>
           <tbody>
-            {pageRows.map((row, ri) => (
-              <tr key={ri} style={{ background: ri % 2 === 0 ? "#0d1117" : "#111820" }}>
+            {/* {pageRows.map((row, ri) => (
+              <tr
+                key={ri}
+                onClick={() => {
+                  if (!onRowClick) return;
+                  // Find first non-numeric column as the filter column
+                  const dimCol = columns.find(c => !numericCols.has(c));
+                  if (dimCol && row[dimCol]) onRowClick(dimCol, row[dimCol]);
+                }}
+                onMouseEnter={() => setHoveredRow(ri)}
+                onMouseLeave={() => setHoveredRow(null)}
+                style={{
+                  background: hoveredRow === ri
+                    ? "rgba(31,168,201,0.08)"
+                    : ri % 2 === 0 ? "#0d1117" : "#111820",
+                  cursor: onRowClick ? "pointer" : "default",
+                  transition: "background .1s",
+                }}
+              >
                 {columns.map((col) => {
                   const val   = row[col];
                   const isNum = numericCols.has(col);
@@ -1380,7 +784,63 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
                   return <td key={col} style={S.td}>{val ?? ""}</td>;
                 })}
               </tr>
-            ))}
+            ))} */}
+
+            {pageRows.map((row, ri) => {
+              const isSummary = row.__summary__;
+              return (
+              <tr
+                key={ri}
+                onClick={() => {
+                  if (isSummary || !onRowClick) return;
+                  const dimCol = columns.find(c => !numericCols.has(c));
+                  if (dimCol && row[dimCol]) onRowClick(dimCol, row[dimCol]);
+                }}
+                onMouseEnter={() => !isSummary && setHoveredRow(ri)}
+                onMouseLeave={() => setHoveredRow(null)}
+                style={{
+                  background: isSummary
+                    ? "rgba(31,168,201,0.12)"
+                    : hoveredRow === ri
+                    ? "rgba(31,168,201,0.08)"
+                    : ri % 2 === 0 ? "#0d1117" : "#111820",
+                  cursor: (!isSummary && onRowClick) ? "pointer" : "default",
+                  transition: "background .1s",
+                  fontWeight: isSummary ? 700 : 400,
+                  borderTop: isSummary ? "2px solid rgba(31,168,201,0.3)" : undefined,
+                }}
+              >
+                {columns.map((col) => {
+                  if (col === "__summary__") return null;
+                  const val   = row[col];
+                  const isNum = numericCols.has(col);
+                  if (isSummary) {
+                    return (
+                      <td key={col} style={{
+                        ...( isNum ? S.tdNum : S.td ),
+                        color: "#1FA8C9", fontWeight: 700,
+                        borderTop: "2px solid rgba(31,168,201,0.3)",
+                      }}>
+                        {val !== undefined ? fmtTableNum(val, col) : ""}
+                      </td>
+                    );
+                  }
+                  const isNum2 = numericCols.has(col);
+                  if (isNum2) {
+                    const cfColor  = evalConditionalColor(val, col, rules);
+                    const barColor = (!cfColor && showCellBars)
+                      ? cellBarColor(val, colBarValues[col] || []) : null;
+                    const bgColor  = cfColor || barColor;
+                    const cellStyle = bgColor
+                      ? { ...S.tdNum, background: bgColor, color: contrastColor(bgColor), fontWeight: cfColor ? 600 : 400 }
+                      : { ...S.tdNum, color: "#1FA8C9" };
+                    return <td key={col} style={cellStyle}>{fmtTableNum(val, col)}</td>;
+                  }
+                  return <td key={col} style={S.td}>{val ?? ""}</td>;
+                })}
+              </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1400,6 +860,7 @@ export default function PivotTable({
   colnames,
   conditionalFormatting,
   showCellBars,
+  onRowClick,
 }) {
   const isPivot =
     groupbyColumns?.length > 0 && groupbyRows?.length > 0 && metricKeys?.length > 0;
@@ -1417,6 +878,7 @@ export default function PivotTable({
           columnOrder={columnOrder}
           conditionalFormatting={conditionalFormatting}
           showCellBars={showCellBars}
+          onRowClick={onRowClick}
         />
       );
     }
@@ -1431,6 +893,7 @@ export default function PivotTable({
       colnames={colnames}
       conditionalFormatting={conditionalFormatting}
       showCellBars={showCellBars}
+      onRowClick={onRowClick}
     />
   );
 }

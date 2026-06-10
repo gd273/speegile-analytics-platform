@@ -588,6 +588,9 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
   const dateToRef        = useRef(null);
   const filterDefsRef    = useRef([]);
 
+  // pop-up State
+  const [crossFilterWarning, setCrossFilterWarning] = useState(null);
+
   // ── Keep refs in sync with state ──────────────────────────
   useEffect(() => { sectionsRef.current      = sections;      }, [sections]);
   useEffect(() => { tenantLogoRef.current    = tenantLogoUrl; }, [tenantLogoUrl]);
@@ -975,6 +978,7 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
       api.get("/filter-options",    { params: { dashboardId: dashboardNumericId } }).catch(() => null),
     ]).then(([cR, lR, fR]) => {
       if (cR.data.success) setCharts(cR.data.charts.filter(c => c.viz_type !== "filter_box"));
+      console.log("Loaded chart IDs:", cR.data.charts.map(c => c.slice_id)); // ← ADD
       if (lR?.data?.success) { const p = parseSupersetLayout(lR.data.layout); setSections(p); }
       if (fR?.data?.success) setFilterDefs(fR.data.filters || []);
     }).catch(() => setError("Failed to load dashboard."))
@@ -996,13 +1000,93 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
 
   // ── Card props ────────────────────────────────────────────
   const cardProps = (chart, chartHeightPx = 320) => {
-    const applicableCrossFilters = Object.fromEntries(
-      Object.entries(crossFilters).filter(([, f]) => {
-        // if (!f.chartsInScope) return true;
-            if (!f.chartsInScope || f.chartsInScope.length === 0) return false;  // ← skip if no scope defined (means filter is meant for tables only)
-        return f.chartsInScope.map(Number).includes(Number(chart.slice_id));
-      })
-    );
+
+
+    // const applicableCrossFilters = Object.fromEntries(
+    //   Object.entries(crossFilters).filter(([, f]) => {
+    //     // if (!f.chartsInScope) return true;
+    //         if (!f.chartsInScope || f.chartsInScope.length === 0) return false;  // ← skip if no scope defined (means filter is meant for tables only)
+    //     return f.chartsInScope.map(Number).includes(Number(chart.slice_id));
+    //   })
+    // );
+
+//     const loadedChartIds = new Set(charts.map(c => Number(c.slice_id)));
+
+// const applicableCrossFilters = Object.fromEntries(
+//   Object.entries(crossFilters).filter(([, f]) => {
+//     if (Number(f.sourceChartId) === Number(chart.slice_id)) return false;
+//     if (!f.chartsInScope || f.chartsInScope.length === 0) return false;
+
+//     const scope = f.chartsInScope.map(Number);
+//     const anyOnThisDashboard = scope.some(id => loadedChartIds.has(id));
+
+//     // Stale IDs — apply to all charts except source
+//     if (!anyOnThisDashboard) return true;
+
+//     // Valid scope — respect it
+//     return scope.includes(Number(chart.slice_id));
+//   })
+// );
+
+
+// REPLACE the entire applicableCrossFilters block with:
+// const loadedChartIds = new Set(charts.map(c => Number(c.slice_id)));
+
+// const applicableCrossFilters = Object.fromEntries(
+//   Object.entries(crossFilters).filter(([, f]) => {
+//     // Never send filter back to source chart
+//     if (Number(f.sourceChartId) === Number(chart.slice_id)) return false;
+
+//     // No scope defined = cross-filter not assigned in Superset → skip
+//     if (!f.chartsInScope || f.chartsInScope.length === 0) return false;
+
+//     const scope = f.chartsInScope.map(Number);
+
+//     // Check if scoped IDs exist on this dashboard
+//     const anyOnThisDashboard = scope.some(id => loadedChartIds.has(id));
+
+//     if (!anyOnThisDashboard) {
+//       // Stale IDs — apply only to charts that share same dataset/column
+//       // Do NOT apply to all charts blindly
+//       // Check if this chart has the filter column in its known columns
+//       const filterCols = Object.keys(crossFilters);
+//       const chartGroupby = [
+//         ...(chart.groupby || []),
+//         ...(chart.groupby_rows || []),
+//         ...(chart.groupby_cols || []),
+//         chart.x_axis,
+//       ].filter(Boolean).map(c => String(c).toLowerCase());
+
+//       return filterCols.some(col =>
+//         chartGroupby.includes(col.toLowerCase())
+//       );
+//     }
+
+//     // Valid scope — respect it exactly
+//     return scope.includes(Number(chart.slice_id));
+//   })
+// );
+
+
+// REPLACE the entire applicableCrossFilters block with this simple version:
+const applicableCrossFilters = Object.fromEntries(
+  Object.entries(crossFilters).filter(([, f]) => {
+    // Never send filter back to source chart
+    if (Number(f.sourceChartId) === Number(chart.slice_id)) return false;
+
+    // No scope defined in Superset = don't filter this chart
+    if (!f.chartsInScope || f.chartsInScope.length === 0) return false;
+
+    // Use exactly what Superset configured — no fallback logic
+    return f.chartsInScope.map(Number).includes(Number(chart.slice_id));
+  })
+);
+
+
+
+    if (Object.keys(crossFilters).length > 0) {
+  console.log(`Chart ${chart.slice_id}: crossFilters=${JSON.stringify(crossFilters)}, applicable=${JSON.stringify(applicableCrossFilters)}`);
+}
     return {
       sliceId:             chart.slice_id,
       title:               chart.slice_name,
