@@ -1104,462 +1104,6 @@ def truncate_table_simple():
 # GET ALL CHARTS FOR A DASHBOARD
 # ---------------------------------------------------------
 
-# @app.route("/api/dashboard-charts", methods=["GET"])
-# @login_required
-# def get_dashboard_charts():
-#     dashboard_id = request.args.get("dashboardId")
-
-#     if not dashboard_id:
-#         return jsonify({"error": "dashboardId is required"}), 400
-
-#     try:
-#         access_token = get_superset_access_token()
-#         if not access_token:
-#             return jsonify({"error": "Superset auth failed"}), 500
-
-#         response = requests.get(
-#             f"{SUPERSET_URL}/api/v1/dashboard/{dashboard_id}/charts",
-#             headers={"Authorization": f"Bearer {access_token}"},
-#             timeout=15
-#         )
-
-#         charts     = response.json().get("result", [])
-#         chart_list = []
-
-#         print(f"DEBUG: All chart IDs on dashboard {dashboard_id}: {[c.get('id') for c in charts]}", flush=True)
-#         # ── Fetch dashboard metadata for cross-filter scoping ────────
-#         dashboard_meta_resp = requests.get(
-#             f"{SUPERSET_URL}/api/v1/dashboard/{dashboard_id}",
-#             headers={"Authorization": f"Bearer {access_token}"},
-#             timeout=15
-#         )
-#         dashboard_meta    = dashboard_meta_resp.json().get("result", {})
-#         raw_json_meta     = dashboard_meta.get("json_metadata") or "{}"
-#         try:
-#             json_metadata = json.loads(raw_json_meta)
-#         except Exception:
-#             json_metadata = {}
-
-#         # ── Read cross-filter scoping from chart_configuration ───────
-#         chart_configuration = json_metadata.get("chart_configuration", {})
-
-#         for chart in charts:
-#             chart_id    = chart.get("id")
-#             detail_resp = requests.get(
-#                 f"{SUPERSET_URL}/api/v1/chart/{chart_id}",
-#                 headers={"Authorization": f"Bearer {access_token}"},
-#                 timeout=10
-#             )
-#             detail    = detail_resp.json().get("result", {})
-#             form_data = detail.get("form_data", {})
-
-#             # ── Step 1: fallback to params if form_data is empty ─────
-#             if not form_data:
-#                 params_raw = detail.get("params", "{}")
-#                 try:
-#                     form_data = json.loads(params_raw) if isinstance(params_raw, str) else (params_raw or {})
-#                 except Exception:
-#                     form_data = {}
-
-#             # ── Step 2: merge params into form_data ──────────────────
-#             # Some fields like conditional_formatting / percentage_threshold
-#             # only exist in params, not form_data
-#             try:
-#                 params_raw = detail.get("params", "{}")
-#                 params     = json.loads(params_raw) if isinstance(params_raw, str) else (params_raw or {})
-#                 for k, v in params.items():
-#                     if k not in form_data:
-#                         form_data[k] = v
-#             except Exception:
-#                 pass
-
-#             # ── Step 3: resolve viz_type ─────────────────────────────
-#             viz_type = (
-#                 form_data.get("viz_type")
-#                 or detail.get("viz_type")
-#                 or "echarts_timeseries_bar"
-#             )
-
-#             # ── Step 4: pie threshold debug — AFTER full form_data ───
-#             if viz_type == "pie":
-#                 print(f"DEBUG pie {chart_id} ALL keys: {list(form_data.keys())}", flush=True)
-#                 for k, v in form_data.items():
-#                     if "other" in k.lower() or "threshold" in k.lower():
-#                         print(f"DEBUG pie {chart_id} threshold key: {k} = {v}", flush=True)
-
-#             # ── Step 5: extract threshold values ─────────────────────
-#             # percentage_threshold = form_data.get("percentage_threshold", 0) or 0
-#             # other_threshold      = form_data.get("other_threshold", 0) or 0
-
-#             # CORRECT key names from Superset:
-#             percentage_threshold = (
-#                 form_data.get("show_labels_threshold")    # ← correct key
-#                 or form_data.get("percentage_threshold")  # ← fallback
-#                 or 0
-#             ) or 0
-
-#             other_threshold = (
-#                 form_data.get("threshold_for_other")      # ← correct key
-#                 or form_data.get("other_threshold")       # ← fallback
-#                 or 0
-#             ) or 0
-
-#             print(f"DEBUG pie {chart_id}: percentage_threshold={percentage_threshold} other_threshold={other_threshold}", flush=True)
-
-#             print(
-#                 f"DEBUG chart {chart_id}: "
-#                 f"percentage_threshold={percentage_threshold} "
-#                 f"other_threshold={other_threshold}",
-#                 flush=True
-#             )
-
-#             # ── Debug for timeseries/line charts ─────────────────────
-#             if 'timeseries' in viz_type.lower() or 'line' in viz_type.lower():
-#                 print(f"DEBUG chart {chart_id} form_data keys: {list(form_data.keys())}", flush=True)
-#                 print(f"DEBUG chart {chart_id} groupby raw: {form_data.get('groupby')}", flush=True)
-#                 print(f"DEBUG chart {chart_id} metrics raw: {form_data.get('metrics', [])[:3]}", flush=True)
-
-#             # ── Helper: extract plain string ──────────────────────────
-#             def _extract_col_string(raw):
-#                 if not raw:
-#                     return ""
-#                 if isinstance(raw, str):
-#                     return raw.strip()
-#                 if isinstance(raw, dict):
-#                     return (
-#                         raw.get("column_name") or
-#                         raw.get("label")       or
-#                         raw.get("name")        or
-#                         ""
-#                     ).strip()
-#                 return ""
-
-#             # ── Helper: extract list of plain strings from groupby ───
-#             def _col_names(lst):
-#                 if isinstance(lst, str):
-#                     return [lst] if lst else []
-#                 out = []
-#                 for item in (lst or []):
-#                     if isinstance(item, str):
-#                         out.append(item)
-#                     elif isinstance(item, dict):
-#                         name = (
-#                             item.get("column_name")
-#                             or item.get("label")
-#                             or item.get("name")
-#                             or item.get("sqlExpression")
-#                             or ""
-#                         )
-#                         if name:
-#                             out.append(name)
-#                 return [x for x in out if x]
-
-#             # ── x_axis ────────────────────────────────────────────────
-#             x_axis_raw = (
-#                 form_data.get("x_axis")
-#                 or form_data.get("granularity_sqla")
-#                 or ""
-#             )
-#             x_axis = _extract_col_string(x_axis_raw)
-
-#             if not x_axis:
-#                 gb_list = form_data.get("groupby") or []
-#                 if gb_list:
-#                     x_axis = _extract_col_string(gb_list[0])
-
-#             # ── metrics ───────────────────────────────────────────────
-#             metrics_primary   = form_data.get("metrics",   [])
-#             metrics_secondary = form_data.get("metrics_b", [])
-#             metrics = metrics_primary + (metrics_secondary if metrics_secondary else [])
-
-#             # ── groupby ───────────────────────────────────────────────
-#             groupby_raw = (
-#                 form_data.get("groupby")
-#                 or form_data.get("series_columns")
-#                 or form_data.get("dimensions")
-#                 or form_data.get("breakdown")
-#                 or []
-#             )
-#             groupby = _col_names(groupby_raw)
-
-#             groupby_rows_raw = (
-#                 form_data.get("groupbyRows")
-#                 or form_data.get("groupby_rows")
-#                 or []
-#             )
-#             groupby_cols_raw = (
-#                 form_data.get("groupbyColumns")
-#                 or form_data.get("groupby_cols")
-#                 or form_data.get("columns")
-#                 or []
-#             )
-
-#             groupby_rows = _col_names(groupby_rows_raw)
-#             groupby_cols = _col_names(groupby_cols_raw)
-
-#             conditional_formatting = []
-#             is_table = viz_type and ("table" in viz_type.lower() or "pivot" in viz_type.lower())
-#             column_order = []
-#             if is_table:
-#                 col_config = form_data.get("column_config") or {}
-#                 # col_config is a dict like { "tags": {"index": 0}, "CBC": {"index": 1} }
-#                 if isinstance(col_config, dict) and col_config:
-#                     column_order = sorted(col_config.keys(),
-#                                           key=lambda k: col_config[k].get("index", 999))
-                    
-#             if is_table:
-#                 raw_cf = (
-#                     form_data.get("conditional_formatting")
-#                     or form_data.get("conditionalFormatting")
-#                     or []
-#                 )
-#                 for rule in (raw_cf or []):
-#                     if not isinstance(rule, dict):
-#                         continue
-#                     col      = rule.get("column") or rule.get("col") or ""
-#                     operator = rule.get("operator") or rule.get("op") or ""
-#                     target   = rule.get("targetValue")
-#                     if target is None:
-#                         target = rule.get("target_value")
- 
-#                     raw_color = (
-#                         rule.get("colorScheme")
-#                         or rule.get("color")
-#                         or (rule.get("colorScheme", {}) or {}).get("value")
-#                         or (rule.get("style", {}) or {}).get("color")
-#                     )
-#                     color = resolve_color_scheme(raw_color)
-#                     if color and col and operator:
-#                         conditional_formatting.append({
-#                             "column":   col,
-#                             "operator": operator,
-#                             "value":    float(target) if target is not None else None,
-#                             "color":    color,
-#                         })
- 
-#             print(
-#                 f"DEBUG chart {chart_id}: conditional_formatting rules = {conditional_formatting}",
-#                 flush=True
-#             )
-
-
-#             # ── show_cell_bars: magnitude-based cell colouring ────────
-#             show_cell_bars = bool(form_data.get("show_cell_bars", False)) if is_table else False
-#             print(f"DEBUG chart {chart_id}: show_cell_bars = {show_cell_bars}", flush=True)
-            
-                
-#             # ── raw_x_axis_column ─────────────────────────────────────
-#             raw_x_axis_column = _extract_col_string(
-#                 form_data.get("x_axis") or form_data.get("granularity_sqla") or ""
-#             )
-
-#             x_axis_is_temporal = bool(
-#                 form_data.get("granularity_sqla")
-#                 or (raw_x_axis_column and any(
-#                     k in raw_x_axis_column.lower()
-#                     for k in ["date", "time", "month", "day", "year", "period"]
-#                 ))
-#             )
-
-#             print(
-#                 f"DEBUG chart {chart_id}: viz={viz_type!r} x_axis={x_axis!r} "
-#                 f"groupby={groupby} "
-#                 f"groupby_rows={groupby_rows} groupby_cols={groupby_cols} "
-#                 f"metrics=[{[m if isinstance(m, str) else m.get('label', '?') for m in metrics[:3]]}]",
-#                 flush=True,
-#             )
-
-#             # ── BigNum conditional colors ─────────────────────────────
-#             font_color         = None
-#             conditional_colors = []
-
-#             if viz_type and "big_number" in viz_type.lower():
-
-#                 # ── Color scheme map — named schemes → hex ────────────────
-#                 COLOR_SCHEME_MAP = {
-#                     # 6.0.1 scheme names
-#                     "success":           "#22c55e",
-#                     "alert":             "#fbbf24",
-#                     "error":             "#f87171",
-#                     # 6.1.0 possible scheme names
-#                     "colorsuccessbg":    "#22c55e",
-#                     "colorwarningbg":    "#fbbf24",
-#                     "colorerrorbg":      "#f87171",
-#                     "successbg":         "#22c55e",
-#                     "warningbg":         "#fbbf24",
-#                     "errorbg":           "#f87171",
-#                     "green":             "#22c55e",
-#                     "yellow":            "#fbbf24",
-#                     "red":               "#f87171",
-#                     "orange":            "#f97316",
-#                     "blue":              "#3b82f6",
-#                     "purple":            "#a855f7",
-#                     # possible new names in 6.1.0
-#                     "primary":           "#1FA8C9",
-#                     "secondary":         "#454E7C",
-#                     "danger":            "#f87171",
-#                     "warning":           "#fbbf24",
-#                     "info":              "#1FA8C9",
-#                 }
-
-#                 def resolve_color(raw_color):
-#                     """Resolve color from any format Superset might use."""
-#                     if not raw_color:
-#                         return None
-#                     s = str(raw_color).strip()
-
-#                     # Already a hex color
-#                     if s.startswith("#") and len(s) in [4, 7, 9]:
-#                         return s
-
-#                     # RGB string: "rgb(34, 197, 94)"
-#                     if s.startswith("rgb("):
-#                         try:
-#                             parts = s.replace("rgb(", "").replace(")", "").split(",")
-#                             r, g, b = [int(p.strip()) for p in parts]
-#                             return f"#{r:02x}{g:02x}{b:02x}"
-#                         except Exception:
-#                             pass
-
-#                     # RGBA string: "rgba(34, 197, 94, 1)"
-#                     if s.startswith("rgba("):
-#                         try:
-#                             parts = s.replace("rgba(", "").replace(")", "").split(",")
-#                             r, g, b = [int(p.strip()) for p in parts[:3]]
-#                             return f"#{r:02x}{g:02x}{b:02x}"
-#                         except Exception:
-#                             pass
-
-#                     # Named scheme
-#                     return COLOR_SCHEME_MAP.get(s.lower(), None)
-
-#                 # ── Try reading conditional_formatting ────────────────────
-#                 # Structure varies between Superset versions:
-#                 #
-#                 # 6.0.1 structure:
-#                 # [{ "colorScheme": "success", "operator": ">", "targetValue": 0 }]
-#                 #
-#                 # 6.1.0 possible structure A (same but different key):
-#                 # [{ "color": "#22c55e", "operator": ">", "targetValue": 0 }]
-#                 #
-#                 # 6.1.0 possible structure B (nested):
-#                 # [{ "colorScheme": { "value": "#22c55e" }, "operator": ">", "targetValue": 0 }]
-#                 #
-#                 # 6.1.0 possible structure C (style object):
-#                 # [{ "style": { "color": "#22c55e" }, "operator": ">", "targetValue": 0 }]
-
-#                 conditional_formatting = (
-#                     form_data.get("conditional_formatting") or
-#                     form_data.get("conditionalFormatting") or  # camelCase version
-#                     form_data.get("color_config")          or  # alternate key
-#                     []
-#                 )
-
-#                 for rule in (conditional_formatting or []):
-#                     if not isinstance(rule, dict):
-#                         continue
-
-#                     operator = rule.get("operator", "") or rule.get("op", "")
-#                     target   = rule.get("targetValue", rule.get("target_value", 0))
-
-#                     # Skip invalid operators
-#                     if not operator or operator in ("None", "none", ""):
-#                         continue
-
-#                     # ── Try every possible color field ───────────────────
-#                     raw_color = (
-#                         rule.get("colorScheme")              or   # 6.0.1
-#                         rule.get("color")                    or   # 6.1.0 option A
-#                         rule.get("fontColor")                or   # possible
-#                         rule.get("font_color")               or   # possible
-#                         rule.get("textColor")                or   # possible
-#                         # nested: { "colorScheme": { "value": "#..." } }
-#                         (rule.get("colorScheme", {}) or {}).get("value") or
-#                         # nested: { "style": { "color": "#..." } }
-#                         (rule.get("style", {}) or {}).get("color") or
-#                         None
-#                     )
-
-#                     color = resolve_color(raw_color)
-
-#                     if color:
-#                         conditional_colors.append({
-#                             "operator":    operator,
-#                             "targetValue": target,
-#                             "color":       color,
-#                         })
-
-#                 # ── Also try top-level font_color / color ─────────────────
-#                 # Some Superset versions store it directly on form_data
-#                 if not conditional_colors:
-#                     direct_color = (
-#                         form_data.get("font_color")   or
-#                         form_data.get("fontColor")    or
-#                         form_data.get("color")        or
-#                         None
-#                     )
-#                     if direct_color:
-#                         font_color = resolve_color(direct_color)
-
-#                 if conditional_colors:
-#                     font_color = conditional_colors[0]["color"]
-
-#                 print(
-#                     f"DEBUG bignum {chart_id}: "
-#                     f"conditional_colors={conditional_colors} "
-#                     f"font_color={font_color}",
-#                     flush=True
-#                 )
-
-
-#             # ── Cross-filter scoping ──────────────────────────────────
-#             chart_cfg       = chart_configuration.get(str(chart_id), {})
-#             charts_in_scope = chart_cfg.get("crossFilters", {}).get("chartsInScope", None)
-
-            
-                
-#             if charts_in_scope is not None and len(charts_in_scope) == 0:
-#                 charts_in_scope = []
-
-#             print(f"DEBUG chart {chart_id}: chartsInScope = {charts_in_scope}", flush=True)
-#             print(f"DEBUG chart {chart_id}: cross_filter_scope = {charts_in_scope}", flush=True)
-#             print(f"DEBUG chart {chart_id}: cross_filter chartsInScope = {charts_in_scope}", flush=True)
-
-#             # ── Append to chart list ──────────────────────────────────
-#             chart_list.append({
-#                 "slice_id":             chart_id,
-#                 "slice_name":           detail.get("slice_name"),
-#                 "viz_type":             viz_type,
-#                 "x_axis":               x_axis,
-#                 "metrics":              metrics,
-#                 "groupby":              groupby,
-#                 "groupby_rows":         groupby_rows,
-#                 "groupby_cols":         groupby_cols,
-#                 "raw_x_axis_column":    raw_x_axis_column,
-#                 "x_axis_is_temporal":   x_axis_is_temporal,
-#                 "zoomable":             bool(form_data.get("zoomable", False)),
-#                 "font_color":           font_color,
-#                 "conditional_colors":   conditional_colors,
-#                 "conditional_formatting": conditional_formatting,   # ← ADD THIS
-#                 "column_order":            column_order, 
-#                 "show_cell_bars":          show_cell_bars,
-#                 "cross_filter_scope":   charts_in_scope,
-#                 "percentage_threshold": percentage_threshold,
-#                 "other_threshold":      other_threshold,
-                
-#             })
-
-#             print(f"DEBUG chart {chart_id}: zoomable = {form_data.get('zoomable')} | viz = {viz_type}", flush=True)
-
-#             if 'bar' in viz_type.lower():
-#                 print(f"DEBUG chart {chart_id} bar form_data keys: {list(form_data.keys())}", flush=True)
-
-#         return jsonify({"success": True, "charts": chart_list}), 200
-
-#     except Exception as e:
-#         print(f"DEBUG: get_dashboard_charts error: {e}", flush=True)
-#         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/api/dashboard-charts", methods=["GET"])
 @login_required
@@ -1591,100 +1135,61 @@ def get_dashboard_charts():
             headers={"Authorization": f"Bearer {access_token}"},
             timeout=15
         )
-        dashboard_meta    = dashboard_meta_resp.json().get("result", {})
-        raw_json_meta     = dashboard_meta.get("json_metadata") or "{}"
+        dashboard_meta = dashboard_meta_resp.json().get("result", {})
+        raw_json_meta  = dashboard_meta.get("json_metadata") or "{}"
         try:
             json_metadata = json.loads(raw_json_meta)
         except Exception:
             json_metadata = {}
 
-        # ── Read cross-filter scoping from chart_configuration ───────
         chart_configuration = json_metadata.get("chart_configuration", {})
+        position_json       = json_metadata.get("positions", {})
 
-        # ── Build helpers for cross-filter scope resolution ──────────
-        current_chart_ids  = set(c.get("id") for c in charts if c.get("id"))
-        current_name_to_id = {
-            c.get("slice_name", "").strip().lower(): c.get("id")
-            for c in charts if c.get("slice_name")
-        }
-        position_json = json_metadata.get("positions", {})
+        # ── resolve_scope: converts scope object → list of chart IDs ─
+        def resolve_scope(scope_obj):
+            if not scope_obj or not isinstance(scope_obj, dict):
+                return None
+            root_path = scope_obj.get("rootPath", [])
+            excluded  = [int(x) for x in scope_obj.get("excluded", [])]
 
-        # Build position component → slice_id map
-        comp_to_slice = {}
-        for comp_key, comp_val in position_json.items():
-            if isinstance(comp_val, dict) and comp_val.get("type") == "CHART":
-                cid = comp_val.get("meta", {}).get("chartId")
-                if cid:
-                    comp_to_slice[comp_key]   = cid
-                    comp_to_slice[str(cid)]   = cid
-                    try:
-                        comp_to_slice[int(comp_key)] = cid
-                    except (ValueError, TypeError):
-                        pass
-        # Also map slice_id → itself (direct ID case)
-        for sid in current_chart_ids:
-            comp_to_slice[sid]      = sid
-            comp_to_slice[str(sid)] = sid
+            # Empty rootPath = whole dashboard → scan ALL chart nodes
+            if not root_path:
+                all_chart_ids = []
+                for val in position_json.values():
+                    if isinstance(val, dict) and val.get("type") == "CHART":
+                        cid = val.get("meta", {}).get("chartId")
+                        if cid:
+                            all_chart_ids.append(int(cid))
+                result = [cid for cid in all_chart_ids if cid not in excluded]
+                print(f"DEBUG resolve_scope: rootPath=[] → scanned all → {result}", flush=True)
+                return result
 
-        def resolve_scope(raw_scope):
-            """
-            Resolve chartsInScope to actual slice IDs on this dashboard.
-            Handles 3 cases:
-              1. Position component keys (e.g. "CHART-abc") → map via positions
-              2. Direct slice IDs that exist on this dashboard → use as-is
-              3. Stale IDs from other dashboards → fetch chart name, match by name
-            """
-            if not raw_scope:
-                return raw_scope
+            # Walk layout tree from each root node
+            def collect(node_id):
+                found = []
+                node  = position_json.get(node_id)
+                if node is None:
+                    if node_id in ("ROOT_ID", "GRID_ID"):
+                        for val in position_json.values():
+                            if isinstance(val, dict) and val.get("type") == "CHART":
+                                cid = val.get("meta", {}).get("chartId")
+                                if cid:
+                                    found.append(int(cid))
+                    return found
+                if node.get("type") == "CHART":
+                    cid = node.get("meta", {}).get("chartId")
+                    if cid:
+                        found.append(int(cid))
+                for child_id in node.get("children", []):
+                    found.extend(collect(child_id))
+                return found
 
-            resolved = []
-            stale    = []
-
-            for raw_id in raw_scope:
-                mapped = comp_to_slice.get(raw_id) or comp_to_slice.get(str(raw_id))
-                if mapped and mapped in current_chart_ids:
-                    resolved.append(mapped)
-                else:
-                    stale.append(raw_id)
-
-            # For stale IDs, try resolving by chart name via Superset API
-            for stale_id in stale:
-                try:
-                    r = requests.get(
-                        f"{SUPERSET_URL}/api/v1/chart/{stale_id}",
-                        headers={"Authorization": f"Bearer {access_token}"},
-                        timeout=5
-                    )
-                    stale_name = r.json().get("result", {}).get("slice_name", "")
-                    if stale_name:
-                        matched_id = current_name_to_id.get(stale_name.strip().lower())
-                        if matched_id:
-                            resolved.append(matched_id)
-                            print(
-                                f"DEBUG: Stale scope ID {stale_id} ('{stale_name}') "
-                                f"→ resolved to {matched_id} by name match",
-                                flush=True
-                            )
-                        else:
-                            print(
-                                f"DEBUG: Stale scope ID {stale_id} ('{stale_name}') "
-                                f"→ no match on this dashboard",
-                                flush=True
-                            )
-                except Exception as e:
-                    print(f"DEBUG: Could not resolve stale scope ID {stale_id}: {e}", flush=True)
-
-            # Deduplicate while preserving order
-            seen = set()
-            deduped = []
-            for x in resolved:
-                if x not in seen:
-                    seen.add(x)
-                    deduped.append(x)
-
-            return deduped if deduped else (
-                [int(x) for x in raw_scope if str(x).isdigit()] or raw_scope
-            )
+            in_scope = []
+            for root_node_id in root_path:
+                in_scope.extend(collect(root_node_id))
+            in_scope = [cid for cid in set(in_scope) if cid not in excluded]
+            print(f"DEBUG resolve_scope: rootPath={root_path}, result={in_scope}", flush=True)
+            return in_scope
 
         for chart in charts:
             chart_id    = chart.get("id")
@@ -1997,20 +1502,28 @@ def get_dashboard_charts():
                 )
 
             # ── Cross-filter scoping ──────────────────────────────────
-            chart_cfg = chart_configuration.get(str(chart_id), {})
-            raw_scope = chart_cfg.get("crossFilters", {}).get("chartsInScope", None)
-
+            chart_cfg       = chart_configuration.get(str(chart_id), {})
+            cf_scope_obj    = chart_cfg.get("crossFilters", {}).get("scope")
             charts_in_scope = None
-            if raw_scope is not None:
-                charts_in_scope = resolve_scope(raw_scope)
-                print(
-                    f"DEBUG chart {chart_id}: raw_scope={raw_scope} "
-                    f"→ resolved={charts_in_scope}",
-                    flush=True
-                )
 
-            if charts_in_scope is not None and len(charts_in_scope) == 0:
-                charts_in_scope = []
+            if cf_scope_obj is not None:
+                if cf_scope_obj == "global":
+                    # Use global_chart_configuration scope
+                    global_cfg  = json_metadata.get("global_chart_configuration", {})
+                    global_scope = global_cfg.get("scope") if global_cfg else None
+                    if global_scope:
+                        resolved = resolve_scope(global_scope)
+                        if resolved is not None:
+                            charts_in_scope = [cid for cid in resolved if cid != chart_id]
+                    else:
+                        charts_in_scope = []
+                else:
+                    # Explicit scope object
+                    resolved = resolve_scope(cf_scope_obj)
+                    if resolved is not None:
+                        charts_in_scope = [cid for cid in resolved if cid != chart_id]
+                    else:
+                        charts_in_scope = []
 
             print(f"DEBUG chart {chart_id}: chartsInScope = {charts_in_scope}", flush=True)
             print(f"DEBUG chart {chart_id}: cross_filter_scope = {charts_in_scope}", flush=True)
@@ -2049,6 +1562,7 @@ def get_dashboard_charts():
     except Exception as e:
         print(f"DEBUG: get_dashboard_charts error: {e}", flush=True)
         return jsonify({"error": str(e)}), 500
+    
 # ---------------------------------------------------------
 # GET ALL CHARTS FOR A DASHBOARD
 # ---------------------------------------------------------
@@ -2521,178 +2035,6 @@ def get_chart_data():
 # ---------------------------------------------------------
 # GET FILTER OPTIONS
 # ---------------------------------------------------------
-# @app.route("/api/filter-options", methods=["GET"])
-# @login_required
-# def get_filter_options():
-#     dashboard_id = request.args.get("dashboardId")
-#     if not dashboard_id:
-#         return jsonify({"error": "dashboardId required"}), 400
-
-#     try:
-#         access_token = get_superset_access_token()
-
-#         resp   = requests.get(
-#             f"{SUPERSET_URL}/api/v1/dashboard/{dashboard_id}",
-#             headers={"Authorization": f"Bearer {access_token}"},
-#             timeout=10
-#         )
-#         result        = resp.json().get("result", {})
-#         json_metadata = result.get("json_metadata", "{}")
-#         if isinstance(json_metadata, str):
-#             json_metadata = json.loads(json_metadata)
-
-#         native_filters = json_metadata.get("native_filter_configuration", [])
-
-#         def get_distinct_values(dataset_id, column_name):
-#             payload = {
-#                 "datasource": {"id": dataset_id, "type": "table"},
-#                 "force": False,
-#                 "queries": [{
-#                     "columns":   [column_name],
-#                     "metrics":   [],
-#                     "filters":   [],
-#                     "orderby":   [[column_name, True]],
-#                     "row_limit": 500,
-#                     "extras":    {"having": "", "where": ""},
-#                     "applied_time_extras": {}
-#                 }],
-#                 "result_format": "json",
-#                 "result_type":   "results"
-#             }
-#             r    = requests.post(
-#                 f"{SUPERSET_URL}/api/v1/chart/data",
-#                 headers={
-#                     "Authorization": f"Bearer {access_token}",
-#                     "Content-Type":  "application/json"
-#                 },
-#                 json=payload,
-#                 timeout=15
-#             )
-#             rows = r.json().get("result", [{}])[0].get("data", [])
-#             return [row[column_name] for row in rows if row.get(column_name)]
-
-#         filter_options = []
-#         # for f in native_filters:
-#         #     filter_type = f.get("filterType")
-#         #     target      = f.get("targets", [{}])[0]
-#         #     col_name    = target.get("column", {}).get("name")
-#         #     dataset_id  = target.get("datasetId")
-
-#         #     # if not col_name or not dataset_id:
-#         #         # continue
-
-#         #     if filter_type == "filter_time":
-#         #         scope_obj     = f.get("scope", {})
-#         #         root_path     = scope_obj.get("rootPath", ["ROOT_ID"])
-#         #         tabs_in_scope = f.get("tabsInScope") or []
-#         #         if not tabs_in_scope:
-#         #             tabs_in_scope = [p for p in root_path if p.startswith("TAB-")]
-
-#         #         filter_options.append({
-#         #             "id":           f.get("id"),
-#         #             "name":         f.get("name"),
-#         #             "type":         "date",
-#         #             "column":       col_name,
-#         #             "values":       [],
-#         #             "tabsInScope":  tabs_in_scope,
-#         #             "chartsInScope": f.get("chartsInScope", []),
-#         #           })
-                
-#         #     elif filter_type in ["filter_select", "filter_groupby"]:
-#         #         values = get_distinct_values(dataset_id, col_name)
-
-#         #         scope_obj     = f.get("scope", {})
-#         #         root_path     = scope_obj.get("rootPath", ["ROOT_ID"])
-#         #         tabs_in_scope = f.get("tabsInScope") or []
-#         #         if not tabs_in_scope:
-#         #             tabs_in_scope = [p for p in root_path if p.startswith("TAB-")]
-
-#         #         filter_options.append({
-#         #                 "id":           f.get("id"),
-#         #                 "name":         f.get("name"),
-#         #                 "type":         "select",
-#         #                 "column":       col_name,
-#         #                 "values":       values,
-#         #                 "tabsInScope":  tabs_in_scope,
-#         #                 "chartsInScope": f.get("chartsInScope", []),
-#         #             })
-#         # print(f"DEBUG filter '{f.get('name')}': scope={scope_obj}, tabs_in_scope={tabs_in_scope}, charts_in_scope={f.get('chartsInScope', [])}", flush=True)        
-
-#         for native_filter in native_filters:
-#             filter_type = native_filter.get("filterType")
-#             target      = native_filter.get("targets", [{}])[0]
-#             col_name    = target.get("column", {}).get("name")
-#             dataset_id  = target.get("datasetId")
-
-#             if filter_type == "filter_time":
-#                 filter_options.append({
-#                     "id":     native_filter.get("id"),
-#                     "name":   native_filter.get("name"),
-#                     "type":   "date",
-#                     "column": col_name or "",
-#                     "values": []
-#                 })
-#             elif filter_type in ["filter_select", "filter_groupby"]:
-#                 if not col_name or not dataset_id:
-#                     continue
-#                 values = get_distinct_values(dataset_id, col_name)
-#                 filter_options.append({
-#                     "id":     native_filter.get("id"),
-#                     "name":   native_filter.get("name"),
-#                     "type":   "select",
-#                     "column": col_name,
-#                     "values": values
-#                 })
-
-#             # ── filter_time (date range) has no col_name or dataset_id
-#             # ── so we only skip for select/groupby filters
-#             if filter_type == "filter_time":
-#                 scope_obj     = native_filter.get("scope", {})
-#                 root_path     = scope_obj.get("rootPath", ["ROOT_ID"])
-#                 tabs_in_scope = native_filter.get("tabsInScope") or []
-#                 if not tabs_in_scope:
-#                     tabs_in_scope = [p for p in root_path if p.startswith("TAB-")]
-
-#                 filter_options.append({
-#                     "id":            native_filter.get("id"),
-#                     "name":          native_filter.get("name"),
-#                     "type":          "date",
-#                     "column":        col_name,
-#                     "values":        [],
-#                     "tabsInScope":   tabs_in_scope,
-#                     "chartsInScope": native_filter.get("chartsInScope", []),
-#                 })
-
-#             elif filter_type in ["filter_select", "filter_groupby"]:
-#                 # Select filters DO need col_name and dataset_id
-#                 if not col_name or not dataset_id:   # ← moved here
-#                     continue
-
-#                 values = get_distinct_values(dataset_id, col_name)
-
-#                 scope_obj     = native_filter.get("scope", {})
-#                 root_path     = scope_obj.get("rootPath", ["ROOT_ID"])
-#                 tabs_in_scope = native_filter.get("tabsInScope") or []
-#                 if not tabs_in_scope:
-#                     tabs_in_scope = [p for p in root_path if p.startswith("TAB-")]
-
-#                 filter_options.append({
-#                     "id":            native_filter.get("id"),
-#                     "name":          native_filter.get("name"),
-#                     "type":          "select",
-#                     "column":        col_name,
-#                     "values":        values,
-#                     "tabsInScope":   tabs_in_scope,
-#                     "chartsInScope": native_filter.get("chartsInScope", []),
-#                 })
-
-#         print(f"DEBUG filter '{native_filter.get('name')}': scope={scope_obj}, tabs_in_scope={tabs_in_scope}, charts_in_scope={native_filter.get('chartsInScope', [])}", flush=True)
-#         print(f"DEBUG filter_options: {filter_options}", flush=True)
-#         return jsonify({"success": True, "filters": filter_options}), 200
-
-#     except Exception as e:
-#         print(f"DEBUG filter_options error: {e}", flush=True)
-#         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/filter-options", methods=["GET"])
 @login_required
@@ -3190,8 +2532,6 @@ def get_cross_filter_scope():
     except Exception as e:
         print(f"ERROR get_cross_filter_scope: {e}", flush=True)
         return jsonify({"error": str(e)}), 500
-
-
 
 
 if __name__ == '__main__':

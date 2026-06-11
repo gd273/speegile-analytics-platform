@@ -1274,7 +1274,16 @@ const applicableCrossFilters = Object.fromEntries(
   return (
     <div style={{ background: "#0d1117", minHeight: "100vh", padding: isMobile ? "10px" : "16px", position: "relative" }}>
     <PdfProgressOverlay progress={pdfProgress} />
-        <CrossFilterPills crossFilters={crossFilters} onClear={clearCrossFilter} onClearAll={clearAllCrossFilters} />
+        {/* <CrossFilterPills crossFilters={crossFilters} onClear={clearCrossFilter} onClearAll={clearAllCrossFilters} /> */}
+
+        <CrossFilterPills
+          crossFilters={crossFilters}
+          onClear={clearCrossFilter}
+          onClearAll={clearAllCrossFilters}
+          crossFilterScopeMap={crossFilterScopeMap}
+          crossFiltersEnabled={crossFiltersEnabled}
+        />
+        
     <FilterPanel
       filterDefs={filterDefs.filter(fd => {
         if (!fd.tabsInScope || fd.tabsInScope.length === 0) return true;
