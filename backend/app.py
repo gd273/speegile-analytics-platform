@@ -1,4 +1,5 @@
 import os as _os
+from unittest import result
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 import jwt
@@ -1142,8 +1143,18 @@ def get_dashboard_charts():
         except Exception:
             json_metadata = {}
 
+        print(f"DEBUG json_metadata keys: {list(json_metadata.keys())}", flush=True)
+    
+
         chart_configuration = json_metadata.get("chart_configuration", {})
-        position_json       = json_metadata.get("positions", {})
+        # position_json       = json_metadata.get("positions", {})
+
+        position_json = dashboard_meta.get("position_json", "{}")
+        if isinstance(position_json, str):
+            try:
+                position_json = json.loads(position_json)
+            except Exception:
+                position_json = {}
 
         # ── resolve_scope: converts scope object → list of chart IDs ─
         def resolve_scope(scope_obj):
