@@ -3057,7 +3057,143 @@ def clear_cache():
             "success": False,
             "error":   str(e),
         }), 500
-    
+
+
+#---------------------------------------------------------
+# cross-filter scope map
+#---------------------------------------------------------
+@app.route("/api/dashboard-cross-filter-scope", methods=["GET"])
+@login_required
+def get_cross_filter_scope():
+    """
+    Returns a map of { chartId -> [list of chart IDs it is allowed to filter] }
+    computed from Superset's json_metadata + position_json.
+    If a chart has no explicit scope configured, it maps to [] (filters nobody).
+    """
+    print(f"DEBUG scope endpoint HIT", flush=True)
+    dashboard_id = request.args.get("dashboardId")
+    if not dashboard_id:
+        return jsonify({"error": "dashboardId required"}), 400
+
+    try:
+        access_token = get_superset_access_token()
+        resp = requests.get(
+            f"{SUPERSET_URL}/api/v1/dashboard/{dashboard_id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10
+        )
+        result = resp.json().get("result", {})
+
+        json_metadata = result.get("json_metadata", "{}")
+        position_json = result.get("position_json", "{}")
+        if isinstance(json_metadata, str):
+            json_metadata = json.loads(json_metadata)
+        if isinstance(position_json, str):
+            position_json = json.loads(position_json)
+
+        # ── ADD THESE DEBUG PRINTS ──────────────────────────────
+        print(f"DEBUG position_json keys: {list(position_json.keys())[:30]}", flush=True)
+        print(f"DEBUG chart_configuration: {json_metadata.get('chart_configuration', {})}", flush=True)
+        print(f"DEBUG global_chart_config: {json_metadata.get('global_chart_configuration', {})}", flush=True)
+        # ────────────────────────────────────────────────────────    
+
+        cross_filters_enabled = json_metadata.get("cross_filters_enabled", False)
+        if not cross_filters_enabled:
+            return jsonify({"enabled": False, "scope": {}}), 200
+
+        chart_configuration    = json_metadata.get("chart_configuration", {})
+        global_chart_config    = json_metadata.get("global_chart_configuration", {})
+
+        # --- Helper: walk position_json tree from a root node ID,
+        #     collect all CHART-type chartIds found underneath it ---
+        # def collect_chart_ids_under(node_id, layout):
+        #     found = []
+        #     node = layout.get(node_id, {})
+        #     if node.get("type") == "CHART":
+        #         chart_id = node.get("meta", {}).get("chartId")
+        #         if chart_id:
+        #             found.append(int(chart_id))
+        #     for child_id in node.get("children", []):
+        #         found.extend(collect_chart_ids_under(child_id, layout))
+        #     return found
+
+        def collect_chart_ids_under(node_id, layout):
+            found = []
+            node = layout.get(node_id)
+            # If ROOT_ID or GRID_ID not found, scan ALL chart nodes in layout
+            if node is None:
+                if node_id in ("ROOT_ID", "GRID_ID"):
+                    for key, val in layout.items():
+                        if isinstance(val, dict) and val.get("type") == "CHART":
+                            chart_id = val.get("meta", {}).get("chartId")
+                            if chart_id:
+                                found.append(int(chart_id))
+                return found
+            if node.get("type") == "CHART":
+                chart_id = node.get("meta", {}).get("chartId")
+                if chart_id:
+                    found.append(int(chart_id))
+            for child_id in node.get("children", []):
+                found.extend(collect_chart_ids_under(child_id, layout))
+            return found
+
+        def resolve_scope(scope_obj, layout):
+            if not scope_obj or not isinstance(scope_obj, dict):
+                return None
+            root_path = scope_obj.get("rootPath", [])
+            excluded  = [int(x) for x in scope_obj.get("excluded", [])]
+            # Empty rootPath = whole dashboard
+            if not root_path:
+                root_path = ["ROOT_ID"]
+            in_scope = []
+            for root_node_id in root_path:
+                in_scope.extend(collect_chart_ids_under(root_node_id, layout))
+            in_scope = [cid for cid in set(in_scope) if cid not in excluded]
+            print(f"DEBUG resolve_scope: rootPath={root_path}, result={in_scope}", flush=True)
+            return in_scope
+
+        # --- Resolve global scope once ---
+        global_scope_obj = global_chart_config.get("scope") if global_chart_config else None
+        global_resolved  = resolve_scope(global_scope_obj, position_json)  # may be None
+
+        # --- Build the scope map ---
+        scope_map = {}
+        for chart_id_str, config in chart_configuration.items():
+            chart_id   = int(chart_id_str)
+            cf_config  = config.get("crossFilters", {})
+            scope_val  = cf_config.get("scope")
+
+            if scope_val is None:
+                # No scope defined at all → your rule: filter nobody
+                scope_map[chart_id] = []
+
+            elif scope_val == "global":
+                # Points to global config
+                if global_resolved is not None:
+                    # Remove self from scope
+                    scope_map[chart_id] = [cid for cid in global_resolved if cid != chart_id]
+                else:
+                    # global config also missing → filter nobody
+                    scope_map[chart_id] = []
+
+            else:
+                # Explicit {rootPath, excluded} scope object
+                resolved = resolve_scope(scope_val, position_json)
+                if resolved is not None:
+                    # Remove self from scope
+                    scope_map[chart_id] = [cid for cid in resolved if cid != chart_id]
+                else:
+                    scope_map[chart_id] = []
+
+        return jsonify({"enabled": True, "scope": scope_map}), 200
+
+    except Exception as e:
+        print(f"ERROR get_cross_filter_scope: {e}", flush=True)
+        return jsonify({"error": str(e)}), 500
+
+
+
+
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
 

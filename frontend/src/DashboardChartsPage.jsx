@@ -217,8 +217,50 @@ function parseSupersetLayout(positionJson) {
 const unitsToPx = (u) => Math.max(220, (u || 50) * 8);
 
 // ── Cross-filter pills ──────────────────────────────────────
-function CrossFilterPills({ crossFilters, onClear, onClearAll }) {
-  const entries = Object.entries(crossFilters).filter(([, f]) => f.value);
+// function CrossFilterPills({ crossFilters, onClear, onClearAll }) {
+//   const entries = Object.entries(crossFilters).filter(([, f]) => f.value)
+//   if (!entries.length) return null;
+//   return (
+//     <div style={{ background: "rgba(31,168,201,0.07)", border: "1px solid rgba(31,168,201,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+//       <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 4 }}>
+//         <Zap size={13} style={{ color: "#1FA8C9" }} />
+//         <span style={{ fontSize: 11, fontWeight: 700, color: "#1FA8C9", letterSpacing: "0.07em", textTransform: "uppercase" }}>Cross-filters active</span>
+//       </div>
+//       {entries.map(([col, f]) => (
+//         <span key={col} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, background: "rgba(31,168,201,0.15)", color: "#67c5d8", border: "1px solid rgba(31,168,201,0.3)", padding: "3px 10px 3px 12px", borderRadius: 16 }}>
+//           <span style={{ color: "#4a8fa8", fontSize: 9, fontWeight: 600 }}>{f.sourceChartTitle || "Chart"}:</span>
+//           <span style={{ color: "#e2e8f0", fontWeight: 600 }}>{f.value}</span>
+//           <button onClick={() => onClear(col)} style={{ background: "none", border: "none", color: "#4a8fa8", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
+//             onMouseEnter={e => e.currentTarget.style.color = "#1FA8C9"}
+//             onMouseLeave={e => e.currentTarget.style.color = "#4a8fa8"}>
+//             <X size={11} />
+//           </button>
+//         </span>
+//       ))}
+//       {entries.length > 1 && (
+//         <button onClick={onClearAll} style={{ fontSize: 10, color: "#4a8fa8", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+//           onMouseEnter={e => e.currentTarget.style.color = "#1FA8C9"}
+//           onMouseLeave={e => e.currentTarget.style.color = "#4a8fa8"}>
+//           Clear all
+//         </button>
+//       )}
+//     </div>
+//   );
+// }
+
+
+function CrossFilterPills({ crossFilters, onClear, onClearAll, crossFilterScopeMap = {}, crossFiltersEnabled = false }) {
+  const scopeMapLoaded = crossFilterScopeMap && Object.keys(crossFilterScopeMap).length > 0;
+
+  const entries = Object.entries(crossFilters).filter(([, f]) => {
+    if (!f.value) return false;
+    if (!scopeMapLoaded) return true;
+    if (!crossFiltersEnabled) return false;
+    const sourceId = Number(f.sourceChartId);
+    if (!crossFilterScopeMap.hasOwnProperty(sourceId)) return true;
+    return crossFilterScopeMap[sourceId].length > 0;
+  });
+
   if (!entries.length) return null;
   return (
     <div style={{ background: "rgba(31,168,201,0.07)", border: "1px solid rgba(31,168,201,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
@@ -247,6 +289,7 @@ function CrossFilterPills({ crossFilters, onClear, onClearAll }) {
     </div>
   );
 }
+
 
 // ── Date Range Picker ───────────────────────────────────────
 function DateRangePicker({ dateFrom, dateTo, onFromChange, onToChange, onClear, dataDateRange }) {
@@ -590,6 +633,11 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
 
   // pop-up State
   const [crossFilterWarning, setCrossFilterWarning] = useState(null);
+
+  // cross-filter scoping state
+const [crossFilterScopeMap, setCrossFilterScopeMap] = useState({}); // { chartId -> [chartIds] }
+const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
+
 
   // ── Keep refs in sync with state ──────────────────────────
   useEffect(() => { sectionsRef.current      = sections;      }, [sections]);
@@ -976,11 +1024,18 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
       api.get("/dashboard-charts", { params: { dashboardId: dashboardNumericId } }),
       api.get("/dashboard-layout",  { params: { dashboardId: dashboardNumericId } }).catch(() => null),
       api.get("/filter-options",    { params: { dashboardId: dashboardNumericId } }).catch(() => null),
-    ]).then(([cR, lR, fR]) => {
+      api.get("/dashboard-cross-filter-scope", { params: { dashboardId: dashboardNumericId } }).catch(() => null),
+    ]).then(([cR, lR, fR, scR]) => {
       if (cR.data.success) setCharts(cR.data.charts.filter(c => c.viz_type !== "filter_box"));
       console.log("Loaded chart IDs:", cR.data.charts.map(c => c.slice_id)); // ← ADD
       if (lR?.data?.success) { const p = parseSupersetLayout(lR.data.layout); setSections(p); }
       if (fR?.data?.success) setFilterDefs(fR.data.filters || []);
+      setCrossFiltersEnabled(scR?.data?.enabled || false);
+      setCrossFilterScopeMap(scR?.data?.scope   || {});
+
+      console.log("crossFiltersEnabled:", scR?.data?.enabled);
+      console.log("crossFilterScopeMap:", scR?.data?.scope);
+
     }).catch(() => setError("Failed to load dashboard."))
       .finally(() => setLoading(false));
   }, [dashboardNumericId]);
@@ -1027,60 +1082,60 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
 //     return scope.includes(Number(chart.slice_id));
 //   })
 // );
+console.log("scopeMap at render:", crossFilterScopeMap, "enabled:", crossFiltersEnabled);
+
+// const applicableCrossFilters = Object.fromEntries(
+//   Object.entries(crossFilters).filter(([, f]) => {
+//     // Never filter the emitter chart itself
+//     if (Number(f.sourceChartId) === Number(chart.slice_id)) return false;
+
+//     const sourceId = Number(f.sourceChartId);
+//     const targetId = Number(chart.slice_id);
+
+//     // If cross-filters are disabled on this dashboard, apply nothing
+//     if (!crossFiltersEnabled) return false;
+
+//     // Check the scope map fetched from Superset metadata
+//     if (crossFilterScopeMap.hasOwnProperty(sourceId)) {
+//       // Explicit scope found — only apply if this chart is in the list
+//       // const allowedTargets = crossFilterScopeMap[sourceId];
+//       // return allowedTargets.includes(targetId);
+//       return crossFilterScopeMap[sourceId].includes(targetId);
+//     }
+
+//     // Source chart has no entry in scope map at all
+//     // → Your rule: no explicit scope = filter nobody
+//     return false;
+//   })
+// );
+
+const applicableCrossFilters = Object.fromEntries(
+  Object.entries(crossFilters).filter(([, f]) => {
+    if (Number(f.sourceChartId) === Number(chart.slice_id)) return false;
+    if (!crossFiltersEnabled) return false;
+    const sourceId = Number(f.sourceChartId);
+    const targetId = Number(chart.slice_id);
+    if (crossFilterScopeMap.hasOwnProperty(sourceId)) {
+      return crossFilterScopeMap[sourceId].includes(targetId);
+    }
+    return false;
+  })
+);
 
 
-// REPLACE the entire applicableCrossFilters block with:
-// const loadedChartIds = new Set(charts.map(c => Number(c.slice_id)));
-
+// REPLACE the entire applicableCrossFilters block with this simple version:
 // const applicableCrossFilters = Object.fromEntries(
 //   Object.entries(crossFilters).filter(([, f]) => {
 //     // Never send filter back to source chart
 //     if (Number(f.sourceChartId) === Number(chart.slice_id)) return false;
 
-//     // No scope defined = cross-filter not assigned in Superset → skip
+//     // No scope defined in Superset = don't filter this chart
 //     if (!f.chartsInScope || f.chartsInScope.length === 0) return false;
 
-//     const scope = f.chartsInScope.map(Number);
-
-//     // Check if scoped IDs exist on this dashboard
-//     const anyOnThisDashboard = scope.some(id => loadedChartIds.has(id));
-
-//     if (!anyOnThisDashboard) {
-//       // Stale IDs — apply only to charts that share same dataset/column
-//       // Do NOT apply to all charts blindly
-//       // Check if this chart has the filter column in its known columns
-//       const filterCols = Object.keys(crossFilters);
-//       const chartGroupby = [
-//         ...(chart.groupby || []),
-//         ...(chart.groupby_rows || []),
-//         ...(chart.groupby_cols || []),
-//         chart.x_axis,
-//       ].filter(Boolean).map(c => String(c).toLowerCase());
-
-//       return filterCols.some(col =>
-//         chartGroupby.includes(col.toLowerCase())
-//       );
-//     }
-
-//     // Valid scope — respect it exactly
-//     return scope.includes(Number(chart.slice_id));
+//     // Use exactly what Superset configured — no fallback logic
+//     return f.chartsInScope.map(Number).includes(Number(chart.slice_id));
 //   })
 // );
-
-
-// REPLACE the entire applicableCrossFilters block with this simple version:
-const applicableCrossFilters = Object.fromEntries(
-  Object.entries(crossFilters).filter(([, f]) => {
-    // Never send filter back to source chart
-    if (Number(f.sourceChartId) === Number(chart.slice_id)) return false;
-
-    // No scope defined in Superset = don't filter this chart
-    if (!f.chartsInScope || f.chartsInScope.length === 0) return false;
-
-    // Use exactly what Superset configured — no fallback logic
-    return f.chartsInScope.map(Number).includes(Number(chart.slice_id));
-  })
-);
 
 
 
