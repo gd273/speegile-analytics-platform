@@ -2061,8 +2061,12 @@ def get_filter_options():
         if isinstance(json_metadata, str):
             json_metadata = json.loads(json_metadata)
 
+        # native_filters = json_metadata.get("native_filter_configuration", [])
         native_filters = json_metadata.get("native_filter_configuration", [])
-        print(f"DEBUG raw filter: {json.dumps(native_filter, indent=2)}", flush=True)
+        print(f"DEBUG native_filters count: {len(native_filters)}", flush=True)  # ✅
+        for nf in native_filters:
+            print(f"DEBUG raw filter: {json.dumps(nf, indent=2)}", flush=True)  # ✅ inside loop
+        
 
         def get_distinct_values(dataset_id, column_name):
             payload = {
@@ -2183,8 +2187,10 @@ def get_dashboard_filters():
         if isinstance(json_metadata, str):
             json_metadata = json.loads(json_metadata)
 
+        # native_filters = json_metadata.get("native_filter_configuration", [])
+        # print(f"DEBUG raw filter: {json.dumps(native_filter, indent=2)}", flush=True)
         native_filters = json_metadata.get("native_filter_configuration", [])
-        print(f"DEBUG raw filter: {json.dumps(native_filter, indent=2)}", flush=True)
+        print(f"DEBUG dashboard-filters native_filters: {native_filters}", flush=True)  # ✅
         
         filters_out    = []
 
