@@ -867,9 +867,8 @@ def _process_upload_background(
                     conn.execute(
                         text(
                             f'CALL "{tenant_schema}".'
-                            f'"{procedure_name}"(:load_id)'
-                        ),
-                        {"load_id": load_id}
+                            f'"{procedure_name}"()'
+                        )
                     )
                     print(f"DEBUG: Procedure {procedure_name} done.",
                           flush=True)
@@ -1585,9 +1584,12 @@ def get_chart_data():
     slice_id       = body.get("sliceId")
     date_from      = body.get("dateFrom")   # "2026-01-01" or None
     date_to        = body.get("dateTo")     # "2026-03-31" or None
+    time_filter_id = body.get("timeFilterId")
     active_filters = body.get("activeFilters", [])
     cross_filters  = body.get("crossFilters",  [])
 
+    print(f"🗓 INCOMING: sliceId={slice_id} dateFrom={date_from} dateTo={date_to} timeFilterId={time_filter_id}", flush=True)
+    
     VALID_OPS = {
         "IN", "NOT IN", "==", "!=", ">", "<", ">=", "<=",
         "LIKE", "ILIKE", "IS NULL", "IS NOT NULL", "TEMPORAL_RANGE",
@@ -1925,50 +1927,42 @@ def get_chart_data():
                             flush=True
                         )
 
-            # ── 2. Date range filter ──────────────────────────
-            if date_from or date_to:
-                from_str       = date_from if date_from else "2000-01-01"
-                to_str         = date_to   if date_to   else "2099-12-31"
-                date_range_val = f"{from_str} : {to_str}"
+                    # ── 2. Date range filter — outside the for loop ──
+            if date_from and date_to and time_filter_id:
+                from datetime import datetime, timedelta
+                d_from = datetime.strptime(date_from, "%Y-%m-%d")
+                d_to   = datetime.strptime(date_to,   "%Y-%m-%d") + timedelta(days=1)
+                date_range_val = f"{d_from.strftime('%Y-%m-%d')} : {d_to.strftime('%Y-%m-%d')}"
+                # date_range_val = f"{date_from} : {date_to}"
 
-                # Detect which column to filter on
-                temporal_col = detect_temporal_col(query)
-
-                if temporal_col:
-                    # Update existing TEMPORAL_RANGE filter if present
-                    temporal_found = False
+                for query in query_context.get("queries", []):
+                    # Find existing TEMPORAL_RANGE filter and update it
+                    updated = False
                     for f in query.get("filters", []):
                         if f.get("op") == "TEMPORAL_RANGE":
-                            f["col"] = temporal_col
                             f["val"] = date_range_val
-                            temporal_found = True
+                            updated = True
                             break
-
-                    # Add new one if not found
-                    if not temporal_found:
-                        query.setdefault("filters", []).append({
-                            "col": temporal_col,
-                            "op":  "TEMPORAL_RANGE",
-                            "val": date_range_val,
-                        })
-
-                    # Clear time extras so our range takes effect
+                    # If no existing TEMPORAL_RANGE filter, detect column and add one
+                    if not updated:
+                        temporal_col = detect_temporal_col(query)
+                        if temporal_col:
+                            query.setdefault("filters", []).append({
+                                "col": temporal_col,
+                                "op":  "TEMPORAL_RANGE",
+                                "val": date_range_val,
+                            })
                     query["applied_time_extras"] = {}
-                    query_context["force"]       = True
+                    query_context["force"] = True
 
-                    print(
-                        f"DEBUG chart {slice_id}: date filter applied → "
-                        f"col={temporal_col} val={date_range_val}",
-                        flush=True
-                    )
-                else:
-                    print(
-                        f"DEBUG chart {slice_id}: date filter skipped — "
-                        f"no temporal column found in query",
-                        flush=True
-                    )
+                print(f"DEBUG: date range applied → {date_range_val}", flush=True)
+                print(
+                    f"DEBUG chart {slice_id}: native date filter applied → "
+                    f"id={time_filter_id} value={d_from.strftime('%Y-%m-%d')} : {d_to.strftime('%Y-%m-%d')}",
+                    # f"id={time_filter_id} value={date_range_val}",
+                    flush=True
+                )
 
-            print(f"DEBUG chart {slice_id}: final filters = {query.get('filters')}", flush=True)
 
         data_resp = requests.post(
             f"{SUPERSET_URL}/api/v1/chart/data",
@@ -2122,6 +2116,7 @@ def get_filter_options():
                 filter_options.append({
                     "id":            native_filter.get("id"),
                     "name":          native_filter.get("name"),
+                    "filterType":    "filter_time",
                     "type":          "date",
                     "column":        col_name or "",
                     "values":        [],

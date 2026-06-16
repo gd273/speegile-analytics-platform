@@ -304,6 +304,7 @@ function DateRangePicker({ dateFrom, dateTo, onFromChange, onToChange, onClear, 
   const hasDate = dateFrom || dateTo;
 
   const handleSearch = () => {
+    console.log("🔍 handleSearch called:", { draftFrom, draftTo }); // ADD
     onFromChange(draftFrom || null);
     onToChange(draftTo     || null);
   };
@@ -337,7 +338,12 @@ function DateRangePicker({ dateFrom, dateTo, onFromChange, onToChange, onClear, 
           max={dataDateRange?.max || undefined}
           onChange={e => setDraftTo(e.target.value)}
           style={inputStyle(draftTo)} />
-        <button onClick={handleSearch} disabled={!draftFrom || !draftTo}
+        {/* <button onClick={handleSearch} disabled={!draftFrom || !draftTo} */}
+        <button onClick={() => {
+                console.log("🔍 BUTTON CLICKED", { draftFrom, draftTo });
+                handleSearch();
+              }} 
+              disabled={!draftFrom || !draftTo}
           style={{
             display: "flex", alignItems: "center", gap: 4,
             background: (draftFrom && draftTo) ? "rgba(31,168,201,0.15)" : "rgba(255,255,255,0.03)",
@@ -367,7 +373,7 @@ function DateRangePicker({ dateFrom, dateTo, onFromChange, onToChange, onClear, 
 }
 
 // ── Tab group ───────────────────────────────────────────────
-function TabGroup({ tabs = [], chartMap, cardProps, isMobile, renderRows, onTabChange, pdfTabIdx, pdfNestedTabIdx, dateFrom, dateTo, setDateFrom, setDateTo, dataDateRange }) {
+function TabGroup({ tabs = [], chartMap, cardProps, isMobile, renderRows, onTabChange, pdfTabIdx, pdfNestedTabIdx, dateFrom, dateTo, setDateFrom, setDateTo, dataDateRange, hasTimeFilter  }) {
   const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
@@ -380,36 +386,51 @@ function TabGroup({ tabs = [], chartMap, cardProps, isMobile, renderRows, onTabC
 
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "#12151f", minHeight: 42, marginBottom: 14 }}>
-        <style>{`
-          .tabs-scroll-container::-webkit-scrollbar { height: 3px; }
-          .tabs-scroll-container::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 10px; }
-          .tabs-scroll-container::-webkit-scrollbar-thumb { background: rgba(31,168,201,0.4); border-radius: 10px; transition: background 0.2s; }
-          .tabs-scroll-container::-webkit-scrollbar-thumb:hover { background: rgba(31,168,201,0.8); }
-          .tabs-scroll-container { scrollbar-width: thin; scrollbar-color: rgba(31,168,201,0.4) rgba(255,255,255,0.04); }
-        `}</style>
-        {tabs.length > 0 && (
-          <div className="tabs-scroll-container"
-            onWheel={(e) => { if (e.deltaY !== 0) { e.currentTarget.scrollLeft += e.deltaY; e.preventDefault(); } }}
-            style={{ flex: 1, display: "flex", alignItems: "center", overflowX: "auto", overflowY: "hidden", gap: 2, padding: "4px 8px 8px 8px", minWidth: 0, cursor: "grab" }}>
-            {tabs.map((tab, i) => (
-              <button key={tab.id}
-                onClick={() => { setActiveIdx(i); if (onTabChange) onTabChange(tab.id); }}
-                style={{ flexShrink: 0, padding: "10px 18px", fontSize: 13, fontWeight: displayIdx === i ? 600 : 400, color: displayIdx === i ? "#1FA8C9" : "#64748b", background: "transparent", border: "none", borderBottom: displayIdx === i ? "2px solid #1FA8C9" : "2px solid transparent", cursor: "pointer", whiteSpace: "nowrap", transition: "color 0.15s, border-color 0.15s" }}>
-                {tab.name}
-              </button>
-            ))}
-          </div>
-        )}
-        <div style={{ marginLeft: "auto", flexShrink: 0, borderLeft: "1px solid rgba(255,255,255,0.07)", padding: "0 12px", display: "flex", alignItems: "center", gap: 8, height: "100%", minHeight: 42 }}>
-          <DateRangePicker
-            dateFrom={dateFrom} dateTo={dateTo}
-            onFromChange={setDateFrom} onToChange={setDateTo}
-            onClear={() => { setDateFrom(null); setDateTo(null); }}
-            dataDateRange={dataDateRange}
-          />
-        </div>
+      <div>
+  <style>{`
+    .tabs-scroll-container::-webkit-scrollbar { height: 3px; }
+    .tabs-scroll-container::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 10px; }
+    .tabs-scroll-container::-webkit-scrollbar-thumb { background: rgba(31,168,201,0.4); border-radius: 10px; transition: background 0.2s; }
+    .tabs-scroll-container::-webkit-scrollbar-thumb:hover { background: rgba(31,168,201,0.8); }
+    .tabs-scroll-container { scrollbar-width: thin; scrollbar-color: rgba(31,168,201,0.4) rgba(255,255,255,0.04); }
+  `}</style>
+
+  {/* ── Tab buttons row ── */}
+  <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "#12151f", minHeight: 42, marginBottom:14 }}>
+    {tabs.length > 0 && (
+      <div className="tabs-scroll-container"
+        onWheel={(e) => { if (e.deltaY !== 0) { e.currentTarget.scrollLeft += e.deltaY; } }}
+        style={{ flex: 1, display: "flex", alignItems: "center", overflowX: "auto", overflowY: "hidden", gap: 2, padding: "4px 8px 8px 8px", minWidth: 0, cursor: "grab" }}>
+        {tabs.map((tab, i) => (
+          <button key={tab.id}
+            onClick={() => { setActiveIdx(i); if (onTabChange) onTabChange(tab.id); }}
+            style={{ flexShrink: 0, padding: "10px 18px", fontSize: 13, fontWeight: displayIdx === i ? 600 : 400, color: displayIdx === i ? "#1FA8C9" : "#64748b", background: "transparent", border: "none", borderBottom: displayIdx === i ? "2px solid #1FA8C9" : "2px solid transparent", cursor: "pointer", whiteSpace: "nowrap", transition: "color 0.15s, border-color 0.15s" }}>
+            {tab.name}
+          </button>
+        ))}
       </div>
+    )}
+  </div>
+
+  {/* ── Date picker row — separate from tab scroll ── */}
+  {/* {hasTimeFilter && (
+    <div style={{ background: "#12151f", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "8px 12px", display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+      <DateRangePicker
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onFromChange={setDateFrom}
+        onToChange={setDateTo}
+        onClear={() => { setDateFrom(null); setDateTo(null); }}
+        dataDateRange={dataDateRange}
+      />
+    </div>
+  )} */}
+
+    
+
+  {/* ── If no time filter, still add bottom margin ── */}
+  {!hasTimeFilter && <div style={{ marginBottom: 14 }} />}
+</div>
 
       {activeTab?.rows?.length > 0 && renderRows(activeTab.rows)}
 
@@ -420,6 +441,7 @@ function TabGroup({ tabs = [], chartMap, cardProps, isMobile, renderRows, onTabC
           onTabChange={onTabChange} pdfTabIdx={pdfNestedTabIdx} pdfNestedTabIdx={null}
           dateFrom={dateFrom} dateTo={dateTo} setDateFrom={setDateFrom} setDateTo={setDateTo}
           dataDateRange={dataDateRange}
+          hasTimeFilter={hasTimeFilter}
         />
       )}
 
@@ -434,6 +456,8 @@ function TabGroup({ tabs = [], chartMap, cardProps, isMobile, renderRows, onTabC
 function FilterDropdown({ fd, activeFilters, dateFrom, dateTo, onFilterChange, onDateFromChange, onDateToChange }) {
   const [open,   setOpen]   = useState(false);
   const [search, setSearch] = useState("");
+  const [draftFrom, setDraftFrom] = useState("");
+  const [draftTo,   setDraftTo]   = useState("");
   const ref = useRef(null);
 
   useEffect(() => {
@@ -460,7 +484,16 @@ function FilterDropdown({ fd, activeFilters, dateFrom, dateTo, onFilterChange, o
 
   return (
     <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
-      <button onClick={() => { setOpen(p => !p); setSearch(""); }}
+      {/* <button onClick={() => { setOpen(p => !p); setSearch(""); }} */}
+      <button onClick={() => {
+            const opening = !open;
+            setOpen(p => !p);
+            setSearch("");
+            if (opening) {
+              setDraftFrom(dateFrom || "");
+              setDraftTo(dateTo || "");
+            }
+          }}
         style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: hasSelection ? 700 : 500, border: `1px solid ${hasSelection ? "rgba(31,168,201,0.55)" : open ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.09)"}`, background: hasSelection ? "rgba(31,168,201,0.13)" : open ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)", color: hasSelection ? "#1FA8C9" : "#94a3b8", cursor: "pointer", outline: "none", whiteSpace: "nowrap", userSelect: "none", transition: "all .15s" }}>
         <span>{fd.name}</span>
         {selCount > 0 && <span style={{ fontSize: 9, background: "#1FA8C9", color: "#fff", borderRadius: 8, padding: "1px 6px", fontWeight: 700, lineHeight: 1.5, flexShrink: 0 }}>{selCount}</span>}
@@ -482,7 +515,7 @@ function FilterDropdown({ fd, activeFilters, dateFrom, dateTo, onFilterChange, o
             </div>
           </div>
 
-          {fd.type === "date" && (
+          {/* {fd.type === "date" && (
             <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
               {[["From", dateFrom, onDateFromChange], ["To", dateTo, onDateToChange]].map(([label, val, setter]) => (
                 <div key={label}>
@@ -490,6 +523,52 @@ function FilterDropdown({ fd, activeFilters, dateFrom, dateTo, onFilterChange, o
                   <input type="date" value={val} onChange={e => setter?.(e.target.value)} style={{ background: "#0d1117", border: "1px solid #2d3748", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#94a3b8", width: "100%", outline: "none", cursor: "pointer" }} />
                 </div>
               ))}
+            </div>
+          )} */}
+          {fd.type === "date" && (
+            <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+              <div>
+                <p style={{ fontSize: 10, color: "#475569", marginBottom: 5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>From</p>
+                <input
+                  type="date"
+                  value={draftFrom}
+                  onChange={e => setDraftFrom(e.target.value)}
+                  style={{ background: "#0d1117", border: "1px solid #2d3748", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#94a3b8", width: "100%", outline: "none", cursor: "pointer" }}
+                />
+              </div>
+              <div>
+                <p style={{ fontSize: 10, color: "#475569", marginBottom: 5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>To</p>
+                <input
+                  type="date"
+                  value={draftTo}
+                  onChange={e => setDraftTo(e.target.value)}
+                  style={{ background: "#0d1117", border: "1px solid #2d3748", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#94a3b8", width: "100%", outline: "none", cursor: "pointer" }}
+                />
+              </div>
+              <button
+                disabled={!draftFrom || !draftTo}
+                onClick={() => {
+                  if (draftFrom && draftTo) {
+                    onDateFromChange?.(draftFrom);
+                    onDateToChange?.(draftTo);
+                    setOpen(false);
+                  }
+                }}
+                style={{
+                  marginTop: 4,
+                  padding: "7px 0",
+                  borderRadius: 7,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: (draftFrom && draftTo) ? "pointer" : "not-allowed",
+                  border: `1px solid ${(draftFrom && draftTo) ? "rgba(31,168,201,0.5)" : "rgba(255,255,255,0.08)"}`,
+                  background: (draftFrom && draftTo) ? "rgba(31,168,201,0.15)" : "rgba(255,255,255,0.03)",
+                  color: (draftFrom && draftTo) ? "#1FA8C9" : "#374151",
+                  width: "100%",
+                  transition: "all 0.15s",
+                }}>
+                🔍 Apply
+              </button>
             </div>
           )}
 
@@ -606,6 +685,8 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
   const [dataDateRange,   setDataDateRange]   = useState({ min: null, max: null });
   const [dateFrom,        setDateFrom]        = useState(null);
   const [dateTo,          setDateTo]          = useState(null);
+  const [hasTimeFilter,   setHasTimeFilter]   = useState(false);
+  const [timeFilterId,    setTimeFilterId]    = useState(null);
   const [activeTabId,     setActiveTabId]     = useState(null);
   const [isPdfLoading,    setIsPdfLoading]    = useState(false); // eslint-disable-line no-unused-vars
   const [pdfTabIdx,       setPdfTabIdx]       = useState(null);
@@ -674,10 +755,10 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
   }, []);
 
   const handleReset = useCallback(() => {
-    setActiveFilters({});
-    setDateFrom("");
-    setDateTo("");
-  }, []);
+  setActiveFilters({});
+  setDateFrom(null);
+  setDateTo(null);
+}, []);
 
   const handleCrossFilter = useCallback((column, value, sourceChartId, sourceChartTitle, fromTable = false, chartsInScope = null) => {
     const normalizedScope = chartsInScope ? chartsInScope.map(Number) : null;
@@ -1014,8 +1095,10 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
     setLoading(true);
     setError(null);
     setActiveFilters({});
-    setDateFrom("");
-    setDateTo("");
+    setDateFrom(null);
+    setDateTo(null);
+    setHasTimeFilter(false);
+    setTimeFilterId(null);
     setSections(null);
     setCrossFilters({});
     setDataDateRange({ min: null, max: null });
@@ -1029,7 +1112,15 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
       if (cR.data.success) setCharts(cR.data.charts.filter(c => c.viz_type !== "filter_box"));
       console.log("Loaded chart IDs:", cR.data.charts.map(c => c.slice_id)); // ← ADD
       if (lR?.data?.success) { const p = parseSupersetLayout(lR.data.layout); setSections(p); }
-      if (fR?.data?.success) setFilterDefs(fR.data.filters || []);
+      // if (fR?.data?.success) setFilterDefs(fR.data.filters || []);
+      if (fR?.data?.success) {
+        setFilterDefs(fR.data.filters || []);
+        console.log("📋 ALL FILTERS:", JSON.stringify(fR.data.filters, null, 2)); // ADD
+        const timeFilt = (fR.data.filters || []).find(f => f.filterType === "filter_time");
+        setHasTimeFilter(!!timeFilt);
+        setTimeFilterId(timeFilt?.id || null);
+        console.log("⏱ timeFilt:", JSON.stringify(timeFilt)); // ADD
+      }
       setCrossFiltersEnabled(scR?.data?.enabled || false);
       setCrossFilterScopeMap(scR?.data?.scope   || {});
 
@@ -1149,8 +1240,11 @@ const applicableCrossFilters = Object.fromEntries(
       xAxis:               chart.x_axis,
       height:              (chart.viz_type || "").toLowerCase().includes("big_number") ? BIGNUM_HEIGHT : chartHeightPx,
       activeFilters,
-      dateFrom:            dateFrom || null,
-      dateTo:              dateTo   || null,
+      // dateFrom:            dateFrom || null,
+      // dateTo:              dateTo   || null,
+      dateFrom: hasTimeFilter ? (dateFrom || null) : null,
+      dateTo:   hasTimeFilter ? (dateTo   || null) : null,
+      timeFilterId: hasTimeFilter ? timeFilterId : null,
       crossFilters:        applicableCrossFilters,
       onCrossFilter:       handleCrossFilter,
       onDrillDown:         handleFilterChange,
@@ -1223,11 +1317,14 @@ const applicableCrossFilters = Object.fromEntries(
           }}
           pdfTabIdx={pdfTabIdx}
           pdfNestedTabIdx={pdfNestedTabIdx}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          setDateFrom={setDateFrom}
-          setDateTo={setDateTo}
+          dateFrom={hasTimeFilter ? dateFrom : null}
+          dateTo={hasTimeFilter ? dateTo : null}
+          // setDateFrom={hasTimeFilter ? setDateFrom : () => {}}
+          // setDateTo={hasTimeFilter ? setDateTo : () => {}}
+          setDateFrom={hasTimeFilter ? (val) => { console.log("📅 tab dateFrom:", val); setDateFrom(val); } : () => {}}
+          setDateTo={hasTimeFilter ? (val) => { console.log("📅 tab dateTo:", val); setDateTo(val); } : () => {}}
           dataDateRange={dataDateRange}
+          hasTimeFilter={hasTimeFilter}
         />
       );
     return null;
@@ -1291,25 +1388,31 @@ const applicableCrossFilters = Object.fromEntries(
         return fd.tabsInScope.includes(activeTabId);
       })}
       activeFilters={activeFilters}
-      dateFrom={dateFrom}
-      dateTo={dateTo}
+      dateFrom={hasTimeFilter ? dateFrom : null}
+      dateTo={hasTimeFilter ? dateTo : null}
+      // onDateFromChange={hasTimeFilter ? setDateFrom : undefined}
+      // onDateToChange={hasTimeFilter ? setDateTo : undefined}
+      onDateFromChange={hasTimeFilter ? (val) => { console.log("📅 dateFrom changing to:", val); setDateFrom(val); } : undefined}
+      onDateToChange={hasTimeFilter ? (val) => { console.log("📅 dateTo changing to:", val); setDateTo(val); } : undefined}
       onFilterChange={handleFilterChange}
-      onDateFromChange={setDateFrom}
-      onDateToChange={setDateTo}
+      // onDateFromChange={setDateFrom}
+      // onDateToChange={setDateTo}
       onReset={handleReset}
     />
 
     
     <ActivePills
       activeFilters={activeFilters}
-      dateFrom={dateFrom}
-      dateTo={dateTo}
+      dateFrom={hasTimeFilter ? dateFrom : null}
+      dateTo={hasTimeFilter ? dateTo : null}
+      onRemoveDate={() => { setDateFrom(null); setDateTo(null); }}
       onRemove={(col, val) => handleFilterChange(col, val)}
-      onRemoveDate={() => { setDateFrom(""); setDateTo(""); }}
+      // onRemoveDate={() => { setDateFrom(""); setDateTo(""); }}
     />
 
     {/* ── Show DateRangePicker for dashboards WITHOUT tabs ── */}
-    {sections && !sections.some(s => s.type === "tabs") && (
+    {/*
+    {hasTimeFilter && sections && !sections.some(s => s.type === "tabs") && (
       <div style={{
         background: "#12151f",
         border: "1px solid rgba(255,255,255,0.07)",
@@ -1321,13 +1424,14 @@ const applicableCrossFilters = Object.fromEntries(
         gap: 8
       }}>
 
-      {/* ── DateRangePicker — always visible, right aligned ── */}
-    <div style={{
-      display:        "flex",
-      justifyContent: "flex-end",
-      marginBottom:   14,
-    }}></div>
-        <DateRangePicker
+      -- DateRangePicker — always visible, right aligned --
+
+      <div style={{
+        display:        "flex",
+        justifyContent: "flex-end",
+        marginBottom:   14,
+      }}></div>
+      <DateRangePicker
         dateFrom={dateFrom}
         dateTo={dateTo}
         onFromChange={setDateFrom}
@@ -1337,6 +1441,7 @@ const applicableCrossFilters = Object.fromEntries(
       />
     </div>
     )}
+    */}
 
     <div ref={dashboardContentRef}>
       {sections ? renderWithLayout() : renderFallback()}

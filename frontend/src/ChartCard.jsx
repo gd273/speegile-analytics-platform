@@ -1084,7 +1084,7 @@ if (type === "line") {
 // ══════════════════════════════════════════════════════════════
 export default function ChartCard({
   sliceId, title, vizType, xAxis, height: heightProp = 320,
-  activeFilters = {}, dateFrom, dateTo,
+  activeFilters = {}, dateFrom, dateTo,timeFilterId,
   onCrossFilter, crossFilters = {}, onDrillDown,
   metrics:        metricsProp     = [],
   groupby:        groupbyProp     = [],
@@ -1139,6 +1139,7 @@ const activeFiltersString      = JSON.stringify(activeFilters);
 const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters, sliceId, chartType === "table"));
 
   useEffect(() => {
+      console.log("🔄 ChartCard useEffect fired:", { sliceId, dateFrom, dateTo, timeFilterId }); // ADD THIS FIRST LINE
     if (!sliceId) return;
     if ((dateFrom && !dateTo) || (!dateFrom && dateTo)) return;
 
@@ -1149,12 +1150,14 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
 
     const body = {
       sliceId,
-      ...(dateFrom || dateTo ? { dateFrom, dateTo } : {}),
+      ...(dateFrom || dateTo ? { dateFrom, dateTo, timeFilterId } : {}),
       activeFilters: Object.entries(activeFilters)
-      .filter(([, v]) => Array.isArray(v) ? v.length > 0 : (v != null && v !== ""))
-      .map(([col, val]) => ({ col, op: "IN", val: Array.isArray(val) ? val : [val] })),
+        .filter(([, v]) => Array.isArray(v) ? v.length > 0 : (v != null && v !== ""))
+        .map(([col, val]) => ({ col, op: "IN", val: Array.isArray(val) ? val : [val] })),
       crossFilters: crossFilterPayload,
     };
+
+    console.log("🗓 Chart body:", { sliceId, dateFrom, dateTo, timeFilterId }); // ADD THIS
 
     api.post("/chart-data", body)
       .then(res => {
@@ -1218,7 +1221,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     sliceId,
-    dateFrom, dateTo,
+    dateFrom, dateTo, timeFilterId,
     activeFiltersString,
     crossFilterPayloadString,
   ]);
@@ -1525,7 +1528,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
           crossFilterValue={selectedValue}
           title={title}
           columnOrder={columnOrderProp}
-          showCellBars={showCellBars}    // ← ADD
+          showCellBars={showCellBars}    // ← AD
           conditionalFormatting={conditionalFormattingProp}
           onRowClick={(col, val) =>  {
             if (!onCrossFilter) return;
