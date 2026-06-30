@@ -1459,6 +1459,49 @@ def get_dashboard_charts():
                             pass
                     return COLOR_SCHEME_MAP.get(s.lower(), None)
 
+                # conditional_formatting = (
+                #     form_data.get("conditional_formatting") or
+                #     form_data.get("conditionalFormatting") or
+                #     form_data.get("color_config")          or
+                #     []
+                # )
+
+                # for rule in (conditional_formatting or []):
+                #     if not isinstance(rule, dict):
+                #         continue
+                #     operator = rule.get("operator", "") or rule.get("op", "")
+                #     target   = rule.get("targetValue", rule.get("target_value", 0))
+                #     if not operator or operator in ("None", "none", ""):
+                #         continue
+                #     raw_color = (
+                #         rule.get("colorScheme")              or
+                #         rule.get("color")                    or
+                #         rule.get("fontColor")                or
+                #         rule.get("font_color")               or
+                #         rule.get("textColor")                or
+                #         (rule.get("colorScheme", {}) or {}).get("value") or
+                #         (rule.get("style", {}) or {}).get("color") or
+                #         None
+                #     )
+                #     color = resolve_color(raw_color)
+                #     if color:
+                #         conditional_colors.append({
+                #             "operator":    operator,
+                #             "targetValue": target,
+                #             "color":       color,
+                #         })
+
+                # if not conditional_colors:
+                #     direct_color = (
+                #         form_data.get("font_color")   or
+                #         form_data.get("fontColor")    or
+                #         form_data.get("color")        or
+                #         None
+                #     )
+                #     if direct_color:
+                #         font_color = resolve_color(direct_color)
+
+
                 conditional_formatting = (
                     form_data.get("conditional_formatting") or
                     form_data.get("conditionalFormatting") or
@@ -1466,11 +1509,28 @@ def get_dashboard_charts():
                     []
                 )
 
+                # ── DEBUG: log RAW rules before any filtering/resolving ──
+                print(f"DEBUG bignum {chart_id} RAW conditional_formatting = {conditional_formatting}", flush=True)
+                for _r in (conditional_formatting or []):
+                    if isinstance(_r, dict):
+                        print(
+                            f"DEBUG bignum {chart_id} RAW rule: "
+                            f"operator={_r.get('operator')!r} "
+                            f"targetValue={_r.get('targetValue')!r} "
+                            f"targetValueLeft={_r.get('targetValueLeft')!r} "
+                            f"targetValueRight={_r.get('targetValueRight')!r} "
+                            f"colorScheme={_r.get('colorScheme')!r} "
+                            f"column={_r.get('column')!r}",
+                            flush=True,
+                        )
+
                 for rule in (conditional_formatting or []):
                     if not isinstance(rule, dict):
                         continue
                     operator = rule.get("operator", "") or rule.get("op", "")
                     target   = rule.get("targetValue", rule.get("target_value", 0))
+                    target_left  = rule.get("targetValueLeft")
+                    target_right = rule.get("targetValueRight")
                     if not operator or operator in ("None", "none", ""):
                         continue
                     raw_color = (
@@ -1484,25 +1544,38 @@ def get_dashboard_charts():
                         None
                     )
                     color = resolve_color(raw_color)
-                    if color:
-                        conditional_colors.append({
-                            "operator":    operator,
-                            "targetValue": target,
-                            "color":       color,
-                        })
+                    # ── If a token didn't resolve, log it so we can extend the map ──
+                    if not color:
+                        print(f"DEBUG bignum {chart_id}: UNRESOLVED colorScheme={raw_color!r} (rule dropped)", flush=True)
+                        continue
+                    conditional_colors.append({
+                        "operator":         operator,
+                        "targetValue":      target,
+                        "targetValueLeft":  target_left,
+                        "targetValueRight": target_right,
+                        "color":            color,
+                    })
 
-                if not conditional_colors:
-                    direct_color = (
-                        form_data.get("font_color")   or
-                        form_data.get("fontColor")    or
-                        form_data.get("color")        or
-                        None
-                    )
-                    if direct_color:
-                        font_color = resolve_color(direct_color)
+                # ── Default font color: ONLY from a real default field, NEVER from rule[0] ──
+                direct_color = (
+                    form_data.get("font_color") or
+                    form_data.get("fontColor")  or
+                    form_data.get("color")      or
+                    None
+                )
+                if direct_color:
+                    font_color = resolve_color(direct_color)
+                # NOTE: deliberately NOT setting font_color = conditional_colors[0]["color"]
+                #       That was leaking the first rule's color when no rule matched.
 
-                if conditional_colors:
-                    font_color = conditional_colors[0]["color"]
+                print(
+                    f"DEBUG bignum {chart_id}: "
+                    f"conditional_colors={conditional_colors} "
+                    f"font_color={font_color}",
+                    flush=True
+                )
+                # if conditional_colors:
+                #     font_color = conditional_colors[0]["color"]
 
                 print(
                     f"DEBUG bignum {chart_id}: "
@@ -2061,12 +2134,7 @@ def get_filter_options():
         if isinstance(json_metadata, str):
             json_metadata = json.loads(json_metadata)
 
-        # native_filters = json_metadata.get("native_filter_configuration", [])
         native_filters = json_metadata.get("native_filter_configuration", [])
-        print(f"DEBUG native_filters count: {len(native_filters)}", flush=True)  # ✅
-        for nf in native_filters:
-            print(f"DEBUG raw filter: {json.dumps(nf, indent=2)}", flush=True)  # ✅ inside loop
-        
 
         def get_distinct_values(dataset_id, column_name):
             payload = {
@@ -2187,11 +2255,7 @@ def get_dashboard_filters():
         if isinstance(json_metadata, str):
             json_metadata = json.loads(json_metadata)
 
-        # native_filters = json_metadata.get("native_filter_configuration", [])
-        # print(f"DEBUG raw filter: {json.dumps(native_filter, indent=2)}", flush=True)
         native_filters = json_metadata.get("native_filter_configuration", [])
-        print(f"DEBUG dashboard-filters native_filters: {native_filters}", flush=True)  # ✅
-        
         filters_out    = []
 
         for f in native_filters:
@@ -2551,5 +2615,3 @@ def get_cross_filter_scope():
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
-
-
