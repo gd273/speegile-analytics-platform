@@ -1415,15 +1415,23 @@ def get_dashboard_charts():
             if viz_type and "big_number" in viz_type.lower():
 
                 COLOR_SCHEME_MAP = {
-                    "success":           "#22c55e",
-                    "alert":             "#fbbf24",
-                    "error":             "#f87171",
+                    # Ant Design 5 bare semantic tokens (Superset 6.1.0)
+                    "colorsuccess":      "#22c55e",
+                    "colorerror":        "#f87171",
+                    "colorwarning":      "#fbbf24",
+                    "colorinfo":         "#1FA8C9",
+                    "colorprimary":      "#1FA8C9",
+                    # Ant Design "bg" variants (seen on 6.0.1)
                     "colorsuccessbg":    "#22c55e",
                     "colorwarningbg":    "#fbbf24",
                     "colorerrorbg":      "#f87171",
                     "successbg":         "#22c55e",
                     "warningbg":         "#fbbf24",
                     "errorbg":           "#f87171",
+                    # Plain names
+                    "success":           "#22c55e",
+                    "alert":             "#fbbf24",
+                    "error":             "#f87171",
                     "green":             "#22c55e",
                     "yellow":            "#fbbf24",
                     "red":               "#f87171",
