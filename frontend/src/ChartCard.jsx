@@ -691,14 +691,107 @@ const scrollLegend = (keys) => ({
 
 
 
+  // if (type === "bar") {
+    
+  //   // ── Sort legend items in ascending order ──
+  //   const sortedKeys = [...keys].sort((a, b) =>
+  //     String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" })
+  //   );
+
+  //   const isGrouped  = keys.length > 1;
+  //   const showLabels = data.length <= 1150;
+  //   const labelRotate = data.length > 35 ? 45 : 0; 
+  //   return {
+  //     ...base,
+  //      legend: {
+  //         ...scrollLegend(sortedKeys),  // ← uses sortedKeys
+  //         selector: [
+  //           { type: "all",     title: "All" },
+  //           { type: "inverse", title: "Inv" }
+  //         ],
+  //         selectorPosition: "end",
+  //         selectorLabel: {
+  //           fontSize: 10,
+  //           padding:  [3, 8],
+  //           borderRadius:     4,
+  //           color:            "#8b9ab0",
+  //           borderColor:      "rgba(255,255,255,0.18)",
+  //           backgroundColor:  "rgba(255,255,255,0.04)",
+  //         },
+  //         selectorItemGap: 6,
+  //       }, 
+
+  //       // ── Data zoom — only when Superset chart has zoomable enabled ──
+  //   ...(zoomable ? {
+  //     grid: { left: 12, right: 40, top: 36, bottom: 110, containLabel: true },
+  //     dataZoom: [
+  //       {
+  //         type:            "slider",
+  //         xAxisIndex:      [0],
+  //         bottom:          36,
+  //         height:          22,
+  //         borderColor:     "rgba(255,255,255,0.08)",
+  //         backgroundColor: "rgba(255,255,255,0.03)",
+  //         fillerColor:     "rgba(31,168,201,0.18)",
+  //         handleStyle:     { color: "#1FA8C9", borderColor: "#1FA8C9" },
+  //         moveHandleStyle: { color: "#1FA8C9" },
+  //         textStyle:       { color: "#64748b", fontSize: 10 },
+  //         dataBackground: {
+  //           lineStyle: { color: "#1FA8C9", opacity: 0.25 },
+  //           areaStyle: { color: "#1FA8C9", opacity: 0.08 },
+  //         },
+  //         selectedDataBackground: {
+  //           lineStyle: { color: "#1FA8C9", opacity: 0.6 },
+  //           areaStyle: { color: "#1FA8C9", opacity: 0.2 },
+  //         },
+  //       },
+  //       {
+  //         type:       "inside",   // ← enables mouse wheel zoom
+  //         xAxisIndex: [0],
+  //       },
+  //     ],
+  //   } : {}),
+
+  //     xAxis: axisX(cats), yAxis: axisY(),
+  //     series: sortedKeys.map((k, i) => ({
+  //       type: "bar", name: k,
+  //       barCategoryGap: isGrouped ? "20%" : "30%",
+  //       barGap: isGrouped ? "5%" : "30%",
+  //       ...(isGrouped ? {} : { barMaxWidth: 48 }),
+  //       data: sData(k).map((val, ci) => ({
+  //         value: val,
+  //         // itemStyle: { color: dimmedColor(COLORS[i % COLORS.length], cats[ci]), borderRadius: [4, 4, 0, 0] },
+  //         itemStyle: { color: dimmedColor(getColor(k, i), cats[ci]), borderRadius: [4, 4, 0, 0] },
+  //       })),
+  //       label: { 
+  //         show: showLabels, 
+  //         position: "top",
+  //         color: "#94a3b8", 
+  //         distance: 8,
+  //         fontSize: 9, 
+  //         fontFamily: "inherit", 
+  //         fontWeight: "600", 
+  //         formatter: p => fmtNum(p.value), 
+  //         rotate: labelRotate, 
+  //       },
+  //       emphasis: { focus: "series" },
+  //     })),
+  //   };
+  // }
+
   if (type === "bar") {
+    // ── Sort legend items in ascending order ──
+    const sortedKeys = [...keys].sort((a, b) =>
+      String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" })
+    );
+
     const isGrouped  = keys.length > 1;
     const showLabels = data.length <= 1150;
     const labelRotate = data.length > 35 ? 45 : 0; 
     return {
       ...base,
        legend: {
-          ...scrollLegend(keys),
+          ...scrollLegend(sortedKeys),            // ← sortedKeys
           selector: [
             { type: "all",     title: "All" },
             { type: "inverse", title: "Inv" }
@@ -747,14 +840,14 @@ const scrollLegend = (keys) => ({
     } : {}),
 
       xAxis: axisX(cats), yAxis: axisY(),
-      series: keys.map((k, i) => ({
+      series: sortedKeys.map((k, i) => ({       // ← sortedKeys
         type: "bar", name: k,
+        itemStyle: { color: getColor(k, i) }, 
         barCategoryGap: isGrouped ? "20%" : "30%",
         barGap: isGrouped ? "5%" : "30%",
         ...(isGrouped ? {} : { barMaxWidth: 48 }),
         data: sData(k).map((val, ci) => ({
           value: val,
-          // itemStyle: { color: dimmedColor(COLORS[i % COLORS.length], cats[ci]), borderRadius: [4, 4, 0, 0] },
           itemStyle: { color: dimmedColor(getColor(k, i), cats[ci]), borderRadius: [4, 4, 0, 0] },
         })),
         label: { 
