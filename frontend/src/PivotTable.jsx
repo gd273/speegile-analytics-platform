@@ -124,7 +124,12 @@ function SearchBar({ value, onChange, placeholder = "Search..." }) {
 }
 const CURRENCY_COL_PATTERN =
   /amount|net|sales|revenue|value|cost|price|mrp|sell|earning|income|profit|loss/i;
-const ID_COL_PATTERN = /\bid\b|_id$|^id_/i;
+
+// Columns that must NEVER be treated as "numbers to format" — mobile/phone/contact
+// numbers, pincodes, IDs, invoice numbers etc. These should always render as plain text,
+// never get thousands-separator commas, currency symbols, or right-alignment.
+const ID_COL_PATTERN =
+  /\bid\b|_id$|^id_|mobile|phone|contact|tel|fax|whatsapp|pincode|zip|postal|pin_code|\bpin\b|order[_ ]?no|order_id|invoice|^no\.?$|#/i;
 
 // ── Conditional formatting evaluator ─────────────────────────────
 // For PIVOT: Superset rules use the metric label (e.g. "MIN(rn)") as column.
@@ -181,26 +186,44 @@ function cellBarColor(value, colValues) {
   return `rgba(31,168,201,${alpha.toFixed(2)})`;
 }
 
-// ── Number formatter ─────────────────────────────────────────────
+// ── Number / Date formatter ────────────────────────────────────────
 function isTimestampMs(n) {
   return Number.isInteger(n) && n > 1_000_000_000_000;
 }
+// Simple, unambiguous ISO date — matches Superset's own default date display (YYYY-MM-DD)
 function fmtDateMs(ms) {
-  return new Date(ms).toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric",
-  });
+  const d = new Date(ms);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 function fmtTableNum(val, colName = "") {
   if (val === null || val === undefined || val === "") return "";
+  // Mobile/phone/contact/ID/pincode etc. columns: always render exactly as received,
+  // never run through number formatting (no commas, no currency symbol).
+  if (colName && ID_COL_PATTERN.test(colName)) return String(val);
   const n = Number(val);
   if (isNaN(n)) return String(val);
   if (isTimestampMs(n)) return fmtDateMs(n);
-  if (colName && ID_COL_PATTERN.test(colName)) return String(val);
   const formatted = new Intl.NumberFormat("en-IN", {
     maximumFractionDigits: 2, minimumFractionDigits: 0,
   }).format(n);
   if (colName && CURRENCY_COL_PATTERN.test(colName)) return `₹${formatted}`;
   return formatted;
+}
+
+// Value used specifically for Excel export. Differs from fmtTableNum in that
+// plain numeric metric columns are kept as real numbers (so totals/sums still
+// work in Excel), while dates are converted to a clean ISO string and
+// mobile/ID-type columns are forced to text so Excel doesn't strip leading
+// zeros or reformat them.
+function exportCellValue(val, colName = "") {
+  if (val === null || val === undefined) return "";
+  if (colName && ID_COL_PATTERN.test(colName)) return String(val);
+  const n = Number(val);
+  if (!isNaN(n) && isTimestampMs(n)) return fmtDateMs(n);
+  return val;
 }
 
 // ── Quarter/period sorter ─────────────────────────────────────────
@@ -232,6 +255,13 @@ function sortPeriodValues(vals) {
   return [...vals].sort((a, b) => toNum(a) - toNum(b));
 }
 
+// Normalizes a column-name-like string for tolerant matching (trims, lowercases,
+// collapses internal whitespace). Used to line up backend `columnOrder` values
+// against actual data keys even if casing/whitespace differs slightly.
+function normKey(s) {
+  return String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 // ── Pivot builder ─────────────────────────────────────────────────
 // columnOrder : top-level colDim values in desired order (centername)
 // colnames    : full column list from API response (used for flat table)
@@ -254,13 +284,16 @@ function buildPivot(rows, groupbyRows, groupbyColumns, metricKeys, columnOrder) 
     if (v != null && !topDimSeen.has(v)) { topDimSeen.add(v); topDimVals.push(v); }
   }
 
-  // Step 2: sort top-level by columnOrder if provided, else alphabetically
+  // Step 2: sort top-level by columnOrder if provided, else alphabetically.
+  // Matching is done on a normalized (trimmed/lowercased) key so that minor
+  // casing/whitespace differences between the backend-provided columnOrder
+  // and the actual data values don't silently break the intended order.
   let sortedTopVals;
   if (columnOrder?.length) {
-    const orderMap = new Map(columnOrder.map((v, i) => [v, i]));
+    const orderMap = new Map(columnOrder.map((v, i) => [normKey(v), i]));
     sortedTopVals = [...topDimVals].sort((a, b) => {
-      const ia = orderMap.has(a) ? orderMap.get(a) : 9999;
-      const ib = orderMap.has(b) ? orderMap.get(b) : 9999;
+      const ia = orderMap.has(normKey(a)) ? orderMap.get(normKey(a)) : 9999;
+      const ib = orderMap.has(normKey(b)) ? orderMap.get(normKey(b)) : 9999;
       return ia - ib;
     });
   } else {
@@ -324,29 +357,67 @@ function buildPivot(rows, groupbyRows, groupbyColumns, metricKeys, columnOrder) 
   return { rowDims, colDims, colDimValues, colCombos, metrics, rowMap };
 }
 
-// ── Pagination bar ────────────────────────────────────────────────
 function PageTabs({ totalRows, page, setPage }) {
-  const pageCount = Math.ceil(totalRows / ROWS_PER_PAGE);
-  if (pageCount <= 1) return null;
+  if (totalRows <= ROWS_PER_PAGE) return null;
+  const totalPages = Math.ceil(totalRows / ROWS_PER_PAGE);
+
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 4, padding: "6px 8px",
-      borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0d1117", flexWrap: "wrap",
+      display: "flex",
+      alignItems: "center",
+      borderTop: "1px solid rgba(255,255,255,0.07)",
+      background: "#12151f",
+      padding: "6px 10px",
+      gap: 8,
+      minHeight: 38,
     }}>
-      <span style={{ fontSize: 11, color: "#8b8fa8", marginRight: 4, whiteSpace: "nowrap" }}>
-        {totalRows.toLocaleString("en-IN")} rows ·
+      {/* ── Fixed left: row count — never scrolls ── */}
+      <span style={{
+        fontSize: 11,
+        color: "#64748b",
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+      }}>
+        {totalRows.toLocaleString()} rows
       </span>
-      {Array.from({ length: pageCount }, (_, i) => (
-        <button key={i} onClick={() => setPage(i)} style={{
-          padding: "2px 10px", borderRadius: 4, fontSize: 11, fontWeight: page === i ? 700 : 400,
-          border: page === i ? "1px solid #1FA8C9" : "1px solid rgba(255,255,255,0.12)",
-          background: page === i ? "rgba(31,168,201,0.18)" : "transparent",
-          color: page === i ? "#1FA8C9" : "#8b8fa8", cursor: "pointer", transition: "all .12s",
-        }}>
-          {(i * ROWS_PER_PAGE + 1).toLocaleString("en-IN")}–
-          {Math.min((i + 1) * ROWS_PER_PAGE, totalRows).toLocaleString("en-IN")}
-        </button>
-      ))}
+
+      {/* ── Scrollable right: page buttons ── */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        overflowX: "auto",
+        flex: 1,
+        paddingBottom: 2,
+        scrollbarWidth: "thin",
+        scrollbarColor: "rgba(31,168,201,0.4) transparent",
+      }}>
+        {Array.from({ length: totalPages }, (_, i) => {
+          const start = i * ROWS_PER_PAGE + 1;
+          const end   = Math.min((i + 1) * ROWS_PER_PAGE, totalRows);
+          const active = page === i;
+          return (
+            <button
+              key={i}
+              onClick={() => setPage(i)}
+              style={{
+                flexShrink: 0,
+                padding: "3px 10px",
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: active ? 700 : 400,
+                border: `1px solid ${active ? "#1FA8C9" : "rgba(255,255,255,0.1)"}`,
+                background: active ? "rgba(31,168,201,0.18)" : "transparent",
+                color: active ? "#1FA8C9" : "#64748b",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {start.toLocaleString()}–{end.toLocaleString()}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -479,11 +550,11 @@ function ProperPivotTable({
         pivot.metrics.map(mk => {
           const cellKey = combo.join("||") + "||" + mk;
           const v = entry.metricMap[cellKey];
-          return v !== null && v !== undefined ? v : "";
+          return exportCellValue(v, mk);
         })
       ),
     ]);
-    exportToExcel("pivot_table.csv", headers, rows2d);
+    exportToExcel("pivot_table.xlsx", headers, rows2d);
   };
 
   return (
@@ -669,6 +740,9 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
   // 1. columnOrder from backend chart meta (column_config)
   // 2. colnames from API data response (res.data.colnames) -- Superset live order
   // 3. Object.keys(rows[0]) -- last resort
+  // Matching is done both exactly AND on a normalized (trim + lowercase) key so
+  // minor casing/whitespace mismatches between the backend list and the actual
+  // data keys don't cause a column to drop out of order silently.
   const columns = useMemo(() => {
     if (!allRows.length) return [];
     const dataKeys = Object.keys(allRows[0]).filter(k => k !== "__summary__");
@@ -676,8 +750,15 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
                     : colnames?.length    ? colnames
                     : [];
     if (!preferred.length) return dataKeys;
-    const ordered = preferred.filter((c) => dataKeys.includes(c));
-    const rest    = dataKeys.filter((c) => !preferred.includes(c));
+
+    const dataKeyByNorm = new Map(dataKeys.map(k => [normKey(k), k]));
+    const ordered = [];
+    const used = new Set();
+    for (const p of preferred) {
+      let match = dataKeys.includes(p) ? p : dataKeyByNorm.get(normKey(p));
+      if (match && !used.has(match)) { ordered.push(match); used.add(match); }
+    }
+    const rest = dataKeys.filter((c) => !used.has(c));
     return [...ordered, ...rest];
   }, [allRows, columnOrder, colnames]);
 
@@ -687,6 +768,9 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
     const s = new Set(metricSet);
     if (!s.size) {
       for (const col of columns) {
+        // Never auto-detect mobile/phone/contact/ID/pincode-type columns as numeric,
+        // even if every sampled value happens to parse as a number.
+        if (ID_COL_PATTERN.test(col)) continue;
         const sample = allRows.slice(0, 20).map((r) => r[col]).filter((v) => v != null);
         if (sample.length && sample.every((v) => !isNaN(Number(v)))) s.add(col);
       }
@@ -719,7 +803,7 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
   if (!allRows.length) return <div style={{ color: "#8b8fa8", padding: 16 }}>No data</div>;
 
   const handleFlatExport = () => {
-    const rows2d = filteredRows.map(row => columns.map(col => row[col] ?? ""));
+    const rows2d = filteredRows.map(row => columns.map(col => exportCellValue(row[col], col)));
     exportToExcel("table_data.xlsx", columns, rows2d);
   };
 
@@ -749,43 +833,6 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
             </tr>
           </thead>
           <tbody>
-            {/* {pageRows.map((row, ri) => (
-              <tr
-                key={ri}
-                onClick={() => {
-                  if (!onRowClick) return;
-                  // Find first non-numeric column as the filter column
-                  const dimCol = columns.find(c => !numericCols.has(c));
-                  if (dimCol && row[dimCol]) onRowClick(dimCol, row[dimCol]);
-                }}
-                onMouseEnter={() => setHoveredRow(ri)}
-                onMouseLeave={() => setHoveredRow(null)}
-                style={{
-                  background: hoveredRow === ri
-                    ? "rgba(31,168,201,0.08)"
-                    : ri % 2 === 0 ? "#0d1117" : "#111820",
-                  cursor: onRowClick ? "pointer" : "default",
-                  transition: "background .1s",
-                }}
-              >
-                {columns.map((col) => {
-                  const val   = row[col];
-                  const isNum = numericCols.has(col);
-                  if (isNum) {
-                    const cfColor  = evalConditionalColor(val, col, rules);
-                    const barColor = (!cfColor && showCellBars)
-                      ? cellBarColor(val, colBarValues[col] || []) : null;
-                    const bgColor  = cfColor || barColor;
-                    const cellStyle = bgColor
-                      ? { ...S.tdNum, background: bgColor, color: contrastColor(bgColor), fontWeight: cfColor ? 600 : 400 }
-                      : { ...S.tdNum, color: "#1FA8C9" };
-                    return <td key={col} style={cellStyle}>{fmtTableNum(val, col)}</td>;
-                  }
-                  return <td key={col} style={S.td}>{val ?? ""}</td>;
-                })}
-              </tr>
-            ))} */}
-
             {pageRows.map((row, ri) => {
               const isSummary = row.__summary__;
               return (
