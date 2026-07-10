@@ -10,10 +10,6 @@ const COLORS = [
   "#8E44AD","#27AE60","#E74C3C","#F39C12","#2C3E50",
 ];
 
-
-// ─────────────────────────────────────────────────────────────
-//  useChartHeight — shrinks on small landscape screens
-// ─────────────────────────────────────────────────────────────
 const ID_COL_PATTERN = /pincode|zip|postal|pin_code|order_id|invoice|phone|mobile|id$/i;
 
 
@@ -37,15 +33,10 @@ function useChartHeight(defaultHeight) {
   return height;
 }
 
-// ─────────────────────────────────────────────────────────────
-//  buildFilterPayload
-// ─────────────────────────────────────────────────────────────
-// ✅ Revert to this — no knownCols filtering
-// ── Updated to skip table-row filters for non-table charts ──
 function buildFilterPayload(crossFilters, ownSliceId, isTable = false) {
   return Object.entries(crossFilters)
     .filter(([, f]) => f.sourceChartId !== ownSliceId && f.value != null && f.value !== "")
-    .filter(([, f]) => isTable || !f.fromTable)  // ← non-tables skip table-row filters
+    .filter(([, f]) => isTable || !f.fromTable)
     .map(([col, f]) => ({
       col,
       op:  "IN",
@@ -53,11 +44,6 @@ function buildFilterPayload(crossFilters, ownSliceId, isTable = false) {
     }));
 }
 
-
-
-// ─────────────────────────────────────────────────────────────
-//  Chart-type helper
-// ─────────────────────────────────────────────────────────────
 const getChartType = (vt = "") => {
   const v = vt.toLowerCase();
   if (v.includes("table") || v.includes("pivot")) return "table";
@@ -74,9 +60,6 @@ const getChartType = (vt = "") => {
   return "bar";
 };
 
-// ─────────────────────────────────────────────────────────────
-//  Formatters
-// ─────────────────────────────────────────────────────────────
 const isTimestampMs = (v) => {
   const n = Number(v);
   if (!Number.isFinite(n) || n < 0) return false;
@@ -96,24 +79,12 @@ const si3 = (n, div, sfx) => {
   const s = abs >= 100 ? x.toFixed(0) : abs >= 10 ? x.toFixed(1) : x.toFixed(2);
   return s.replace(/\.?0+$/, "") + sfx;
 };
-// const fmtNum = (v) => {
-//   const n = Number(v);
-//   if (isNaN(n)) return String(v ?? "");
-//   if (isTimestampMs(n)) return fmtDateMs(n);
-//   const abs = Math.abs(n);
-//   if (abs === 0) return "0";
-//   if (abs >= 1e9) return si3(n, 1e9, "B");
-//   if (abs >= 1e6) return si3(n, 1e6, "M");
-//   if (abs >= 1e3) return si3(n, 1e3, "k");
-//   return parseFloat(n.toFixed(2)).toString();
-// };
 
 const fmtNum = (v, colName = "") => {
   const n = Number(v);
   if (isNaN(n)) return String(v ?? "");
   if (isTimestampMs(n)) return fmtDateMs(n);
 
-  // ← NEW: skip abbreviation for ID-type columns
   if (colName && ID_COL_PATTERN.test(colName)) {
     return Number.isInteger(n) ? String(n) : n.toFixed(2);
   }
@@ -193,23 +164,10 @@ function looksLikeDimension(v) {
 
 const normalise = (s) => String(s ?? "").toLowerCase().replace(/\s+/g, "").replace(/[()]/g, "");
 
-// ─────────────────────────────────────────────────────────────
-//  detectXKey  (FIXED)
-//
-//  Two fixes applied:
-//    1. xAxisProp is normalised to a string first — Superset sometimes
-//       sends a column-definition dict like {column_name:"monthdate"}
-//       instead of the plain string "monthdate".
-//    2. Step 5 (date-named column) now REQUIRES the column name to
-//       have NO spaces.  This prevents metric labels like
-//       "Current Year" and "Prev Year" from being picked as the
-//       x-axis just because they contain the word "year".
-// ─────────────────────────────────────────────────────────────
 const detectXKey = (rows, xAxisProp, metricLabels, groupbyProp) => {
   if (!rows?.length) return "__seq__";
   const cols = Object.keys(rows[0]);
 
-  // ── FIX 1: normalise xAxisProp — handle dict column definitions ──
   let xAxisStr = xAxisProp;
   if (xAxisProp && typeof xAxisProp === "object") {
     xAxisStr = (
@@ -221,14 +179,11 @@ const detectXKey = (rows, xAxisProp, metricLabels, groupbyProp) => {
   }
   xAxisStr = xAxisStr ? String(xAxisStr) : "";
 
-  // Step 1: Explicit prop — exact match
   if (xAxisStr && cols.includes(xAxisStr) && looksLikeDimension(rows[0][xAxisStr]))
     return xAxisStr;
 
-  // Step 2: Superset time-series sentinel column
   if (cols.includes("__timestamp")) return "__timestamp";
 
-  // Step 3: Explicit prop — case-insensitive match
   if (xAxisStr) {
     const lower = xAxisStr.toLowerCase();
     const ci    = cols.find(c => c.toLowerCase() === lower);
@@ -237,7 +192,6 @@ const detectXKey = (rows, xAxisProp, metricLabels, groupbyProp) => {
 
   const metricSet = new Set(metricLabels);
 
-  // Step 4: First groupby dimension that is actually a column
   const gb0    = Array.isArray(groupbyProp) ? groupbyProp[0] : null;
   const gbName = typeof gb0 === "string"
     ? gb0
@@ -247,32 +201,21 @@ const detectXKey = (rows, xAxisProp, metricLabels, groupbyProp) => {
 
   const nonMetric = cols.filter(k => !metricSet.has(k));
 
-  // ── FIX 2: Step 5 — only match column names WITHOUT spaces ──────
-  //
-  //  Real time/date columns:  "monthdate" ✓  "sale_date" ✓  "yearmonth" ✓
-  //  Metric label columns:    "Current Year" ✗  "Prev Year" ✗  (have spaces)
-  //
-  //  Without this guard, /year/i matched "Current Year" and used it
-  //  as the x-axis, leaving only one series (Prev Year) on the chart.
   const dateNameCol = nonMetric.find(k =>
     !k.includes(" ") &&
     /date|time|month|quarter|year|period|day|week/i.test(k)
   );
   if (dateNameCol) return dateNameCol;
 
-  // Step 6: Column whose values are epoch-ms timestamps
   const tsValueCol = nonMetric.find(k => isTimestampMs(rows[0][k]));
   if (tsValueCol) return tsValueCol;
 
-  // Step 7: Any string column
   const strCol = nonMetric.find(k => typeof rows[0][k] === "string");
   if (strCol) return strCol;
 
-  // Step 8: Any dimension-looking column
   const dimCol = nonMetric.find(k => looksLikeDimension(rows[0][k]));
   if (dimCol) return dimCol;
 
-  // Step 9: Fallback
   return cols.find(k => looksLikeDimension(rows[0][k])) ?? "__seq__";
 };
 
@@ -302,9 +245,6 @@ const detectSeriesKeys = (rows, xKey, metricLabels) => {
   });
 };
 
-// ─────────────────────────────────────────────────────────────
-//  Skeleton
-// ─────────────────────────────────────────────────────────────
 const Skeleton = ({ height }) => (
   <div style={{ height, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
     <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 64 }}>
@@ -319,19 +259,30 @@ const Skeleton = ({ height }) => (
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────
-//  ECharts style helpers
-// ─────────────────────────────────────────────────────────────
 const darkTooltip = {
   backgroundColor: "#12151f", borderColor: "rgba(255,255,255,0.08)", borderWidth: 1,
   textStyle: { color: "#e2e8f0", fontSize: 11, fontFamily: "inherit" },
   extraCssText: "box-shadow:0 12px 40px rgba(0,0,0,0.7);border-radius:8px;padding:10px 14px;",
 };
+
+// Single-series hover tooltip — shows ONLY the item under the cursor,
+// not every series at that x-position. Used by both bar and line charts
+// so hovering one bar/point never dumps a long stacked list of every
+// category's value.
+const singleItemTooltip = {
+  trigger: "item", ...darkTooltip,
+  formatter: (p) =>
+    `<div style="color:#64748b;font-size:10px;margin-bottom:4px;font-weight:600">${p.name}</div>
+     <div style="display:flex;align-items:center;gap:6px">
+       <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color}"></span>
+       <span style="color:#94a3b8;font-size:10px;flex:1">${p.seriesName}</span>
+       <span style="color:#e2e8f0;font-weight:600;padding-left:12px">${fmtNum(p.value)}</span>
+     </div>`,
+};
+
 const axisX = (cats) => ({
   type: "category", data: cats,
   axisLine: { lineStyle: { color: "#2d3748" } }, axisTick: { show: false },
-  // axisLabel: { color: "#8b9ab0", fontSize: 10, fontFamily: "inherit", rotate: cats.length > 8 ? 30 : 0 },
-
   axisLabel: {
   color:      "#8b9ab0",
   fontSize:   11,
@@ -339,16 +290,12 @@ const axisX = (cats) => ({
   interval: 0,
   formatter: function(val) {
     if (!val) return val;
-
-    // Try parsing as a date string or timestamp
     const d = new Date(val);
     if (!isNaN(d.getTime())) {
-      const mon = d.toLocaleDateString("en-IN", { month: "short" }); // "Apr"
-      const yr  = String(d.getFullYear()).slice(2);                   // "25"
-      return `${mon}-${yr}`;  // → "Apr-25"
+      const mon = d.toLocaleDateString("en-IN", { month: "short" });
+      const yr  = String(d.getFullYear()).slice(2);
+      return `${mon}-${yr}`;
     }
-
-    // If not a date, return as-is
     return val;
   },
 },
@@ -361,44 +308,31 @@ const axisY = () => ({
   axisLabel: { color: "#8b9ab0", fontSize: 10, fontFamily: "inherit", formatter: fmtNum },
   splitLine: { lineStyle: { color: "rgba(255,255,255,0.05)", type: "dashed" } },
 });
-// const scrollLegend = (keys) => ({
-//   type: "scroll", orient: "horizontal", bottom: 4,
-//   pageIconColor: "#8b9ab0", pageIconInactiveColor: "#2d3748",
-//   pageTextStyle: { color: "#8b9ab0", fontSize: 10 },
-//   textStyle: { color: "#8b9ab0", fontSize: 10, fontFamily: "inherit" },
-//   icon: "circle", itemHeight: 8, itemGap: 14, show: keys.length >= 1,
-// });
 const scrollLegend = (keys) => ({
-  type: "scroll", orient: "horizontal", bottom: 6,  // ← was 4
+  type: "scroll", orient: "horizontal", bottom: 6,
   left: "center",
   pageIconColor: "#8b9ab0", pageIconInactiveColor: "#2d3748",
-  pageTextStyle: { color: "#8b9ab0", fontSize: 12 },           // ← was 10
-  textStyle: { color: "#8b9ab0", fontSize: 13, fontFamily: "inherit" },  // ← was 10
-  icon: "circle", itemHeight: 10, itemGap: 16, show: keys.length >= 1,   // ← itemHeight was 8
+  pageTextStyle: { color: "#8b9ab0", fontSize: 12 },
+  textStyle: { color: "#8b9ab0", fontSize: 13, fontFamily: "inherit" },
+  icon: "circle", itemHeight: 10, itemGap: 16, show: keys.length >= 1,
 });
-
-// ─────────────────────────────────────────────────────────────
-//  buildOption
-// ─────────────────────────────────────────────────────────────
-// function buildOption({ type, data, keys, xKey, selectedValue, initialKeys = [], zoomable = false }) {
 
     function buildOption({ 
       type, data, keys, xKey, selectedValue, 
       initialKeys = [], zoomable = false,
-      percentageThreshold = 0,   // ← ADD
-      otherThreshold      = 0,   // ← ADD
+      percentageThreshold = 0,
+      otherThreshold      = 0,
+      seriesColors        = {},
     }) {
 
-  // ── Consistent color lookup using original unfiltered key order ──
-  // Ensures "161-300" always gets its original purple color even when
-  // it's the only series remaining after cross-filtering
-  const getColor = (key, fallbackIndex) => {
-    if (initialKeys.length > 0) {
-      const origIdx = initialKeys.indexOf(key);
-      if (origIdx >= 0) return COLORS[origIdx % COLORS.length];
-    }
-    return COLORS[fallbackIndex % COLORS.length];
-  };
+    const getColor = (key, fallbackIndex) => {
+      if (seriesColors[key]) return seriesColors[key];
+      if (initialKeys.length > 0) {
+        const origIdx = initialKeys.indexOf(key);
+        if (origIdx >= 0) return COLORS[origIdx % COLORS.length];
+      }
+      return COLORS[fallbackIndex % COLORS.length];
+    };
 
   const cats = xKey === "__seq__"
     ? data.map((_, i) => String(i + 1))
@@ -406,9 +340,13 @@ const scrollLegend = (keys) => ({
 
   const base = {
     backgroundColor: "transparent", animation: true,
-    color: keys.map((k, i) => getColor(k, i)),  // ← ADD THIS — fixes legend/bar color mismatch
+    color: keys.map((k, i) => getColor(k, i)),
     animationDuration: 550, animationEasing: "cubicOut",
     legend: scrollLegend(keys),
+    // ── Multi-series "axis" tooltip (shows every series stacked at once) ──
+    // Kept here for chart types that still want it (mixed, treemap, funnel, etc).
+    // Bar and line charts explicitly override this below with singleItemTooltip
+    // so hovering shows only the one bar/point under the cursor.
     tooltip: {
       trigger: "axis", ...darkTooltip,
       axisPointer: { lineStyle: { color: "rgba(255,255,255,0.08)" } },
@@ -425,9 +363,7 @@ const scrollLegend = (keys) => ({
         return html;
       },
     },
-    // grid: { left: 12, right: 12, top: 12, bottom: keys.length > 1 ? 48 : 30, containLabel: true },
-    // grid: { left: 12, right: 40, top: 36, bottom: 60, containLabel: true },
-    grid: { left: 12, right: 40, top: 36, bottom: 72, containLabel: true },  // ← was 60
+    grid: { left: 12, right: 40, top: 36, bottom: 72, containLabel: true },
   };
 
   const sData = k => data.map(r => {
@@ -439,9 +375,6 @@ const scrollLegend = (keys) => ({
     return catLabel === selectedValue ? baseColor : baseColor + "44";
   };
 
-  
-
-
     if (type === "heatmap") {
         const cols    = Object.keys(data[0]);
         const numCols = cols.filter(k =>
@@ -449,16 +382,13 @@ const scrollLegend = (keys) => ({
         );
         const dimCols = cols.filter(k => !numCols.includes(k));
 
-        // X = first dim col, Y = second dim col, Value = first numeric col
         const xCol   = dimCols[0] || cols[0];
         const yCol   = dimCols[1] || cols[1];
         const valCol = numCols[0] || cols[2];
 
-        // Unique axis values
         const xVals = [...new Set(data.map(r => String(r[xCol] ?? "")))];
         const yVals = [...new Set(data.map(r => String(r[yCol] ?? "")))];
 
-        // Build [xIdx, yIdx, value] format ECharts needs
         const heatData = data.map(r => [
           xVals.indexOf(String(r[xCol] ?? "")),
           yVals.indexOf(String(r[yCol] ?? "")),
@@ -489,9 +419,9 @@ const scrollLegend = (keys) => ({
               axisLine:  { lineStyle: { color: "#2d3748" } },
               axisTick:  { show: false },
               axisLabel: {
-                color:      "#e2e8f0",   // ← brighter white
-                fontSize:   14,          // ← increase size
-                fontWeight: "bold",      // ← make bold
+                color:      "#e2e8f0",
+                fontSize:   14,
+                fontWeight: "bold",
                 fontFamily: "inherit",
               },
               splitArea: { show: true, areaStyle: {
@@ -504,9 +434,9 @@ const scrollLegend = (keys) => ({
               axisLine:  { lineStyle: { color: "#2d3748" } },
               axisTick:  { show: false },
               axisLabel: {
-                color:      "#e2e8f0",   // ← brighter white
-                fontSize:   14,          // ← increase size
-                fontWeight: "bold",      // ← make bold
+                color:      "#e2e8f0",
+                fontSize:   14,
+                fontWeight: "bold",
                 fontFamily: "inherit",
               },
               splitArea: { show: true, areaStyle: {
@@ -521,16 +451,15 @@ const scrollLegend = (keys) => ({
             orient:       "horizontal",
             left:         "center",
             top:          8,
-            // padding:    [0, 0, 20, 0],
             textGap:    20,
             inRange: {
               color: [
-                "#7f0000",   // very dark red   → lowest
-                "#c62828",   // dark red
-                "#e53935",   // medium red
-                "#ef6c00",   // dark orange
-                "#f9a825",   // dark amber
-                "#f9f000",   // bright yellow   → highest
+                "#7f0000",
+                "#c62828",
+                "#e53935",
+                "#ef6c00",
+                "#f9a825",
+                "#f9f000",
               ],
             },
             textStyle:    { color: "#8b9ab0", fontSize: 25, fontFamily: "inherit", fontWeight: "600", padding:  [6, 0, 0, 0], },
@@ -570,7 +499,6 @@ const scrollLegend = (keys) => ({
   const numKey = keys.find(k => data.some(r => !isNaN(Number(r[k])) && r[k] != null)) || keys[0];
   const total  = data.reduce((s, r) => s + (Number(r[numKey]) || 0), 0);
 
-  // ── Build finalData — group small slices only when otherThreshold > 0 ──
   let finalData;
   if (otherThreshold > 0) {
     const mainSlices  = [];
@@ -608,7 +536,6 @@ const scrollLegend = (keys) => ({
     }
 
   } else {
-    // ── Original data mapping unchanged ──────────────────────────
     finalData = data.map((r, i) => {
       const name  = String(r[xKey] ?? "");
       const color = COLORS[i % COLORS.length];
@@ -627,7 +554,7 @@ const scrollLegend = (keys) => ({
   return {
     ...base,
     legend: {
-      ...scrollLegend(finalData.map(r => r.name)),  // ← uses finalData names
+      ...scrollLegend(finalData.map(r => r.name)),
       bottom: 2,
       selector: [
         { type: "all",     title: "All"  },
@@ -662,10 +589,10 @@ const scrollLegend = (keys) => ({
     }],
     series: [{
       type:      "pie",
-      radius:    ["40%", "70%"],    // ← original
-      center:    ["50%", "46%"],    // ← original
-      padAngle:  2,                 // ← original
-      itemStyle: { borderRadius: 4, borderWidth: 0 },  // ← original
+      radius:    ["40%", "70%"],
+      center:    ["50%", "46%"],
+      padAngle:  2,
+      itemStyle: { borderRadius: 4, borderWidth: 0 },
       label: {
         show:     true,
         color:    "#8b9ab0",
@@ -673,114 +600,23 @@ const scrollLegend = (keys) => ({
         fontFamily: "inherit",
         overflow: "truncate",
         width:    80,
-        // ← original format preserved + percentageThreshold check added
         formatter: p => {
           if (percentageThreshold > 0 && p.percent < percentageThreshold) return "";
           return `${p.name}\n${fmtNum(p.value)}`;
         },
       },
-      labelLine: { lineStyle: { color: "#334155" } },  // ← original
+      labelLine: { lineStyle: { color: "#334155" } },
       emphasis:  {
         scale: true, scaleSize: 5,
         itemStyle: { shadowBlur: 20, shadowColor: "rgba(0,0,0,0.6)" }
       },
-      data: finalData,   // ← only change from original
+      data: finalData,
     }],
   };
 }
 
 
-
-  // if (type === "bar") {
-    
-  //   // ── Sort legend items in ascending order ──
-  //   const sortedKeys = [...keys].sort((a, b) =>
-  //     String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" })
-  //   );
-
-  //   const isGrouped  = keys.length > 1;
-  //   const showLabels = data.length <= 1150;
-  //   const labelRotate = data.length > 35 ? 45 : 0; 
-  //   return {
-  //     ...base,
-  //      legend: {
-  //         ...scrollLegend(sortedKeys),  // ← uses sortedKeys
-  //         selector: [
-  //           { type: "all",     title: "All" },
-  //           { type: "inverse", title: "Inv" }
-  //         ],
-  //         selectorPosition: "end",
-  //         selectorLabel: {
-  //           fontSize: 10,
-  //           padding:  [3, 8],
-  //           borderRadius:     4,
-  //           color:            "#8b9ab0",
-  //           borderColor:      "rgba(255,255,255,0.18)",
-  //           backgroundColor:  "rgba(255,255,255,0.04)",
-  //         },
-  //         selectorItemGap: 6,
-  //       }, 
-
-  //       // ── Data zoom — only when Superset chart has zoomable enabled ──
-  //   ...(zoomable ? {
-  //     grid: { left: 12, right: 40, top: 36, bottom: 110, containLabel: true },
-  //     dataZoom: [
-  //       {
-  //         type:            "slider",
-  //         xAxisIndex:      [0],
-  //         bottom:          36,
-  //         height:          22,
-  //         borderColor:     "rgba(255,255,255,0.08)",
-  //         backgroundColor: "rgba(255,255,255,0.03)",
-  //         fillerColor:     "rgba(31,168,201,0.18)",
-  //         handleStyle:     { color: "#1FA8C9", borderColor: "#1FA8C9" },
-  //         moveHandleStyle: { color: "#1FA8C9" },
-  //         textStyle:       { color: "#64748b", fontSize: 10 },
-  //         dataBackground: {
-  //           lineStyle: { color: "#1FA8C9", opacity: 0.25 },
-  //           areaStyle: { color: "#1FA8C9", opacity: 0.08 },
-  //         },
-  //         selectedDataBackground: {
-  //           lineStyle: { color: "#1FA8C9", opacity: 0.6 },
-  //           areaStyle: { color: "#1FA8C9", opacity: 0.2 },
-  //         },
-  //       },
-  //       {
-  //         type:       "inside",   // ← enables mouse wheel zoom
-  //         xAxisIndex: [0],
-  //       },
-  //     ],
-  //   } : {}),
-
-  //     xAxis: axisX(cats), yAxis: axisY(),
-  //     series: sortedKeys.map((k, i) => ({
-  //       type: "bar", name: k,
-  //       barCategoryGap: isGrouped ? "20%" : "30%",
-  //       barGap: isGrouped ? "5%" : "30%",
-  //       ...(isGrouped ? {} : { barMaxWidth: 48 }),
-  //       data: sData(k).map((val, ci) => ({
-  //         value: val,
-  //         // itemStyle: { color: dimmedColor(COLORS[i % COLORS.length], cats[ci]), borderRadius: [4, 4, 0, 0] },
-  //         itemStyle: { color: dimmedColor(getColor(k, i), cats[ci]), borderRadius: [4, 4, 0, 0] },
-  //       })),
-  //       label: { 
-  //         show: showLabels, 
-  //         position: "top",
-  //         color: "#94a3b8", 
-  //         distance: 8,
-  //         fontSize: 9, 
-  //         fontFamily: "inherit", 
-  //         fontWeight: "600", 
-  //         formatter: p => fmtNum(p.value), 
-  //         rotate: labelRotate, 
-  //       },
-  //       emphasis: { focus: "series" },
-  //     })),
-  //   };
-  // }
-
   if (type === "bar") {
-    // ── Sort legend items in ascending order ──
     const sortedKeys = [...keys].sort((a, b) =>
       String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" })
     );
@@ -790,8 +626,12 @@ const scrollLegend = (keys) => ({
     const labelRotate = data.length > 35 ? 45 : 0; 
     return {
       ...base,
+      // ← Overrides base's multi-series "axis" tooltip. Hovering a single
+      // bar now shows only that bar's series/value, not every series
+      // stacked at that x-position.
+      tooltip: singleItemTooltip,
        legend: {
-          ...scrollLegend(sortedKeys),            // ← sortedKeys
+          ...scrollLegend(sortedKeys),
           selector: [
             { type: "all",     title: "All" },
             { type: "inverse", title: "Inv" }
@@ -808,7 +648,6 @@ const scrollLegend = (keys) => ({
           selectorItemGap: 6,
         }, 
 
-        // ── Data zoom — only when Superset chart has zoomable enabled ──
     ...(zoomable ? {
       grid: { left: 12, right: 40, top: 36, bottom: 110, containLabel: true },
       dataZoom: [
@@ -833,14 +672,14 @@ const scrollLegend = (keys) => ({
           },
         },
         {
-          type:       "inside",   // ← enables mouse wheel zoom
+          type:       "inside",
           xAxisIndex: [0],
         },
       ],
     } : {}),
 
       xAxis: axisX(cats), yAxis: axisY(),
-      series: sortedKeys.map((k, i) => ({       // ← sortedKeys
+      series: sortedKeys.map((k, i) => ({
         type: "bar", name: k,
         itemStyle: { color: getColor(k, i) }, 
         barCategoryGap: isGrouped ? "20%" : "30%",
@@ -902,7 +741,6 @@ if (type === "mixed") {
     xAxis: axisX(cats),
     yAxis: [axisYLeft(), axisYRight()],
 
-    // ── Custom legend showing which axis each series belongs to ──
     legend: {
       type: "scroll",
       orient: "horizontal",
@@ -972,14 +810,12 @@ if (type === "mixed") {
 
 
 if (type === "line") {
-  // ── Sort legend items in ascending order ──
   const sortedKeys = [...keys].sort((a, b) =>
     String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" })
   );
   const showLabels = data.length <= 20;
   return {
     ...base,
-    // legend: scrollLegend(sortedKeys),
 
     legend: {
   ...scrollLegend(sortedKeys),
@@ -1002,17 +838,11 @@ if (type === "line") {
 
     xAxis: axisX(cats),
     yAxis: axisY(),
-    tooltip: {
-      trigger: "item", ...darkTooltip,
-      formatter: p =>
-        `<div style="color:#64748b;font-size:10px;margin-bottom:4px;font-weight:600">${p.name}</div>
-         <div style="display:flex;align-items:center;gap:6px">
-           <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color}"></span>
-           <span style="color:#94a3b8;font-size:10px;flex:1">${p.seriesName}</span>
-           <span style="color:#e2e8f0;font-weight:600;padding-left:12px">${fmtNum(p.value)}</span>
-         </div>`,
-    },
-    series: sortedKeys.map((k, i) => ({   // ← sortedKeys here too
+    // ← Overrides base's multi-series "axis" tooltip. Hovering a single
+    // point now shows only that point's series/value, not every series
+    // stacked at that x-position.
+    tooltip: singleItemTooltip,
+    series: sortedKeys.map((k, i) => ({
       type: "line", name: k, data: sData(k), smooth: false,
       triggerLineEvent: true,
       symbol: "circle",
@@ -1032,20 +862,6 @@ if (type === "line") {
     })),
   };
 }
-
-  // if (type === "area") return {
-  //   ...base, xAxis: axisX(cats), yAxis: axisY(),
-  //   series: keys.map((k, i) => ({
-  //     type: "line", name: k, data: sData(k), smooth: 0.3, symbol: "none", connectNulls: false,
-  //     lineStyle: { color: COLORS[i % COLORS.length], width: 2 },
-  //     itemStyle: { color: COLORS[i % COLORS.length] },
-  //     areaStyle: {
-  //       color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1,
-  //         colorStops: [{ offset: 0, color: COLORS[i % COLORS.length] + "55" }, { offset: 1, color: COLORS[i % COLORS.length] + "05" }] },
-  //     },
-  //     emphasis: { focus: "series" },
-  //   })),
-  // };
 
   if (type === "area") {
   const sortedKeys = [...keys].sort((a, b) =>
@@ -1106,7 +922,7 @@ if (type === "line") {
             type:       "treemap",
             roam:       false,
             nodeClick:  false,
-            visibleMin: 300,             // ← hide label if cell is too small to show text
+            visibleMin: 300,
             breadcrumb: { show: false },
             itemStyle:  { gapWidth: 2, borderRadius: 3 },
             label: {
@@ -1162,19 +978,10 @@ if (type === "line") {
       })),
     })),
   };
-
-
       
 }
 
 
-
-
-
-
-// ══════════════════════════════════════════════════════════════
-//  ChartCard
-// ══════════════════════════════════════════════════════════════
 export default function ChartCard({
   sliceId, title, vizType, xAxis, height: heightProp = 320,
   activeFilters = {}, dateFrom, dateTo,timeFilterId,
@@ -1184,13 +991,14 @@ export default function ChartCard({
   groupbyRows:    groupbyRowsProp = [],
   groupbyColumns: groupbyColsProp = [],
   columnOrder:             columnOrderProp            = [],
-  showCellBars = false,    // ← ADD to destructured props
+  showCellBars = false,
   conditionalFormatting:   conditionalFormattingProp  = [],
-  zoomable = false,    // ← ADD THIS
+  zoomable = false,
   fontColor = null,
   conditionalColors  = [],
-  crossFilterScope  = null,    // ← ADD
+  crossFilterScope  = null,
   percentageThreshold = 0,
+  seriesColors:   seriesColorsProp = {},
   otherThreshold      = 0,
   onDateRangeDetected = null,
 }) {
@@ -1200,7 +1008,7 @@ export default function ChartCard({
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState(null);
   const [colnames,     setColnames]     = useState([]);
-  const [initialKeys,  setInitialKeys]  = useState([]);   // ← ADD THIS
+  const [initialKeys,  setInitialKeys]  = useState([]);
   const cancelRef  = useRef(false);
   const echartsRef = useRef(null);
   const cardRef    = useRef(null);
@@ -1213,8 +1021,6 @@ export default function ChartCard({
   const isFiltered    = Object.entries(crossFilters).some(([, f]) => f.sourceChartId !== sliceId && f.value);
 
 
-  // console.log(`Chart ${sliceId} zoomable:`, zoomable, '| type:', type);
-  // ── ResizeObserver ────────────────────────────────────────────
   useEffect(() => {
     const node = cardRef.current;
     if (!node) return;
@@ -1225,14 +1031,13 @@ export default function ChartCard({
     return () => ro.disconnect();
   }, []);
 
-  // ── Compute type early — needed for buildFilterPayload ──
 const chartType = getChartType(vizType);
 
 const activeFiltersString      = JSON.stringify(activeFilters);
 const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters, sliceId, chartType === "table"));
 
   useEffect(() => {
-      console.log("🔄 ChartCard useEffect fired:", { sliceId, dateFrom, dateTo, timeFilterId }); // ADD THIS FIRST LINE
+      console.log("🔄 ChartCard useEffect fired:", { sliceId, dateFrom, dateTo, timeFilterId });
     if (!sliceId) return;
     if ((dateFrom && !dateTo) || (!dateFrom && dateTo)) return;
 
@@ -1250,7 +1055,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
       crossFilters: crossFilterPayload,
     };
 
-    console.log("🗓 Chart body:", { sliceId, dateFrom, dateTo, timeFilterId }); // ADD THIS
+    console.log("🗓 Chart body:", { sliceId, dateFrom, dateTo, timeFilterId });
 
     api.post("/chart-data", body)
       .then(res => {
@@ -1268,7 +1073,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
               : Object.keys(rows[0]).filter(k => k !== xk && k !== "__seq__").slice(0, 8);
             setData(rows);
 
-            // ── Detect min/max date from data and report to parent ──
               if (onDateRangeDetected && rows.length > 0) {
                 const xk = detectXKey(rows, xAxis, extractMetricLabels(metricsProp), groupbyProp);
                 
@@ -1276,9 +1080,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
                   .map(r => r[xk])
                   .filter(v => v != null)
                   .map(v => {
-                    // Handle timestamp ms
                     if (isTimestampMs(Number(v))) return new Date(Number(v));
-                    // Handle date string
                     const d = new Date(v);
                     return isNaN(d.getTime()) ? null : d;
                   })
@@ -1288,7 +1090,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
                   const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
                   const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
 
-                  // Format as YYYY-MM-DD for input[type=date]
                   const fmt = (d) => d.toISOString().split("T")[0];
                   onDateRangeDetected(fmt(minDate), fmt(maxDate));
                 }
@@ -1298,8 +1099,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
             setColnames(res.data.colnames || []);
             setComputedXKey(xk);
             setKeys(finalKeys);
-            // ── Only update initialKeys when no cross-filters affecting this chart ──
-            // This preserves the original color order even when filtered data returns fewer series
             if (crossFilterPayload.length === 0) {
               setInitialKeys(finalKeys);
             }
@@ -1322,8 +1121,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
   const type = getChartType(vizType);
   const xKey = computedXKey || "__seq__";
 
- 
-
   const handleChartClick = (params) => {
       console.log("CLICK →", { sliceId, type, name: params.name, col: xKey });
 
@@ -1343,15 +1140,12 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
   let filterCol   = xKey;
 
   if (type === "pie" || type === "treemap" || type === "funnel") {
-    // ── Pie / treemap / funnel ──────────────────────────────────
     clickedName = params.name;
     filterCol   = xKey;
 
   } else if (type === "line" || type === "area") {
-    // ── Line / area chart ───────────────────────────────────────
     const seriesName = params.seriesName || "";
 
-    // ── Step 1: use explicit groupby prop if available ──────────
     const gb0   = Array.isArray(groupbyProp) ? groupbyProp[0] : null;
     const gbCol = gb0
       ? (typeof gb0 === "string"
@@ -1360,22 +1154,15 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
       : "";
 
     if (seriesName && gbCol) {
-      // ✅ Best case — groupby column known from backend props
-      // e.g. groupbyProp=["AgeBucket"], seriesName="61-160"
-      // → filter: { col: "AgeBucket", val: "61-160" }
       console.log(`ChartCard ${sliceId}: using groupby prop col = "${gbCol}"`);
       clickedName = seriesName;
       filterCol   = gbCol;
 
     } else if (seriesName) {
-      // ── Step 2: groupby not in props — scan data rows to find
-      //    which column contains the series value ─────────────────
-      //    e.g. data = [{AgeBucket:"61-160", Fulldate:"...", Inv:533}, ...]
-      //    seriesName = "61-160" → found in column "AgeBucket"
       const colWithValue = data.length > 0
         ? Object.keys(data[0]).find(col =>
-            !keys.includes(col) &&          // not a metric/series col
-            col !== xKey &&                 // not the x-axis col
+            !keys.includes(col) &&
+            col !== xKey &&
             data.some(row => String(row[col]) === seriesName)
           )
         : null;
@@ -1386,9 +1173,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
         filterCol   = colWithValue;
 
       } else {
-        // ── Step 3: data is fully pivoted — series names ARE column
-        //    names (e.g. "61-160", "161-300" are column headers).
-        //    Try colnames to find a non-metric, non-xKey dimension col ──
         const dimCol = colnames.find(c =>
           c !== xKey &&
           !keys.includes(c) &&
@@ -1401,8 +1185,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
           filterCol   = dimCol;
 
         } else {
-          // ── Step 4: last resort — metricsProp labels may hint at
-          //    the groupby column. Try extracting from metrics label ──
           const metricLabel = extractMetricLabels(metricsProp)[0] || "";
           const hintCol     = metricLabel.match(/\(([^)]+)\)/)?.[1] || "";
 
@@ -1411,8 +1193,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
             clickedName = seriesName;
             filterCol   = hintCol;
           } else {
-            // ── Step 5: absolute fallback — log a warning so you
-            //    know exactly what to fix in the backend ────────────
             console.warn(
               `ChartCard ${sliceId}: cannot determine groupby col for series "${seriesName}". ` +
               `groupbyProp=${JSON.stringify(groupbyProp)}, ` +
@@ -1421,18 +1201,16 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
               `Fix: ensure backend returns groupby in get_dashboard_charts.`
             );
             clickedName = seriesName;
-            filterCol   = seriesName; // will likely not filter correctly
+            filterCol   = seriesName;
           }
         }
       }
     } else {
-      // ── Single-series line: filter by x-axis value (date/category)
       clickedName = params.name || params.axisValue || "";
       filterCol   = xKey;
     }
 
   } else if (type === "heatmap") {
-  // Click on a cell — filter by both x and y value
   clickedName = params.data?.[1] !== undefined
     ? String(Object.values(data[0])[1] ?? "")
     : params.name;
@@ -1440,21 +1218,19 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
 }
   
   else {
-    // ── Bar / column / scatter / default ───────────────────────
     clickedName = params.name || params.data?.name || params.axisValue || "";
     filterCol   = xKey;
   }
 
   if (!clickedName) return;
 
-  // Toggle: clicking the same value again clears the filter
   const activeFilter = Object.values(crossFilters).find(f => f.sourceChartId === sliceId);
   const isSameValue  = activeFilter?.value === clickedName;
 
 
   console.log("CROSS FILTER FIRING:", {
   sliceId,
-  crossFilterScope,   // ← is this [116] or null?
+  crossFilterScope,
   filterCol,
   clickedName
 })
@@ -1464,8 +1240,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
 };
 
 
-  
-  // ── renderBody ────────────────────────────────────────────────
   const renderBody = () => {
     if (loading) return <Skeleton height={height} />;
     if (error) return (
@@ -1473,13 +1247,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
         ⚠ {error}
       </div>
     );
-
-    // if (!data.length) return (
-    //   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height, gap: 8 }}>
-    //     <div style={{ fontSize: 28, opacity: 0.3, color: "#374151" }}>◌</div>
-    //     <span style={{ fontSize: 12, color: "#374151" }}>No data for current filters</span>
-    //   </div>
-    // );
 
     if (!data.length) return (
   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height, gap: 18 }}>
@@ -1489,7 +1256,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
       @keyframes nd-fi{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
     `}</style>
 
-    {/* Animated rings */}
     <div style={{ position:"relative", width:78, height:78, display:"flex", alignItems:"center", justifyContent:"center" }}>
       <div style={{ position:"absolute", width:78, height:78, borderRadius:"50%", border:"1.5px solid #1FA8C9", animation:"nd-r2 2.6s ease-in-out infinite" }} />
       <div style={{ position:"absolute", width:56, height:56, borderRadius:"50%", border:"1.5px solid #1FA8C9", animation:"nd-r1 2.1s ease-in-out infinite 0.25s" }} />
@@ -1500,7 +1266,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
       </div>
     </div>
 
-    {/* Text */}
     <div style={{ textAlign:"center", animation:"nd-fi 0.5s ease-out 0.15s both" }}>
       <div style={{ fontSize:13, fontWeight:600, color:"#cbd5e1", marginBottom:5 }}>
         No data for current filters
@@ -1513,7 +1278,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
 );
 
 
-
     
     if (type === "bignum") {
   const metricLabels = extractMetricLabels(metricsProp);
@@ -1524,18 +1288,11 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
   const valueKey   = metricLabels.find(m => allCols.includes(m)) || numericCols[0] || allCols[0] || "";
   const rawVal     = data[0]?.[valueKey] ?? 0;
   const n          = Number(rawVal);
-  // const displayVal = fmtBigNum(rawVal, valueKey);
   const displayVal = fmtBigNum(rawVal, valueKey);
-  // const trendArrow = n > 0 ? " ▲" : n < 0 ? " ▼" : "";
   const subtitle   = cleanMetricLabel(String(valueKey || ""));
   const isDate     = isTimestampMs(n);
   const isPct      = isRatioValue(n, valueKey);
 
-  // ── Font size shrinks as value gets longer ──────────────────────
-  // "293"      (3 chars) → 36px
-  // "208k"     (4 chars) → 32px
-  // "1.09k"    (5 chars) → 28px
-  // "1.09k+"   (6 chars) → 24px
   const valueFontSize = isDate
     ? 22
     : Math.max(18, 36 - Math.max(0, displayVal.length - 3) * 4);
@@ -1558,13 +1315,10 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
         textAlign: "center",
       }}>
 
-        {/* ── Main value — dynamic size, never ellipsed, never wraps ── */}
         <div style={{
         fontSize:      valueFontSize,
         fontWeight:    800,
-        // color: fontColor ? fontColor : "#1FA8C9",         // ← use Superset color if set, otherwise default to blue   
         color: (() => {
-          // Apply conditional color rules based on actual value
           if (conditionalColors.length > 0) {
             for (const rule of conditionalColors) {
               const target = Number(rule.targetValue ?? 0);
@@ -1575,7 +1329,6 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
               if (rule.operator === "==" && n === target) return rule.color;
             }
           }
-          // Fallback to font_color or default
           return fontColor || "#1FA8C9";
         })(),
         letterSpacing: isDate ? 0 : -0.5,
@@ -1583,24 +1336,10 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
         textAlign:     "center",
         whiteSpace:    "nowrap",
         width:         "100%",
-        // ← NO overflow:hidden, NO textOverflow — don't clip characters
       }}>
           {displayVal}
           
         </div>
-
-        {/* ── Subtitle ── */}
-        {/* <div style={{
-          fontSize:     10,
-          color:        "#64748b",
-          fontWeight:   500,
-          lineHeight:   1.4,
-          marginTop:    4,
-          wordBreak:    "break-word",
-          overflowWrap: "break-word",
-        }}>
-          {subtitle}
-        </div> */}
 
       </div>
     </div>
@@ -1621,11 +1360,11 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
           crossFilterValue={selectedValue}
           title={title}
           columnOrder={columnOrderProp}
-          showCellBars={showCellBars}    // ← AD
+          showCellBars={showCellBars}
           conditionalFormatting={conditionalFormattingProp}
           onRowClick={(col, val) =>  {
             if (!onCrossFilter) return;
-            onCrossFilter(col, val, sliceId, title, true, crossFilterScope);  // ← true = fromTable
+            onCrossFilter(col, val, sliceId, title, true, crossFilterScope);
           }
             
           }
@@ -1635,13 +1374,10 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
 
     
 
-
-// // ── All / Inv buttons for line and area charts only ──────────────────────────────
 return (
   <ReactECharts
     ref={echartsRef}
-    // option={buildOption({ type, data, keys, xKey, selectedValue, initialKeys, zoomable  })}
-    option={buildOption({ type, data, keys, xKey, selectedValue, initialKeys, zoomable, percentageThreshold, otherThreshold,})}
+    option={buildOption({ type, data, keys, xKey, selectedValue, initialKeys, zoomable, percentageThreshold, otherThreshold, seriesColors: seriesColorsProp})}
     style={{ height, width: "100%", cursor: onCrossFilter ? "pointer" : "default" }}
     opts={{ renderer: "canvas" }}
     onEvents={{ click: handleChartClick }}
@@ -1688,7 +1424,7 @@ return (
         <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0, marginLeft: 8 }}>
           {isSource && (
             <span
-              onClick={() => onCrossFilter && onCrossFilter(xKey, null, sliceId, title, true, crossFilterScope)}  // ← true = clear filter from table
+              onClick={() => onCrossFilter && onCrossFilter(xKey, null, sliceId, title, true, crossFilterScope)}
               title="Click to clear cross-filter"
               style={{ fontSize: 9, background: "rgba(31,168,201,0.2)", color: "#1FA8C9", border: "1px solid rgba(31,168,201,0.5)", padding: "2px 7px", borderRadius: 6, cursor: "pointer", letterSpacing: "0.06em", fontWeight: 700, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 4 }}>
               ✕ {selectedValue}
@@ -1699,9 +1435,6 @@ return (
               Filtered
             </span>
           )}
-          {/* <span style={{ fontSize: 9, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", padding: "2px 7px", borderRadius: 6, color: "#4a5568", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            #{sliceId} · {type}
-          </span> */}
         </div>
       </div>
 
