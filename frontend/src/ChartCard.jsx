@@ -89,10 +89,10 @@ const fmtNum = (v, colName = "") => {
     return Number.isInteger(n) ? String(n) : n.toFixed(2);
   }
 
+  // Only ever abbreviate to "k" (thousands) — never "M"/"B", no matter
+  // how large the value gets. Anything under 1,000 shows as a plain number.
   const abs = Math.abs(n);
   if (abs === 0) return "0";
-  if (abs >= 1e9) return si3(n, 1e9, "B");
-  if (abs >= 1e6) return si3(n, 1e6, "M");
   if (abs >= 1e3) return si3(n, 1e3, "k");
   return parseFloat(n.toFixed(2)).toString();
 };
