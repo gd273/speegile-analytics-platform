@@ -80,6 +80,22 @@ const si3 = (n, div, sfx) => {
   return s.replace(/\.?0+$/, "") + sfx;
 };
 
+// Indian-numbering abbreviation, used everywhere numbers are shown across
+// the app (bar/line/pie labels, tooltips, axis labels, BigNumber cards):
+//   0 – 999            → plain number
+//   1,000 – 99,999     → "K"  (÷1,000)
+//   1,00,000 – 99,99,999  → "L"  (÷1,00,000)  — Lakh
+//   1,00,00,000+       → "Cr" (÷1,00,00,000)  — Crore
+// No "M"/"B" abbreviations are ever used.
+const fmtIndianScale = (n) => {
+  const abs = Math.abs(n);
+  if (abs === 0) return "0";
+  if (abs < 1e3) return parseFloat(n.toFixed(2)).toString();
+  if (abs < 1e5) return si3(n, 1e3, "K");
+  if (abs < 1e7) return si3(n, 1e5, "L");
+  return si3(n, 1e7, "Cr");
+};
+
 const fmtNum = (v, colName = "") => {
   const n = Number(v);
   if (isNaN(n)) return String(v ?? "");
@@ -89,12 +105,7 @@ const fmtNum = (v, colName = "") => {
     return Number.isInteger(n) ? String(n) : n.toFixed(2);
   }
 
-  // Only ever abbreviate to "k" (thousands) — never "M"/"B", no matter
-  // how large the value gets. Anything under 1,000 shows as a plain number.
-  const abs = Math.abs(n);
-  if (abs === 0) return "0";
-  if (abs >= 1e3) return si3(n, 1e3, "k");
-  return parseFloat(n.toFixed(2)).toString();
+  return fmtIndianScale(n);
 };
 
 const fmtAxisLabel = (v) => {
@@ -123,13 +134,7 @@ const fmtBigNum = (rawVal, label = "") => {
     const pct = n * 100, abs = Math.abs(pct);
     return (abs >= 10 ? pct.toFixed(1) : pct.toFixed(2)).replace(/\.?0+$/, "") + "%";
   }
-  // BigNumber cards only ever abbreviate to "k" (thousands) — never "M"/"B",
-  // no matter how large the value gets. Anything under 1,000 shows as a
-  // plain number.
-  const abs = Math.abs(n);
-  if (abs === 0) return "0";
-  if (abs >= 1e3) return si3(n, 1e3, "k");
-  return parseFloat(n.toFixed(2)).toString();
+  return fmtIndianScale(n);
 };
 const SQL_EXPR = /SUM\s*\(CASE WHEN|NULLIF\s*\(|CASE WHEN/i;
 const cleanMetricLabel = (label = "") => {
