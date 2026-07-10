@@ -733,6 +733,9 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
   const [page,   setPage]   = useState(0);
   const [search, setSearch] = useState("");
   const [hoveredRow, setHoveredRow] = useState(null);
+  // Column sort state — click a numeric column header to cycle asc → desc → none
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState(null); // 'asc' | 'desc' | null
   const rules   = conditionalFormatting || [];
   const allRows = data || [];
 
@@ -797,8 +800,34 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
       )
     : allRows;
 
+  // Sort by the clicked numeric column, keeping any __summary__ (totals) row
+  // pinned at the bottom regardless of sort direction.
+  const sortedRows = useMemo(() => {
+    if (!sortCol || !sortDir) return filteredRows;
+    const summaryRows = filteredRows.filter(r => r.__summary__);
+    const dataRows    = filteredRows.filter(r => !r.__summary__);
+    dataRows.sort((a, b) => {
+      const av = Number(a[sortCol]);
+      const bv = Number(b[sortCol]);
+      const aNaN = isNaN(av), bNaN = isNaN(bv);
+      if (aNaN && bNaN) return 0;
+      if (aNaN) return 1;   // push non-numeric/blank values to the end
+      if (bNaN) return -1;
+      return sortDir === "asc" ? av - bv : bv - av;
+    });
+    return [...dataRows, ...summaryRows];
+  }, [filteredRows, sortCol, sortDir]);
+
   const total    = filteredRows.length;
-  const pageRows = filteredRows.slice(page * ROWS_PER_PAGE, (page + 1) * ROWS_PER_PAGE);
+  const pageRows = sortedRows.slice(page * ROWS_PER_PAGE, (page + 1) * ROWS_PER_PAGE);
+
+  const toggleSort = (col) => {
+    if (!numericCols.has(col)) return;
+    if (sortCol !== col) { setSortCol(col); setSortDir("asc"); }
+    else if (sortDir === "asc") setSortDir("desc");
+    else { setSortCol(null); setSortDir(null); }
+    setPage(0);
+  };
 
   if (!allRows.length) return <div style={{ color: "#8b8fa8", padding: 16 }}>No data</div>;
 
@@ -827,9 +856,37 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
         <table style={S.table}>
           <thead>
             <tr>
-              {columns.map((col) => (
-                <th key={col} style={S.thBase}>{col}</th>
-              ))}
+              {columns.map((col) => {
+                const sortable = numericCols.has(col);
+                const active   = sortCol === col;
+                return (
+                  <th
+                    key={col}
+                    onClick={() => toggleSort(col)}
+                    style={{
+                      ...S.thBase,
+                      cursor: sortable ? "pointer" : "default",
+                      userSelect: "none",
+                    }}
+                  >
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      {col}
+                      {sortable && (
+                        <span style={{ display: "inline-flex", flexDirection: "column", lineHeight: 0, marginLeft: 1 }}>
+                          <span style={{
+                            fontSize: 8, lineHeight: "8px",
+                            color: active && sortDir === "asc" ? "#1FA8C9" : "#4a5568",
+                          }}>▲</span>
+                          <span style={{
+                            fontSize: 8, lineHeight: "8px",
+                            color: active && sortDir === "desc" ? "#1FA8C9" : "#4a5568",
+                          }}>▼</span>
+                        </span>
+                      )}
+                    </span>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
