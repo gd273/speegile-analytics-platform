@@ -125,6 +125,13 @@ function SearchBar({ value, onChange, placeholder = "Search..." }) {
 const CURRENCY_COL_PATTERN =
   /amount|net|sales|revenue|value|cost|price|mrp|sell|earning|income|profit|loss/i;
 
+// Quantity/count-type columns must NEVER get the currency symbol, even if their
+// name also contains a currency-ish word — e.g. "Sales Qty" matches CURRENCY_COL_PATTERN
+// on "sales", but it's a unit count, not money. This pattern is checked first and
+// wins over CURRENCY_COL_PATTERN.
+const QTY_COL_PATTERN =
+  /\bqty\b|\bquantity\b|\bcount\b|\bunits?\b|\bnos?\b|\bpcs\b|\bpieces\b/i;
+
 // Columns that must NEVER be treated as "numbers to format" — mobile/phone/contact
 // numbers, pincodes, IDs, invoice numbers etc. These should always render as plain text,
 // never get thousands-separator commas, currency symbols, or right-alignment.
@@ -209,7 +216,7 @@ function fmtTableNum(val, colName = "") {
   const formatted = new Intl.NumberFormat("en-IN", {
     maximumFractionDigits: 2, minimumFractionDigits: 0,
   }).format(n);
-  if (colName && CURRENCY_COL_PATTERN.test(colName)) return `₹${formatted}`;
+  if (colName && CURRENCY_COL_PATTERN.test(colName) && !QTY_COL_PATTERN.test(colName)) return `₹${formatted}`;
   return formatted;
 }
 
