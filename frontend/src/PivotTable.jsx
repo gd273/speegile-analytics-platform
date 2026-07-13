@@ -776,14 +776,14 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
 
   const numericCols = useMemo(() => {
     const s = new Set(metricSet);
-    if (!s.size) {
-      for (const col of columns) {
-        // Never auto-detect mobile/phone/contact/ID/pincode-type columns as numeric,
-        // even if every sampled value happens to parse as a number.
-        if (ID_COL_PATTERN.test(col)) continue;
-        const sample = allRows.slice(0, 20).map((r) => r[col]).filter((v) => v != null);
-        if (sample.length && sample.every((v) => !isNaN(Number(v)))) s.add(col);
-      }
+    for (const col of columns) {
+      // Metrics are already numeric by definition — no need to re-check them.
+      if (s.has(col)) continue;
+      // Never auto-detect mobile/phone/contact/ID/pincode-type columns as numeric,
+      // even if every sampled value happens to parse as a number.
+      if (ID_COL_PATTERN.test(col)) continue;
+      const sample = allRows.slice(0, 20).map((r) => r[col]).filter((v) => v != null);
+      if (sample.length && sample.every((v) => !isNaN(Number(v)))) s.add(col);
     }
     return s;
   }, [columns, allRows, metricSet]);
