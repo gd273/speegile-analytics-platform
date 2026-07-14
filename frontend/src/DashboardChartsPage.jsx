@@ -531,6 +531,7 @@ function FilterDropdown({ fd, activeFilters, dateFrom, dateTo, onFilterChange, o
                 <p style={{ fontSize: 10, color: "#475569", marginBottom: 5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>From</p>
                 <input
                   type="date"
+                  onClick={(e) => e.currentTarget.showPicker?.()}
                   value={draftFrom}
                   onChange={e => setDraftFrom(e.target.value)}
                   style={{ background: "#0d1117", border: "1px solid #2d3748", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#94a3b8", width: "100%", outline: "none", cursor: "pointer" }}
@@ -540,6 +541,7 @@ function FilterDropdown({ fd, activeFilters, dateFrom, dateTo, onFilterChange, o
                 <p style={{ fontSize: 10, color: "#475569", marginBottom: 5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>To</p>
                 <input
                   type="date"
+                  onClick={(e) => e.currentTarget.showPicker?.()}
                   value={draftTo}
                   onChange={e => setDraftTo(e.target.value)}
                   style={{ background: "#0d1117", border: "1px solid #2d3748", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#94a3b8", width: "100%", outline: "none", cursor: "pointer" }}
@@ -672,7 +674,7 @@ function ActivePills({ activeFilters, dateFrom, dateTo, onRemove, onRemoveDate }
 // ══════════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ══════════════════════════════════════════════════════════════
-export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) {
+export default function DashboardChartsPage({ dashboardNumericId, dashboardTitle, onPdfReady }) {
 
   // ── State ─────────────────────────────────────────────────
   const [charts,          setCharts]          = useState([]);
@@ -706,6 +708,7 @@ export default function DashboardChartsPage({ dashboardNumericId, onPdfReady }) 
   // ── Refs for PDF (snapshot of state at PDF click time) ────
   const [tenantLogoUrl, setTenantLogoUrl] = useState(null);
   const tenantLogoRef    = useRef(null);
+  const dashboardTitleRef  = useRef(null);
   const activeFiltersRef = useRef({});
   const crossFiltersRef  = useRef({});
   const dateFromRef      = useRef(null);
@@ -723,6 +726,7 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
   // ── Keep refs in sync with state ──────────────────────────
   useEffect(() => { sectionsRef.current      = sections;      }, [sections]);
   useEffect(() => { tenantLogoRef.current    = tenantLogoUrl; }, [tenantLogoUrl]);
+  useEffect(() => { dashboardTitleRef.current  = dashboardTitle; }, [dashboardTitle]);
   useEffect(() => { activeFiltersRef.current = activeFilters; }, [activeFilters]);
   useEffect(() => { crossFiltersRef.current  = crossFilters;  }, [crossFilters]);
   useEffect(() => { dateFromRef.current      = dateFrom;      }, [dateFrom]);
@@ -796,7 +800,7 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const HDR   = 18;
-      const FTR   = 10;
+      const FTR   = 11;
 
       // ── Snapshot all filter state at the moment Download is clicked ──
       // Nothing will change these during PDF generation.
@@ -831,7 +835,34 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
       // Simple: just show whatever was active when user clicked Download.
       // No chartsInScope checking. No tab scoping. Just show as-is.
       // ── Build filter text ─────────────────────────────────────────────
-      const buildFilterText = () => {
+      // const buildFilterText = () => {
+      //   const parts = [];
+
+      //   // Panel filters — already scoped by applyTabScopedFilters
+      //   const af = { ...activeFiltersRef.current };
+      //   for (const [col, val] of Object.entries(af)) {
+      //     if (!val) continue;
+      //     const vals = Array.isArray(val) ? val : [val];
+      //     if (vals.length) parts.push(`${col}: ${vals.join(", ")}`);
+      //   }
+
+      //   // Cross-filters
+      //   for (const [col, filter] of Object.entries(snapshotCrossFilters)) {
+      //     if (filter?.value) parts.push(`${col}: ${filter.value}`);
+      //   }
+
+      //   // Date range
+      //   if (snapshotDateFrom && snapshotDateTo)
+      //     parts.push(`Date: ${snapshotDateFrom} → ${snapshotDateTo}`);
+      //   else if (snapshotDateFrom)
+      //     parts.push(`From: ${snapshotDateFrom}`);
+      //   else if (snapshotDateTo)
+      //     parts.push(`To: ${snapshotDateTo}`);
+
+      //   return parts.length ? `Filters: ${parts.join("  |  ")}` : "";
+      // };
+
+      const buildFilterParts = () => {
         const parts = [];
 
         // Panel filters — already scoped by applyTabScopedFilters
@@ -849,13 +880,13 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
 
         // Date range
         if (snapshotDateFrom && snapshotDateTo)
-          parts.push(`Date: ${snapshotDateFrom} → ${snapshotDateTo}`);
+          parts.push(`${snapshotDateFrom} → ${snapshotDateTo}`);
         else if (snapshotDateFrom)
-          parts.push(`From: ${snapshotDateFrom}`);
+          parts.push(`From ${snapshotDateFrom}`);
         else if (snapshotDateTo)
-          parts.push(`To: ${snapshotDateTo}`);
+          parts.push(`To ${snapshotDateTo}`);
 
-        return parts.length ? `Filters: ${parts.join("  |  ")}` : "";
+        return parts;
       };
 
       // ── Load logos ─────────────────────────────────────────────────────
@@ -876,6 +907,7 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
       });
 
       const tenantLogoB64   = await loadImg(tenantLogoRef.current);
+      console.log("DEBUG tenantLogoUrl:", tenantLogoRef.current, "| loaded base64:", tenantLogoB64 ? "SUCCESS" : "FAILED");
       const speegileLogoB64 = await loadImg("/speegile-logo.png");
       const downloadDate    = new Date().toLocaleDateString("en-IN", {
         day: "2-digit", month: "short", year: "numeric"
@@ -921,17 +953,134 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
       });
 
       // ── Add one page to PDF ─────────────────────────────────────────────
+      // const addPage = (canvas, tabName, isFirst, pageNum, totalPages) => {
+      //   if (!isFirst) pdf.addPage();
+
+      //   const filterText = buildFilterText();
+      //   const filterH    = filterText ? 7 : 0;
+      //   const topOffset  = HDR + filterH;
+      //   const margin     = 2;
+      //   const availW     = pageW - margin * 2;
+      //   const availH     = pageH - topOffset - FTR - margin;
+      //   const aspect     = canvas.width / canvas.height;
+      //   const img        = canvas.toDataURL("image/jpeg", 0.98);
+
+      //   // Background
+      //   pdf.setFillColor(13, 17, 23);
+      //   pdf.rect(0, 0, pageW, pageH, "F");
+
+      //   // Chart screenshot
+      //   let w, h, x, y;
+      //   if (aspect > availW / availH) {
+      //     w = availW; h = availW / aspect; x = margin; y = topOffset + margin;
+      //   } else {
+      //     h = availH; w = availH * aspect;
+      //     x = margin + (availW - w) / 2; y = topOffset + margin;
+      //   }
+      //   pdf.addImage(img, "JPEG", x, y, w, h);
+
+      //   // Header strip
+      //   pdf.setFillColor(18, 21, 31);
+      //   pdf.rect(0, 0, pageW, HDR, "F");
+      //   pdf.setDrawColor(45, 55, 72);
+      //   pdf.setLineWidth(0.3);
+      //   pdf.line(0, HDR, pageW, HDR);
+
+      //   // Tenant logo left
+      //   let logoDrawn = false;
+      //   if (tenantLogoB64) {
+      //     try { pdf.addImage(tenantLogoB64, "PNG", 6, 3, 0, 12); logoDrawn = true; }
+      //     catch { logoDrawn = false; }
+      //   }
+      //   if (!logoDrawn) {
+      //     pdf.setFont("helvetica", "bold"); pdf.setFontSize(11);
+      //     pdf.setTextColor(255, 255, 255);
+      //     pdf.text("Dashboard", 8, 11.5);
+      //   }
+
+      //   // Tab name right
+      //   if (tabName) {
+      //     pdf.setFont("helvetica", "normal"); pdf.setFontSize(9);
+      //     pdf.setTextColor(203, 213, 225);
+      //     pdf.text(tabName, pageW - 8, 11.5, { align: "right" });
+      //   }
+
+      //   // Filter strip — shows what filters were active at download time
+      //   if (filterText) {
+      //     pdf.setFillColor(15, 20, 30);
+      //     pdf.rect(0, HDR, pageW, filterH, "F");
+      //     pdf.setDrawColor(31, 50, 70);
+      //     pdf.setLineWidth(0.2);
+      //     pdf.line(0, HDR + filterH, pageW, HDR + filterH);
+      //     pdf.setFont("helvetica", "normal"); pdf.setFontSize(7);
+      //     pdf.setTextColor(100, 148, 180);
+      //     const txt = filterText.length > 160
+      //       ? filterText.slice(0, 160) + "..."
+      //       : filterText;
+      //     pdf.text(txt, 8, HDR + filterH - 1.5);
+      //   }
+
+      //   // Footer strip
+      //   const footerY = pageH - FTR;
+      //   pdf.setFillColor(18, 21, 31);
+      //   pdf.rect(0, footerY, pageW, FTR, "F");
+      //   pdf.setDrawColor(45, 55, 72);
+      //   pdf.setLineWidth(0.3);
+      //   pdf.line(0, footerY, pageW, footerY);
+
+      //   let footerLogoDrawn = false;
+      //   if (speegileLogoB64) {
+      //     try { pdf.addImage(speegileLogoB64, "PNG", 6, footerY + 1.5, 0, 6); footerLogoDrawn = true; }
+      //     catch { footerLogoDrawn = false; }
+      //   }
+      //   if (!footerLogoDrawn) {
+      //     pdf.setFont("helvetica", "bold"); pdf.setFontSize(7);
+      //     pdf.setTextColor(31, 168, 201);
+      //     pdf.text("Speegile Analytics", 6, footerY + 6.5);
+      //   }
+
+      //   pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.5);
+      //   pdf.setTextColor(100, 116, 139);
+      //   pdf.text(`Downloaded: ${downloadDate}`, pageW / 2, footerY + 6.5, { align: "center" });
+      //   pdf.text(`Page ${pageNum} of ${totalPages}`, pageW - 8, footerY + 6.5, { align: "right" });
+      // };
+
+      // ── Gradient helper — draws a thin horizontal teal→slate→purple bar ──
+      const drawGradientBar = (x, y, w, h) => {
+        const stops = [
+          [31, 168, 201],   // #1FA8C9 teal
+          [69, 78, 124],    // #454E7C slate
+          [168, 104, 183],  // #A868B7 purple
+        ];
+        const steps = 80;
+        const segW  = w / steps;
+        for (let i = 0; i < steps; i++) {
+          const t = i / (steps - 1);
+          let c;
+          if (t < 0.5) {
+            const lt = t / 0.5;
+            c = stops[0].map((v, idx) => Math.round(v + (stops[1][idx] - v) * lt));
+          } else {
+            const lt = (t - 0.5) / 0.5;
+            c = stops[1].map((v, idx) => Math.round(v + (stops[2][idx] - v) * lt));
+          }
+          pdf.setFillColor(c[0], c[1], c[2]);
+          pdf.rect(x + segW * i, y, segW + 0.15, h, "F");
+        }
+      };
+
+      // ── Add one page to PDF ─────────────────────────────────────────────
       const addPage = (canvas, tabName, isFirst, pageNum, totalPages) => {
         if (!isFirst) pdf.addPage();
 
-        const filterText = buildFilterText();
-        const filterH    = filterText ? 7 : 0;
-        const topOffset  = HDR + filterH;
-        const margin     = 2;
-        const availW     = pageW - margin * 2;
-        const availH     = pageH - topOffset - FTR - margin;
-        const aspect     = canvas.width / canvas.height;
-        const img        = canvas.toDataURL("image/jpeg", 0.98);
+        const filterParts = buildFilterParts();
+        const filterH     = filterParts.length ? 8 : 0;
+        const topOffset   = HDR + filterH;
+        const margin      = 2;
+        const availW      = pageW - margin * 2;
+        const availH      = pageH - topOffset - FTR - margin;
+        const aspect      = canvas.width / canvas.height;
+        const img         = canvas.toDataURL("image/jpeg", 0.98);
 
         // Background
         pdf.setFillColor(13, 17, 23);
@@ -947,71 +1096,98 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
         }
         pdf.addImage(img, "JPEG", x, y, w, h);
 
-        // Header strip
+        // ── Header strip ───────────────────────────────────────────────
         pdf.setFillColor(18, 21, 31);
         pdf.rect(0, 0, pageW, HDR, "F");
-        pdf.setDrawColor(45, 55, 72);
-        pdf.setLineWidth(0.3);
-        pdf.line(0, HDR, pageW, HDR);
 
-        // Tenant logo left
-        let logoDrawn = false;
+        // Tenant logo — top-left corner badge, out of the way of centered text
+        // if (tenantLogoRef.current) {
+        //   try { pdf.addImage(tenantLogoRef.current, "PNG", 5, 4, 0, 10); } catch {}
+        // }
+        // Tenant logo — top-left corner badge, out of the way of centered text
         if (tenantLogoB64) {
-          try { pdf.addImage(tenantLogoB64, "PNG", 6, 3, 0, 12); logoDrawn = true; }
-          catch { logoDrawn = false; }
-        }
-        if (!logoDrawn) {
-          pdf.setFont("helvetica", "bold"); pdf.setFontSize(11);
-          pdf.setTextColor(255, 255, 255);
-          pdf.text("Dashboard", 8, 11.5);
+          try { pdf.addImage(tenantLogoB64, "PNG", 5, 4, 0, 10); } catch {}
         }
 
-        // Tab name right
+        // Dashboard name — centered, bold, teal (row 1)
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(13);
+        pdf.setTextColor(31, 168, 201);
+        pdf.text(dashboardTitleRef.current || "Dashboard", pageW / 2, 10, { align: "center" });
+
+        // Tab name — centered, muted, directly beneath (row 2)
         if (tabName) {
-          pdf.setFont("helvetica", "normal"); pdf.setFontSize(9);
-          pdf.setTextColor(203, 213, 225);
-          pdf.text(tabName, pageW - 8, 11.5, { align: "right" });
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(9);
+          pdf.setTextColor(148, 163, 184);
+          pdf.text(tabName, pageW / 2, 16.5, { align: "center" });
         }
 
-        // Filter strip — shows what filters were active at download time
-        if (filterText) {
+        // Gradient accent line closing off the header
+        drawGradientBar(0, HDR - 0.7, pageW, 0.7);
+
+        // ── Filter strip — pill-style chips ──────────────────────────────
+        if (filterParts.length) {
           pdf.setFillColor(15, 20, 30);
           pdf.rect(0, HDR, pageW, filterH, "F");
+
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(7);
+
+          let chipX = 6;
+          const chipY = HDR + 1.7;
+          const chipH = 4.8;
+          const maxX  = pageW - 6;
+
+          for (const part of filterParts) {
+            const textW = pdf.getTextWidth(part);
+            const chipW = textW + 6;
+            if (chipX + chipW > maxX) break; // simple overflow guard
+            pdf.setFillColor(20, 45, 58);
+            pdf.setDrawColor(31, 168, 201);
+            pdf.setLineWidth(0.15);
+            pdf.roundedRect(chipX, chipY, chipW, chipH, 1.4, 1.4, "FD");
+            pdf.setTextColor(103, 197, 216);
+            pdf.text(part, chipX + 3, chipY + 3.4);
+            chipX += chipW + 3;
+          }
+
           pdf.setDrawColor(31, 50, 70);
           pdf.setLineWidth(0.2);
           pdf.line(0, HDR + filterH, pageW, HDR + filterH);
-          pdf.setFont("helvetica", "normal"); pdf.setFontSize(7);
-          pdf.setTextColor(100, 148, 180);
-          const txt = filterText.length > 160
-            ? filterText.slice(0, 160) + "..."
-            : filterText;
-          pdf.text(txt, 8, HDR + filterH - 1.5);
         }
 
-        // Footer strip
+        // ── Footer strip ────────────────────────────────────────────────
         const footerY = pageH - FTR;
+
+        // Gradient accent line above footer
+        drawGradientBar(0, footerY, pageW, 0.6);
+
         pdf.setFillColor(18, 21, 31);
-        pdf.rect(0, footerY, pageW, FTR, "F");
-        pdf.setDrawColor(45, 55, 72);
-        pdf.setLineWidth(0.3);
-        pdf.line(0, footerY, pageW, footerY);
+        pdf.rect(0, footerY + 0.6, pageW, FTR - 0.6, "F");
 
         let footerLogoDrawn = false;
         if (speegileLogoB64) {
-          try { pdf.addImage(speegileLogoB64, "PNG", 6, footerY + 1.5, 0, 6); footerLogoDrawn = true; }
+          try { pdf.addImage(speegileLogoB64, "PNG", 6, footerY + 3, 0, 6); footerLogoDrawn = true; }
           catch { footerLogoDrawn = false; }
         }
         if (!footerLogoDrawn) {
           pdf.setFont("helvetica", "bold"); pdf.setFontSize(7);
           pdf.setTextColor(31, 168, 201);
-          pdf.text("Speegile Analytics", 6, footerY + 6.5);
+          pdf.text("Speegile Analytics", 6, footerY + 7);
         }
 
         pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.5);
-        pdf.setTextColor(100, 116, 139);
-        pdf.text(`Downloaded: ${downloadDate}`, pageW / 2, footerY + 6.5, { align: "center" });
-        pdf.text(`Page ${pageNum} of ${totalPages}`, pageW - 8, footerY + 6.5, { align: "right" });
+        pdf.setTextColor(148, 163, 184);
+        pdf.text(`Downloaded: ${downloadDate}`, pageW / 2, footerY + 7, { align: "center" });
+
+        pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.5);
+        pdf.setTextColor(31, 168, 201);
+        pdf.text(`Page ${pageNum} of ${totalPages}`, pageW - 8, footerY + 7, { align: "right" });
       };
+
+
+
 
       // ── Build tab list ──────────────────────────────────────────────────
       const currentSections = sectionsRef.current;
