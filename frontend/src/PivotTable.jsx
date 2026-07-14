@@ -197,13 +197,31 @@ function cellBarColor(value, colValues) {
 function isTimestampMs(n) {
   return Number.isInteger(n) && n > 1_000_000_000_000;
 }
-// Simple, unambiguous ISO date — matches Superset's own default date display (YYYY-MM-DD)
+// Month-grain dates (the 1st of a month — typical of "monthdate"/pivot period
+// columns) display as "Jan-25", matching Superset's own month-column labels.
+// Full/day-grain dates (e.g. a per-transaction BillDate/Fulldate) still show
+// as plain ISO YYYY-MM-DD.
 function fmtDateMs(ms) {
   const d = new Date(ms);
+  if (d.getDate() === 1) {
+    const mon = d.toLocaleDateString("en-IN", { month: "short" });
+    const yr  = String(d.getFullYear()).slice(2);
+    return `${mon}-${yr}`;
+  }
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+// Formats a raw pivot header value — used for column header cells, which are
+// often month-start epoch timestamps but can also be plain dimension strings
+// (e.g. supplier_name). Numeric timestamps get date-formatted; everything
+// else passes through unchanged.
+function fmtHeaderVal(val) {
+  if (val === null || val === undefined || val === "") return "";
+  const n = Number(val);
+  if (!isNaN(n) && isTimestampMs(n)) return fmtDateMs(n);
+  return String(val);
 }
 function fmtTableNum(val, colName = "") {
   if (val === null || val === undefined || val === "") return "";
@@ -222,7 +240,7 @@ function fmtTableNum(val, colName = "") {
 
 // Value used specifically for Excel export. Differs from fmtTableNum in that
 // plain numeric metric columns are kept as real numbers (so totals/sums still
-// work in Excel), while dates are converted to a clean ISO string and
+// work in Excel), while dates are converted to a clean string and
 // mobile/ID-type columns are forced to text so Excel doesn't strip leading
 // zeros or reformat them.
 function exportCellValue(val, colName = "") {
@@ -546,8 +564,8 @@ function ProperPivotTable({
       ...pivot.colCombos.flatMap(combo =>
         pivot.metrics.map(mk =>
           pivot.metrics.length > 1
-            ? combo.join(" | ") + " | " + mk
-            : combo.join(" | ")
+            ? combo.map(fmtHeaderVal).join(" | ") + " | " + mk
+            : combo.map(fmtHeaderVal).join(" | ")
         )
       ),
     ];
@@ -628,7 +646,7 @@ function ProperPivotTable({
                       borderLeft: gi === 0 ? "2px solid rgba(31,168,201,0.3)" : undefined,
                     }}
                   >
-                    {val}
+                    {fmtHeaderVal(val)}
                   </th>
                 ))}
               </tr>
@@ -648,7 +666,7 @@ function ProperPivotTable({
                           top: `${(dimIdx + 2) * rowHeight}px`, // +2 because row 0 is Metric label
                         }}
                       >
-                        {combo[dimIdx + 1]}
+                        {fmtHeaderVal(combo[dimIdx + 1])}
                         {pivot.metrics.length > 1 && (
                           <div style={{ fontSize: 9, color: "#4a8fa8", fontWeight: 400 }}>{mk}</div>
                         )}
@@ -667,7 +685,7 @@ function ProperPivotTable({
                 {pivot.colCombos.flatMap((combo) =>
                   pivot.metrics.map((mk) => (
                     <th key={combo.join("||") + mk} style={{ ...S.thBase, textAlign: "center" }}>
-                      {combo[0]}
+                      {fmtHeaderVal(combo[0])}
                       {pivot.metrics.length > 1 && (
                         <div style={{ fontSize: 9, color: "#5a9fbf" }}>{mk}</div>
                       )}
