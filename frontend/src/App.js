@@ -60,7 +60,7 @@ function App() {
   const [logoUrl, setLogoUrl] = useState("");
   const [brandingName, setBrandingName] = useState("");
   const [defaultLogoUrl, setDefaultLogoUrl] = useState(
-    "https://speegile-tenants.s3.ap-south-1.amazonaws.com/tenant-logo/SpeegileLogo.jpeg",
+    "https://raw.githubusercontent.com/gd273/speegile-analytics-platform/refs/heads/feature-speegile-analytics/frontend/public/SpeegileLogo.jpeg",
   ); // Fallback logo
   const [defaultBrandingName, setDefaultBrandingName] =
     useState("Speegile Analytics"); // Fallback branding name
