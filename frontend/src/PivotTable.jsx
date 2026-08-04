@@ -10,6 +10,8 @@
  */
 
 import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+
 
 const ROWS_PER_PAGE = 1000;
 
@@ -87,6 +89,78 @@ function ExportBtn({ onClick }) {
   );
 }
 
+
+// ── Image lightbox ────────────────────────────────────────────────
+// ── Image lightbox ────────────────────────────────────────────────
+// Rendered via a portal into document.body — dashboard tiles often sit
+// inside a transformed container (drag/resize grid libraries use
+// transform: translate() for tile positioning), which breaks
+// position:fixed by re-anchoring it to that ancestor instead of the
+// viewport. Portaling to <body> guarantees true full-screen fixed layout.
+function ImageLightbox({ src, alt, onClose }) {
+  if (!src) return null;
+
+  const content = (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 99999,
+        background: "rgba(0,0,0,0.82)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: "zoom-out",
+      }}
+    >
+      {/* Positioned wrapper — button is anchored to THIS box's corner,
+          not the full-screen overlay's corner */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "relative",
+          width: "min(480px, 80vw)",
+          height: "min(480px, 80vh)",
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          style={{
+            position: "absolute",
+            top: -14, right: -14,          // sits just outside the image frame's corner
+            width: 34, height: 34, borderRadius: "50%",
+            border: "2px solid #fff",
+            background: "#111",
+            color: "#fff", fontSize: 18, fontWeight: 700, lineHeight: 1,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.6)",
+            zIndex: 2,
+          }}
+        >
+          ✕
+        </button>
+
+        <div
+          style={{
+            width: "100%", height: "100%",
+            background: "#fff",
+            borderRadius: 10,
+            boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            overflow: "hidden",
+          }}
+        >
+          <img
+            src={src}
+            alt={alt || ""}
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  return createPortal(content, document.body);
+}
+
 // Search bar component — flexible, takes available space, min 120px max 280px
 function SearchBar({ value, onChange, placeholder = "Search..." }) {
   return (
@@ -137,6 +211,25 @@ const QTY_COL_PATTERN =
 // never get thousands-separator commas, currency symbols, or right-alignment.
 const ID_COL_PATTERN =
   /\bid\b|_id$|^id_|mobile|phone|contact|tel|fax|whatsapp|pincode|zip|postal|pin_code|\bpin\b|order[_ ]?no|order_id|invoice|^no\.?$|#/i;
+
+const HTML_COL_PATTERN = /photo|image|thumbnail|_img$|^img_/i;
+
+function isHtmlValue(val) {
+  return typeof val === "string" && /^\s*<[a-z][\s\S]*>/i.test(val);
+}
+
+// const SUPERSET_BASE_URL = "https://backend-zr5v.onrender.com"; // ← replace with your actual Superset host/port
+// const SUPERSET_BASE_URL = "https://superset-mnug.onrender.com";
+const SUPERSET_BASE_URL = process.env.REACT_APP_SUPERSET_URL || "http://localhost:8088";
+
+function resolveHtmlImageSrc(html) {
+  // Rewrite src="/static/..." (relative) into an absolute Superset URL.
+  // Leaves already-absolute URLs (http/https) untouched.
+  return html.replace(
+    /src="(\/static\/[^"]*)"/i,
+    (_, path) => `src="${SUPERSET_BASE_URL}${path}"`
+  );
+}
 
 // ── Conditional formatting evaluator ─────────────────────────────
 // For PIVOT: Superset rules use the metric label (e.g. "MIN(rn)") as column.
@@ -243,14 +336,23 @@ function fmtTableNum(val, colName = "") {
 // work in Excel), while dates are converted to a clean string and
 // mobile/ID-type columns are forced to text so Excel doesn't strip leading
 // zeros or reformat them.
-function exportCellValue(val, colName = "") {
+// function exportCellValue(val, colName = "") {
+//   if (val === null || val === undefined) return "";
+//   if (colName && ID_COL_PATTERN.test(colName)) return String(val);
+//   const n = Number(val);
+//   if (!isNaN(n) && isTimestampMs(n)) return fmtDateMs(n);
+//   return val;
+// }
+
+
+
+function exportCellValue(val, colName = "") {          // ← THIS whole function
   if (val === null || val === undefined) return "";
   if (colName && ID_COL_PATTERN.test(colName)) return String(val);
   const n = Number(val);
   if (!isNaN(n) && isTimestampMs(n)) return fmtDateMs(n);
   return val;
-}
-
+} 
 // ── Quarter/period sorter ─────────────────────────────────────────
 // Sorts values that look like "2025-Q1", "2024-Q4", "Jan-25" etc chronologically.
 // Non-period strings fall back to locale sort.
@@ -761,6 +863,7 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
   // Column sort state — click a numeric column header to cycle asc → desc → none
   const [sortCol, setSortCol] = useState(null);
   const [sortDir, setSortDir] = useState(null); // 'asc' | 'desc' | null
+  const [lightbox, setLightbox] = useState(null); // { src, alt } | null
   const rules   = conditionalFormatting || [];
   const allRows = data || [];
 
@@ -860,6 +963,12 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
     const rows2d = filteredRows.map(row => columns.map(col => exportCellValue(row[col], col)));
     exportToExcel("table_data.xlsx", columns, rows2d);
   };
+
+
+  const handlePhotoCellClick = (e) => {
+  const img = e.target.closest("img");
+  if (img) setLightbox({ src: img.src, alt: img.alt });
+};
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: height || "100%", overflow: "hidden" }}>
@@ -965,6 +1074,17 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
                       : { ...S.tdNum, color: "#1FA8C9" };
                     return <td key={col} style={cellStyle}>{fmtTableNum(val, col)}</td>;
                   }
+                  {/* return <td key={col} style={S.td}>{val ?? ""}</td>; */}
+                  if (isHtmlValue(val) || (HTML_COL_PATTERN.test(col) && val)) {
+                    return (
+                      <td
+                        key={col}
+                        style={S.td}
+                        onClick={handlePhotoCellClick}
+                        dangerouslySetInnerHTML={{ __html: resolveHtmlImageSrc(String(val)) }}
+                      />
+                    );
+                  }
                   return <td key={col} style={S.td}>{val ?? ""}</td>;
                 })}
               </tr>
@@ -973,7 +1093,15 @@ function FlatTable({ data, height, metricKeys, columnOrder, colnames, conditiona
           </tbody>
         </table>
       </div>
+      {/* <PageTabs totalRows={total} page={page} setPage={setPage} /> */}
       <PageTabs totalRows={total} page={page} setPage={setPage} />
+        {lightbox && (
+          <ImageLightbox
+            src={lightbox.src}
+            alt={lightbox.alt}
+            onClose={() => setLightbox(null)}
+          />
+        )}
     </div>
   );
 }
