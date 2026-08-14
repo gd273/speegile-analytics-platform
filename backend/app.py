@@ -1146,7 +1146,8 @@ def get_dashboard_charts():
     
 
         chart_configuration = json_metadata.get("chart_configuration", {})
-        # position_json       = json_metadata.get("positions", {})
+        
+
 
         position_json = dashboard_meta.get("position_json", "{}")
         if isinstance(position_json, str):
@@ -1154,6 +1155,25 @@ def get_dashboard_charts():
                 position_json = json.loads(position_json)
             except Exception:
                 position_json = {}
+
+        #before sending the colour series to the frontend, we need to clean it up and only keep valid hex colors
+        # ── Superset's category → color assignments ──
+        raw_shared = json_metadata.get("shared_label_colors")
+        raw_label  = json_metadata.get("label_colors")
+
+        def _clean_label_colors(*sources):
+            out = {}
+            for raw in sources:
+                if isinstance(raw, dict):
+                    for k, v in raw.items():
+                        if isinstance(v, str) and v.startswith("#"):
+                            out[str(k)] = v
+                # if it's a list or anything else, skip it safely
+            return out
+
+        superset_label_colors = _clean_label_colors(raw_shared, raw_label)
+        print(f"DEBUG superset_label_colors = {superset_label_colors}", flush=True)
+        print(f"DEBUG color_scheme = {json_metadata.get('color_scheme')}", flush=True)   # ← ADD
 
         # ── resolve_scope: converts scope object → list of chart IDs ─
         def resolve_scope(scope_obj):
@@ -1235,6 +1255,25 @@ def get_dashboard_charts():
                 or detail.get("viz_type")
                 or "echarts_timeseries_bar"
             )
+
+
+            def _normalize_series_type(t):
+                t = (t or "").lower()
+                if t == "bar":
+                    return "bar"
+                if t == "area":
+                    return "area"
+                return "line"
+
+            series_types = None
+            if viz_type == "mixed_timeseries":
+                left_raw  = form_data.get("seriesType")
+                right_raw = form_data.get("seriesTypeB")
+                print(f"DEBUG mixed chart {chart_id} raw seriesType/B: {left_raw!r} / {right_raw!r}", flush=True)
+                series_types = [
+                    _normalize_series_type(left_raw),
+                    _normalize_series_type(right_raw),
+                ]
 
             # ── Step 4: pie threshold debug ──────────────────────────
             if viz_type == "pie":
@@ -1415,23 +1454,15 @@ def get_dashboard_charts():
             if viz_type and "big_number" in viz_type.lower():
 
                 COLOR_SCHEME_MAP = {
-                    # Ant Design 5 bare semantic tokens (Superset 6.1.0)
-                    "colorsuccess":      "#22c55e",
-                    "colorerror":        "#f87171",
-                    "colorwarning":      "#fbbf24",
-                    "colorinfo":         "#1FA8C9",
-                    "colorprimary":      "#1FA8C9",
-                    # Ant Design "bg" variants (seen on 6.0.1)
+                    "success":           "#22c55e",
+                    "alert":             "#fbbf24",
+                    "error":             "#f87171",
                     "colorsuccessbg":    "#22c55e",
                     "colorwarningbg":    "#fbbf24",
                     "colorerrorbg":      "#f87171",
                     "successbg":         "#22c55e",
                     "warningbg":         "#fbbf24",
                     "errorbg":           "#f87171",
-                    # Plain names
-                    "success":           "#22c55e",
-                    "alert":             "#fbbf24",
-                    "error":             "#f87171",
                     "green":             "#22c55e",
                     "yellow":            "#fbbf24",
                     "red":               "#f87171",
@@ -1641,6 +1672,8 @@ def get_dashboard_charts():
                 "cross_filter_scope":     charts_in_scope,
                 "percentage_threshold":   percentage_threshold,
                 "other_threshold":        other_threshold,
+                "series_colors": superset_label_colors,
+                "series_types":           series_types,
             })
 
             print(f"DEBUG chart {chart_id}: zoomable = {form_data.get('zoomable')} | viz = {viz_type}", flush=True)
