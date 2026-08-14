@@ -90,9 +90,9 @@ const si3 = (n, div, sfx) => {
 const fmtIndianScale = (n) => {
   const abs = Math.abs(n);
   if (abs === 0) return "0";
-  if (abs < 1e3) return parseFloat(n.toFixed(2)).toString();
-  if (abs < 1e5) return si3(n, 1e3, "K");
-  if (abs < 1e7) return si3(n, 1e5, "L");
+  if (abs < 5000) return parseFloat(n.toFixed(2)).toString();
+  if (abs < 1e5)  return si3(n, 1e3, "K");
+  if (abs < 1e7)  return si3(n, 1e5, "L");
   return si3(n, 1e7, "Cr");
 };
 
@@ -334,6 +334,7 @@ const scrollLegend = (keys) => ({
       percentageThreshold = 0,
       otherThreshold      = 0,
       seriesColors        = {},
+      seriesTypesProp     = null,
     }) {
 
     const getColor = (key, fallbackIndex) => {
@@ -717,6 +718,108 @@ const scrollLegend = (keys) => ({
   }
 
 
+// if (type === "mixed") {
+//   const showLabels = true;
+
+//   const seriesWithMag = keys.map(k => {
+//     const avg = data.reduce((s, r) => s + (Math.abs(Number(r[k])) || 0), 0) / (data.length || 1);
+//     return { key: k, avg };
+//   }).sort((a, b) => b.avg - a.avg);
+
+//   const leftKey  = seriesWithMag[0]?.key ?? keys[0];
+//   const rightKey = seriesWithMag[1]?.key ?? keys[1];
+
+//   const axisYLeft = () => ({
+//     type: "value",
+//     axisLine:  { show: false },
+//     axisTick:  { show: false },
+//     axisLabel: { color: "#8b9ab0", fontSize: 10, fontFamily: "inherit", formatter: fmtNum },
+//     splitLine: { lineStyle: { color: "rgba(255,255,255,0.05)", type: "dashed" } },
+//     nameTextStyle: { color: "#8b9ab0", fontSize: 9 },
+//   });
+
+//   const axisYRight = () => ({
+//     type: "value",
+//     axisLine:  { show: false },
+//     axisTick:  { show: false },
+//     axisLabel: { color: "#8b9ab0", fontSize: 10, fontFamily: "inherit", formatter: fmtNum },
+//     splitLine: { show: false },
+//     nameTextStyle: { color: "#8b9ab0", fontSize: 9 },
+//   });
+
+//   return {
+//     ...base,
+//     grid: { left: 12, right: 40, top: 36, bottom: 60, containLabel: true },
+//     xAxis: axisX(cats),
+//     yAxis: [axisYLeft(), axisYRight()],
+
+//     legend: {
+//       type: "scroll",
+//       orient: "horizontal",
+//       bottom: 4,
+//       icon: "circle",
+//       itemHeight: 10,
+//       itemGap: 24,
+//       textStyle: { color: "#8b9ab0", fontSize: 11, fontFamily: "inherit" },
+//       data: [
+//         { name: leftKey,  icon: "circle", itemStyle: { color: getColor(leftKey,  0) } },
+//         { name: rightKey, icon: "circle", itemStyle: { color: getColor(rightKey, 1) } },
+//       ],
+//       formatter: (name) => {
+//         if (name === leftKey)  return `${name}  ← Left`;
+//         if (name === rightKey) return `${name}  Right →`;
+//         return name;
+//       },
+//     },
+
+//     series: [
+//       {
+//         type: "bar",
+//         name: leftKey,
+//         yAxisIndex: 0,
+//         barCategoryGap: "20%",
+//         barGap: "5%",
+//         data: sData(leftKey).map((val) => ({
+//           value: val,
+//           itemStyle: { color: getColor(leftKey,  0), borderRadius: [4, 4, 0, 0] },
+//         })),
+//         label: {
+//           show: showLabels,
+//           position: "top",
+//           color: "#94a3b8",
+//           fontSize: 9,
+//           fontFamily: "inherit",
+//           fontWeight: "600",
+//           formatter: p => fmtNum(p.value),
+//         },
+//         emphasis: { focus: "series" },
+//       },
+//       {
+//         type: "bar",
+//         name: rightKey,
+//         yAxisIndex: 1,
+//         barCategoryGap: "20%",
+//         barGap: "5%",
+//         data: sData(rightKey).map((val) => ({
+//           value: val,
+//           itemStyle: { color: getColor(rightKey, 1), borderRadius: [4, 4, 0, 0] },
+          
+//         })),
+//         label: {
+//           show: showLabels,
+//           position: "top",
+//           color: "#94a3b8",
+//           fontSize: 9,
+//           fontFamily: "inherit",
+//           fontWeight: "600",
+//           formatter: p => fmtNum(p.value),
+//         },
+//         emphasis: { focus: "series" },
+//       },
+//     ],
+//   };
+// }
+
 if (type === "mixed") {
   const showLabels = true;
 
@@ -728,6 +831,14 @@ if (type === "mixed") {
   const leftKey  = seriesWithMag[0]?.key ?? keys[0];
   const rightKey = seriesWithMag[1]?.key ?? keys[1];
 
+  // seriesTypesProp comes straight from Superset's own Query A (seriesType)
+  // and Query B (seriesTypeB) form_data controls, normalized to "bar"/"line"/"area"
+  // on the backend. Falls back to bar+line if not supplied.
+  const [leftType, rightType] =
+    (Array.isArray(seriesTypesProp) && seriesTypesProp.length === 2)
+      ? seriesTypesProp
+      : ["bar", "line"];
+
   const axisYLeft = () => ({
     type: "value",
     axisLine:  { show: false },
@@ -737,8 +848,35 @@ if (type === "mixed") {
     nameTextStyle: { color: "#8b9ab0", fontSize: 9 },
   });
 
+  // const axisYRight = () => ({
+  //   type: "value",
+  //   axisLine:  { show: false },
+  //   axisTick:  { show: false },
+  //   axisLabel: { color: "#8b9ab0", fontSize: 10, fontFamily: "inherit", formatter: fmtNum },
+  //   splitLine: { show: false },
+  //   nameTextStyle: { color: "#8b9ab0", fontSize: 9 },
+  // });
+
+  const niceCeil = (n) => {
+    if (n <= 0) return 10;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(n)));
+    const normalized = n / magnitude;
+    let niceNorm;
+    if (normalized <= 1)      niceNorm = 1;
+    else if (normalized <= 2) niceNorm = 2;
+    else if (normalized <= 2.5) niceNorm = 2.5;
+    else if (normalized <= 5) niceNorm = 5;
+    else                       niceNorm = 10;
+    return niceNorm * magnitude;
+  };
+
+  const rightDataMax = Math.max(...sData(rightKey).map(v => v ?? 0), 0);
+  const rightAxisMax = niceCeil(rightDataMax * 1.75);
+
   const axisYRight = () => ({
     type: "value",
+    min: 0,
+    max: rightAxisMax,
     axisLine:  { show: false },
     axisTick:  { show: false },
     axisLabel: { color: "#8b9ab0", fontSize: 10, fontFamily: "inherit", formatter: fmtNum },
@@ -746,23 +884,118 @@ if (type === "mixed") {
     nameTextStyle: { color: "#8b9ab0", fontSize: 9 },
   });
 
+  const makeSeriesEntry = (key, axisIndex, seriesType) => {
+    const color = getColor(key, axisIndex);
+    const labelCfg = {
+      show: showLabels,
+      position: "top",
+      color: "#94a3b8",
+      fontSize: 9,
+      fontFamily: "inherit",
+      fontWeight: "600",
+      formatter: p => fmtNum(p.value),
+    };
+
+    if (seriesType === "area") {
+      return {
+        type: "line",
+        name: key,
+        yAxisIndex: axisIndex,
+        smooth: 0.3,
+        symbol: "circle",
+        symbolSize: 8,
+        connectNulls: false,
+        lineStyle: { color, width: 2 },
+        itemStyle: { color },
+        areaStyle: {
+          color: {
+            type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: color + "55" },
+              { offset: 1, color: color + "05" },
+            ],
+          },
+        },
+        data: sData(key),
+        label: labelCfg,
+        emphasis: { focus: "series", scale: true },
+        z: 2,
+      };
+    }
+
+    if (seriesType === "line") {
+      return {
+        type: "line",
+        name: key,
+        yAxisIndex: axisIndex,
+        smooth: false,
+        symbol: "circle",
+        symbolSize: 8,
+        connectNulls: false,
+        lineStyle: { color, width: 2.5 },
+        itemStyle: { color },
+        data: sData(key),
+        label: labelCfg,
+        emphasis: {
+          focus: "series", scale: true,
+          itemStyle: { borderWidth: 2, borderColor: "#fff" },
+        },
+        z: 3,
+      };
+    }
+
+    // default: bar
+    return {
+      type: "bar",
+      name: key,
+      yAxisIndex: axisIndex,
+      barCategoryGap: "20%",
+      barGap: "5%",
+      barMaxWidth: 48,
+      data: sData(key).map((val) => ({
+        value: val,
+        itemStyle: { color, borderRadius: [4, 4, 0, 0] },
+      })),
+      label: labelCfg,
+      emphasis: { focus: "series" },
+      z: 2,
+    };
+  };
+
   return {
     ...base,
     grid: { left: 12, right: 40, top: 36, bottom: 60, containLabel: true },
     xAxis: axisX(cats),
     yAxis: [axisYLeft(), axisYRight()],
 
+    tooltip: {
+      trigger: "axis",
+      ...darkTooltip,
+      axisPointer: { type: "shadow" },
+      formatter(params) {
+        const label = params[0]?.axisValueLabel ?? params[0]?.axisValue ?? "";
+        let html = `<div style="color:#64748b;font-size:10px;margin-bottom:5px;font-weight:600">${label}</div>`;
+        params.forEach(p => {
+          html += `<div style="display:flex;align-items:center;gap:6px;margin:2px 0">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color}"></span>
+            <span style="color:#94a3b8;font-size:10px;flex:1">${p.seriesName}</span>
+            <span style="color:#e2e8f0;font-weight:600;padding-left:12px">${fmtNum(p.value)}</span>
+          </div>`;
+        });
+        return html;
+      },
+    },
+
     legend: {
       type: "scroll",
       orient: "horizontal",
       bottom: 4,
-      icon: "circle",
       itemHeight: 10,
       itemGap: 24,
       textStyle: { color: "#8b9ab0", fontSize: 11, fontFamily: "inherit" },
       data: [
-        { name: leftKey,  icon: "circle", itemStyle: { color: getColor(leftKey,  0) } },
-        { name: rightKey, icon: "circle", itemStyle: { color: getColor(rightKey, 1) } },
+        { name: leftKey,  icon: leftType  === "bar" ? "rect" : "circle", itemStyle: { color: getColor(leftKey,  0) } },
+        { name: rightKey, icon: rightType === "bar" ? "rect" : "circle", itemStyle: { color: getColor(rightKey, 1) } },
       ],
       formatter: (name) => {
         if (name === leftKey)  return `${name}  ← Left`;
@@ -772,49 +1005,8 @@ if (type === "mixed") {
     },
 
     series: [
-      {
-        type: "bar",
-        name: leftKey,
-        yAxisIndex: 0,
-        barCategoryGap: "20%",
-        barGap: "5%",
-        data: sData(leftKey).map((val) => ({
-          value: val,
-          itemStyle: { color: getColor(leftKey,  0), borderRadius: [4, 4, 0, 0] },
-        })),
-        label: {
-          show: showLabels,
-          position: "top",
-          color: "#94a3b8",
-          fontSize: 9,
-          fontFamily: "inherit",
-          fontWeight: "600",
-          formatter: p => fmtNum(p.value),
-        },
-        emphasis: { focus: "series" },
-      },
-      {
-        type: "bar",
-        name: rightKey,
-        yAxisIndex: 1,
-        barCategoryGap: "20%",
-        barGap: "5%",
-        data: sData(rightKey).map((val) => ({
-          value: val,
-          itemStyle: { color: getColor(rightKey, 1), borderRadius: [4, 4, 0, 0] },
-          
-        })),
-        label: {
-          show: showLabels,
-          position: "top",
-          color: "#94a3b8",
-          fontSize: 9,
-          fontFamily: "inherit",
-          fontWeight: "600",
-          formatter: p => fmtNum(p.value),
-        },
-        emphasis: { focus: "series" },
-      },
+      makeSeriesEntry(leftKey,  0, leftType),
+      makeSeriesEntry(rightKey, 1, rightType),
     ],
   };
 }
@@ -824,7 +1016,7 @@ if (type === "line") {
   const sortedKeys = [...keys].sort((a, b) =>
     String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" })
   );
-  const showLabels = data.length <= 20;
+  const showLabels = data.length <= 60;
   return {
     ...base,
 
@@ -1012,6 +1204,7 @@ export default function ChartCard({
   seriesColors:   seriesColorsProp = {},
   otherThreshold      = 0,
   onDateRangeDetected = null,
+  seriesTypes:    seriesTypesProp = null,
 }) {
   const [data,         setData]         = useState([]);
   const [keys,         setKeys]         = useState([]);
@@ -1386,9 +1579,24 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
     
 
 return (
+  // <ReactECharts
+  //   ref={echartsRef}
+  //   option={buildOption({ type, data, keys, xKey, selectedValue, initialKeys, zoomable, percentageThreshold, otherThreshold, seriesColors: seriesColorsProp})}
+  //   style={{ height, width: "100%", cursor: onCrossFilter ? "pointer" : "default" }}
+  //   opts={{ renderer: "canvas" }}
+  //   onEvents={{ click: handleChartClick }}
+  //   notMerge
+  //   lazyUpdate={false}
+  // />
+
   <ReactECharts
     ref={echartsRef}
-    option={buildOption({ type, data, keys, xKey, selectedValue, initialKeys, zoomable, percentageThreshold, otherThreshold, seriesColors: seriesColorsProp})}
+    option={buildOption({
+      type, data, keys, xKey, selectedValue, initialKeys, zoomable,
+      percentageThreshold, otherThreshold,
+      seriesColors: seriesColorsProp,
+      seriesTypesProp,   // ← added
+    })}
     style={{ height, width: "100%", cursor: onCrossFilter ? "pointer" : "default" }}
     opts={{ renderer: "canvas" }}
     onEvents={{ click: handleChartClick }}
