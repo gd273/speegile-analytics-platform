@@ -216,37 +216,7 @@ function parseSupersetLayout(positionJson) {
 
 const unitsToPx = (u) => Math.max(220, (u || 50) * 8);
 
-// ── Cross-filter pills ──────────────────────────────────────
-// function CrossFilterPills({ crossFilters, onClear, onClearAll }) {
-//   const entries = Object.entries(crossFilters).filter(([, f]) => f.value)
-//   if (!entries.length) return null;
-//   return (
-//     <div style={{ background: "rgba(31,168,201,0.07)", border: "1px solid rgba(31,168,201,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-//       <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 4 }}>
-//         <Zap size={13} style={{ color: "#1FA8C9" }} />
-//         <span style={{ fontSize: 11, fontWeight: 700, color: "#1FA8C9", letterSpacing: "0.07em", textTransform: "uppercase" }}>Cross-filters active</span>
-//       </div>
-//       {entries.map(([col, f]) => (
-//         <span key={col} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, background: "rgba(31,168,201,0.15)", color: "#67c5d8", border: "1px solid rgba(31,168,201,0.3)", padding: "3px 10px 3px 12px", borderRadius: 16 }}>
-//           <span style={{ color: "#4a8fa8", fontSize: 9, fontWeight: 600 }}>{f.sourceChartTitle || "Chart"}:</span>
-//           <span style={{ color: "#e2e8f0", fontWeight: 600 }}>{f.value}</span>
-//           <button onClick={() => onClear(col)} style={{ background: "none", border: "none", color: "#4a8fa8", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
-//             onMouseEnter={e => e.currentTarget.style.color = "#1FA8C9"}
-//             onMouseLeave={e => e.currentTarget.style.color = "#4a8fa8"}>
-//             <X size={11} />
-//           </button>
-//         </span>
-//       ))}
-//       {entries.length > 1 && (
-//         <button onClick={onClearAll} style={{ fontSize: 10, color: "#4a8fa8", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
-//           onMouseEnter={e => e.currentTarget.style.color = "#1FA8C9"}
-//           onMouseLeave={e => e.currentTarget.style.color = "#4a8fa8"}>
-//           Clear all
-//         </button>
-//       )}
-//     </div>
-//   );
-// }
+
 
 
 function CrossFilterPills({ crossFilters, onClear, onClearAll, crossFilterScopeMap = {}, crossFiltersEnabled = false }) {
@@ -412,19 +382,7 @@ function TabGroup({ tabs = [], chartMap, cardProps, isMobile, renderRows, onTabC
     )}
   </div>
 
-  {/* ── Date picker row — separate from tab scroll ── */}
-  {/* {hasTimeFilter && (
-    <div style={{ background: "#12151f", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "8px 12px", display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
-      <DateRangePicker
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onFromChange={setDateFrom}
-        onToChange={setDateTo}
-        onClear={() => { setDateFrom(null); setDateTo(null); }}
-        dataDateRange={dataDateRange}
-      />
-    </div>
-  )} */}
+  
 
     
 
@@ -828,40 +786,6 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
       };
       // ─────────────────────────────────────────────────────────────────
 
-
-
-
-      // ── Build filter text from snapshot ───────────────────────────────
-      // Simple: just show whatever was active when user clicked Download.
-      // No chartsInScope checking. No tab scoping. Just show as-is.
-      // ── Build filter text ─────────────────────────────────────────────
-      // const buildFilterText = () => {
-      //   const parts = [];
-
-      //   // Panel filters — already scoped by applyTabScopedFilters
-      //   const af = { ...activeFiltersRef.current };
-      //   for (const [col, val] of Object.entries(af)) {
-      //     if (!val) continue;
-      //     const vals = Array.isArray(val) ? val : [val];
-      //     if (vals.length) parts.push(`${col}: ${vals.join(", ")}`);
-      //   }
-
-      //   // Cross-filters
-      //   for (const [col, filter] of Object.entries(snapshotCrossFilters)) {
-      //     if (filter?.value) parts.push(`${col}: ${filter.value}`);
-      //   }
-
-      //   // Date range
-      //   if (snapshotDateFrom && snapshotDateTo)
-      //     parts.push(`Date: ${snapshotDateFrom} → ${snapshotDateTo}`);
-      //   else if (snapshotDateFrom)
-      //     parts.push(`From: ${snapshotDateFrom}`);
-      //   else if (snapshotDateTo)
-      //     parts.push(`To: ${snapshotDateTo}`);
-
-      //   return parts.length ? `Filters: ${parts.join("  |  ")}` : "";
-      // };
-
       const buildFilterParts = () => {
         const parts = [];
 
@@ -952,98 +876,7 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
         },
       });
 
-      // ── Add one page to PDF ─────────────────────────────────────────────
-      // const addPage = (canvas, tabName, isFirst, pageNum, totalPages) => {
-      //   if (!isFirst) pdf.addPage();
 
-      //   const filterText = buildFilterText();
-      //   const filterH    = filterText ? 7 : 0;
-      //   const topOffset  = HDR + filterH;
-      //   const margin     = 2;
-      //   const availW     = pageW - margin * 2;
-      //   const availH     = pageH - topOffset - FTR - margin;
-      //   const aspect     = canvas.width / canvas.height;
-      //   const img        = canvas.toDataURL("image/jpeg", 0.98);
-
-      //   // Background
-      //   pdf.setFillColor(13, 17, 23);
-      //   pdf.rect(0, 0, pageW, pageH, "F");
-
-      //   // Chart screenshot
-      //   let w, h, x, y;
-      //   if (aspect > availW / availH) {
-      //     w = availW; h = availW / aspect; x = margin; y = topOffset + margin;
-      //   } else {
-      //     h = availH; w = availH * aspect;
-      //     x = margin + (availW - w) / 2; y = topOffset + margin;
-      //   }
-      //   pdf.addImage(img, "JPEG", x, y, w, h);
-
-      //   // Header strip
-      //   pdf.setFillColor(18, 21, 31);
-      //   pdf.rect(0, 0, pageW, HDR, "F");
-      //   pdf.setDrawColor(45, 55, 72);
-      //   pdf.setLineWidth(0.3);
-      //   pdf.line(0, HDR, pageW, HDR);
-
-      //   // Tenant logo left
-      //   let logoDrawn = false;
-      //   if (tenantLogoB64) {
-      //     try { pdf.addImage(tenantLogoB64, "PNG", 6, 3, 0, 12); logoDrawn = true; }
-      //     catch { logoDrawn = false; }
-      //   }
-      //   if (!logoDrawn) {
-      //     pdf.setFont("helvetica", "bold"); pdf.setFontSize(11);
-      //     pdf.setTextColor(255, 255, 255);
-      //     pdf.text("Dashboard", 8, 11.5);
-      //   }
-
-      //   // Tab name right
-      //   if (tabName) {
-      //     pdf.setFont("helvetica", "normal"); pdf.setFontSize(9);
-      //     pdf.setTextColor(203, 213, 225);
-      //     pdf.text(tabName, pageW - 8, 11.5, { align: "right" });
-      //   }
-
-      //   // Filter strip — shows what filters were active at download time
-      //   if (filterText) {
-      //     pdf.setFillColor(15, 20, 30);
-      //     pdf.rect(0, HDR, pageW, filterH, "F");
-      //     pdf.setDrawColor(31, 50, 70);
-      //     pdf.setLineWidth(0.2);
-      //     pdf.line(0, HDR + filterH, pageW, HDR + filterH);
-      //     pdf.setFont("helvetica", "normal"); pdf.setFontSize(7);
-      //     pdf.setTextColor(100, 148, 180);
-      //     const txt = filterText.length > 160
-      //       ? filterText.slice(0, 160) + "..."
-      //       : filterText;
-      //     pdf.text(txt, 8, HDR + filterH - 1.5);
-      //   }
-
-      //   // Footer strip
-      //   const footerY = pageH - FTR;
-      //   pdf.setFillColor(18, 21, 31);
-      //   pdf.rect(0, footerY, pageW, FTR, "F");
-      //   pdf.setDrawColor(45, 55, 72);
-      //   pdf.setLineWidth(0.3);
-      //   pdf.line(0, footerY, pageW, footerY);
-
-      //   let footerLogoDrawn = false;
-      //   if (speegileLogoB64) {
-      //     try { pdf.addImage(speegileLogoB64, "PNG", 6, footerY + 1.5, 0, 6); footerLogoDrawn = true; }
-      //     catch { footerLogoDrawn = false; }
-      //   }
-      //   if (!footerLogoDrawn) {
-      //     pdf.setFont("helvetica", "bold"); pdf.setFontSize(7);
-      //     pdf.setTextColor(31, 168, 201);
-      //     pdf.text("Speegile Analytics", 6, footerY + 6.5);
-      //   }
-
-      //   pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.5);
-      //   pdf.setTextColor(100, 116, 139);
-      //   pdf.text(`Downloaded: ${downloadDate}`, pageW / 2, footerY + 6.5, { align: "center" });
-      //   pdf.text(`Page ${pageNum} of ${totalPages}`, pageW - 8, footerY + 6.5, { align: "right" });
-      // };
 
       // ── Gradient helper — draws a thin horizontal teal→slate→purple bar ──
       const drawGradientBar = (x, y, w, h) => {
@@ -1324,57 +1157,8 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
   const cardProps = (chart, chartHeightPx = 320) => {
 
 
-    // const applicableCrossFilters = Object.fromEntries(
-    //   Object.entries(crossFilters).filter(([, f]) => {
-    //     // if (!f.chartsInScope) return true;
-    //         if (!f.chartsInScope || f.chartsInScope.length === 0) return false;  // ← skip if no scope defined (means filter is meant for tables only)
-    //     return f.chartsInScope.map(Number).includes(Number(chart.slice_id));
-    //   })
-    // );
-
-//     const loadedChartIds = new Set(charts.map(c => Number(c.slice_id)));
-
-// const applicableCrossFilters = Object.fromEntries(
-//   Object.entries(crossFilters).filter(([, f]) => {
-//     if (Number(f.sourceChartId) === Number(chart.slice_id)) return false;
-//     if (!f.chartsInScope || f.chartsInScope.length === 0) return false;
-
-//     const scope = f.chartsInScope.map(Number);
-//     const anyOnThisDashboard = scope.some(id => loadedChartIds.has(id));
-
-//     // Stale IDs — apply to all charts except source
-//     if (!anyOnThisDashboard) return true;
-
-//     // Valid scope — respect it
-//     return scope.includes(Number(chart.slice_id));
-//   })
-// );
 console.log("scopeMap at render:", crossFilterScopeMap, "enabled:", crossFiltersEnabled);
 
-// const applicableCrossFilters = Object.fromEntries(
-//   Object.entries(crossFilters).filter(([, f]) => {
-//     // Never filter the emitter chart itself
-//     if (Number(f.sourceChartId) === Number(chart.slice_id)) return false;
-
-//     const sourceId = Number(f.sourceChartId);
-//     const targetId = Number(chart.slice_id);
-
-//     // If cross-filters are disabled on this dashboard, apply nothing
-//     if (!crossFiltersEnabled) return false;
-
-//     // Check the scope map fetched from Superset metadata
-//     if (crossFilterScopeMap.hasOwnProperty(sourceId)) {
-//       // Explicit scope found — only apply if this chart is in the list
-//       // const allowedTargets = crossFilterScopeMap[sourceId];
-//       // return allowedTargets.includes(targetId);
-//       return crossFilterScopeMap[sourceId].includes(targetId);
-//     }
-
-//     // Source chart has no entry in scope map at all
-//     // → Your rule: no explicit scope = filter nobody
-//     return false;
-//   })
-// );
 
 const applicableCrossFilters = Object.fromEntries(
   Object.entries(crossFilters).filter(([, f]) => {
@@ -1388,22 +1172,6 @@ const applicableCrossFilters = Object.fromEntries(
     return false;
   })
 );
-
-
-// REPLACE the entire applicableCrossFilters block with this simple version:
-// const applicableCrossFilters = Object.fromEntries(
-//   Object.entries(crossFilters).filter(([, f]) => {
-//     // Never send filter back to source chart
-//     if (Number(f.sourceChartId) === Number(chart.slice_id)) return false;
-
-//     // No scope defined in Superset = don't filter this chart
-//     if (!f.chartsInScope || f.chartsInScope.length === 0) return false;
-
-//     // Use exactly what Superset configured — no fallback logic
-//     return f.chartsInScope.map(Number).includes(Number(chart.slice_id));
-//   })
-// );
-
 
 
     if (Object.keys(crossFilters).length > 0) {
@@ -1437,6 +1205,7 @@ const applicableCrossFilters = Object.fromEntries(
       crossFilterScope:    chart.cross_filter_scope  ?? null,
       percentageThreshold: chart.percentage_threshold || 0,
       otherThreshold:      chart.other_threshold      || 0,
+      seriesTypes:         chart.series_types         || null,
       onDateRangeDetected: handleDateRangeDetected,
     };
   };
@@ -1512,38 +1281,7 @@ const applicableCrossFilters = Object.fromEntries(
     </div>
   );
 
-  // ── Render ────────────────────────────────────────────────
-  // return (
-  //   <div style={{ background: "#0d1117", minHeight: "100vh", padding: isMobile ? "10px" : "16px", position: "relative" }}>
-  //     <PdfProgressOverlay progress={pdfProgress} />
-  //     <CrossFilterPills crossFilters={crossFilters} onClear={clearCrossFilter} onClearAll={clearAllCrossFilters} />
-  //     <FilterPanel
-  //       filterDefs={filterDefs.filter(fd => {
-  //         if (!fd.tabsInScope || fd.tabsInScope.length === 0) return true;
-  //         if (!activeTabId) return true;
-  //         return fd.tabsInScope.includes(activeTabId);
-  //       })}
-  //       activeFilters={activeFilters}
-  //       dateFrom={dateFrom}
-  //       dateTo={dateTo}
-  //       onFilterChange={handleFilterChange}
-  //       onDateFromChange={setDateFrom}
-  //       onDateToChange={setDateTo}
-  //       onReset={handleReset}
-  //     />
-  //     <ActivePills
-  //       activeFilters={activeFilters}
-  //       dateFrom={dateFrom}
-  //       dateTo={dateTo}
-  //       onRemove={(col, val) => handleFilterChange(col, val)}
-  //       onRemoveDate={() => { setDateFrom(""); setDateTo(""); }}
-  //     />
 
-  //     <div ref={dashboardContentRef}>
-  //       {sections ? renderWithLayout() : renderFallback()}
-  //     </div>
-  //   </div>
-  // );
   return (
     <div style={{ background: "#0d1117", minHeight: "100vh", padding: isMobile ? "10px" : "16px", position: "relative" }}>
     <PdfProgressOverlay progress={pdfProgress} />
