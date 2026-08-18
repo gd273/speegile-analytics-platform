@@ -123,19 +123,125 @@ const fmtAxisLabel = (v) => {
   if (/^\d{4}-Q\d$/.test(s)) return s;
   return s.length > 16 ? s.slice(0, 15) + "…" : s;
 };
-const PCT_KEYWORDS = /change|pct|percent|%|ratio|rate|growth|nullif|case when/i;
-const isRatioValue = (n, label = "") =>
-  Math.abs(n) > 0 && Math.abs(n) < 2 && PCT_KEYWORDS.test(label);
+
+
+// const PCT_KEYWORDS = /change|pct|percent|%|ratio|rate|growth|nullif|case when/i;
+// const isRatioValue = (n, label = "") =>
+//   Math.abs(n) > 0 && Math.abs(n) < 2 && PCT_KEYWORDS.test(label);
+// const fmtBigNum = (rawVal, label = "") => {
+//   const n = Number(rawVal);
+//   if (isNaN(n)) return String(rawVal ?? "");
+//   if (isTimestampMs(n)) return fmtDateMs(n);
+//   if (isRatioValue(n, label)) {
+//     const pct = n * 100, abs = Math.abs(pct);
+//     return (abs >= 10 ? pct.toFixed(1) : pct.toFixed(2)).replace(/\.?0+$/, "") + "%";
+//   }
+//   return fmtIndianScale(n);
+// };
+
+
+// const PCT_KEYWORDS =
+//   /change|pct|percent|%|percentage|ratio|rate|growth|margin|share|nullif|case when/i;
+
+// const isPercentageMetric = (label = "") =>
+//   PCT_KEYWORDS.test(String(label));
+
+// const isRatioValue = (n, label = "") =>
+//   isPercentageMetric(label) && Number.isFinite(n);
+
+// const fmtPercentage = (n) => {
+//   // If the value is between -1 and 1, treat it as a ratio.
+//   // Example: 0.1234 -> 12.34%
+//   //
+//   // If the value is already greater than 1 or less than -1,
+//   // treat it as an already-percentage value.
+//   // Example: 12.34 -> 12.34%
+
+//   const pct = Math.abs(n) <= 1 ? n * 100 : n;
+
+//   return `${pct.toFixed(2)}%`;
+// };
+
+// const fmtBigNum = (rawVal, label = "") => {
+//   const n = Number(rawVal);
+
+//   if (isNaN(n)) return String(rawVal ?? "");
+
+//   if (isTimestampMs(n)) return fmtDateMs(n);
+
+//   // Percentage metrics
+//   if (isPercentageMetric(label)) {
+//     return fmtPercentage(n);
+//   }
+
+//   // Normal numbers
+//   return fmtIndianScale(n);
+// };
+
+
+const PCT_KEYWORDS =
+  /change|pct|percent|percentage|%|ratio|rate|growth|margin|share|nullif|case\s+when/i;
+
+
+/**
+ * Detect whether a metric represents a percentage.
+ *
+ * We check the metric label AND chart title because Superset
+ * may return a metric column name that doesn't contain "%".
+ */
+const isPercentageMetric = (label = "") => {
+  return PCT_KEYWORDS.test(String(label));
+};
+
+
+/**
+ * Format percentage values.
+ *
+ * Supports both common backend representations:
+ *
+ * 0.611  -> 61.10%
+ * 0.4567 -> 45.67%
+ * 61.1   -> 61.10%
+ * -5.25  -> -5.25%
+ */
+const fmtPercentage = (n) => {
+  if (!Number.isFinite(n)) return "";
+
+  const percentage = Math.abs(n) <= 1
+    ? n * 100
+    : n;
+
+  return `${percentage.toFixed(2)}%`;
+};
+
+
+/**
+ * Main Big Number formatter.
+ */
 const fmtBigNum = (rawVal, label = "") => {
   const n = Number(rawVal);
-  if (isNaN(n)) return String(rawVal ?? "");
-  if (isTimestampMs(n)) return fmtDateMs(n);
-  if (isRatioValue(n, label)) {
-    const pct = n * 100, abs = Math.abs(pct);
-    return (abs >= 10 ? pct.toFixed(1) : pct.toFixed(2)).replace(/\.?0+$/, "") + "%";
+
+  if (!Number.isFinite(n)) {
+    return String(rawVal ?? "");
   }
+
+  if (isTimestampMs(n)) {
+    return fmtDateMs(n);
+  }
+
+  // Percentage metric
+  if (isPercentageMetric(label)) {
+    return fmtPercentage(n);
+  }
+
+  // Normal number
   return fmtIndianScale(n);
 };
+
+
+
+
+
 const SQL_EXPR = /SUM\s*\(CASE WHEN|NULLIF\s*\(|CASE WHEN/i;
 const cleanMetricLabel = (label = "") => {
   const l = label.trim();
@@ -1482,57 +1588,89 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
 );
 
 
-    
-    if (type === "bignum") {
+if (type === "bignum") {
   const metricLabels = extractMetricLabels(metricsProp);
-  const allCols      = Object.keys(data[0]);
-  const numericCols  = allCols.filter(k =>
-    !isNaN(Number(data[0][k])) && !isTimestampMs(Number(data[0][k]))
+  const allCols = Object.keys(data[0]);
+
+  const numericCols = allCols.filter(k =>
+    !isNaN(Number(data[0][k])) &&
+    !isTimestampMs(Number(data[0][k]))
   );
-  const valueKey   = metricLabels.find(m => allCols.includes(m)) || numericCols[0] || allCols[0] || "";
-  const rawVal     = data[0]?.[valueKey] ?? 0;
-  const n          = Number(rawVal);
-  const displayVal = fmtBigNum(rawVal, valueKey);
-  const subtitle   = cleanMetricLabel(String(valueKey || ""));
-  const isDate     = isTimestampMs(n);
-  const isPct      = isRatioValue(n, valueKey);
+
+  const valueKey =
+    metricLabels.find(m => allCols.includes(m)) ||
+    numericCols[0] ||
+    allCols[0] ||
+    "";
+
+  const rawVal = data[0]?.[valueKey] ?? 0;
+  const n = Number(rawVal);
+
+  // Check metric name + chart title
+  const percentageLabel =
+    `${String(valueKey || "")} ${String(title || "")}`;
+
+  const isPct = isPercentageMetric(percentageLabel);
+
+  // Format only the displayed value
+  const displayVal = isPct
+    ? fmtPercentage(n)
+    : fmtBigNum(rawVal, valueKey);
+
+  const subtitle = cleanMetricLabel(String(valueKey || ""));
+  const isDate = isTimestampMs(n);
 
   const valueFontSize = isDate
     ? 22
-    : Math.max(18, 36 - Math.max(0, displayVal.length - 3) * 4);
+    : Math.max(
+        18,
+        36 - Math.max(0, displayVal.length - 3) * 4
+      );
 
-  return (
+  // KEEP YOUR EXISTING RETURN JSX BELOW THIS LINE
+return (
+  <div style={{
+    display:        "flex",
+    flexDirection:  "column",
+    alignItems:     "center",
+    justifyContent: "center",
+    height:         "100%",
+    gap:            4,
+    padding:        "8px 10px",
+    boxSizing:      "border-box",
+    overflow:       "hidden",
+  }}>
     <div style={{
-      display:        "flex",
-      flexDirection:  "column",
-      alignItems:     "center",
-      justifyContent: "center",
-      height:         "100%",
-      gap:            4,
-      padding:        "8px 10px",
-      boxSizing:      "border-box",
-      overflow:       "hidden",
+      width:     "100%",
+      maxWidth:  180,
+      textAlign: "center",
     }}>
-      <div style={{
-        width:     "100%",
-        maxWidth:  180,
-        textAlign: "center",
-      }}>
 
-        <div style={{
+      <div style={{
         fontSize:      valueFontSize,
         fontWeight:    800,
         color: (() => {
           if (conditionalColors.length > 0) {
             for (const rule of conditionalColors) {
               const target = Number(rule.targetValue ?? 0);
-              if (rule.operator === ">"  && n >  target) return rule.color;
-              if (rule.operator === ">=" && n >= target) return rule.color;
-              if (rule.operator === "<"  && n <  target) return rule.color;
-              if (rule.operator === "<=" && n <= target) return rule.color;
-              if (rule.operator === "==" && n === target) return rule.color;
+
+              if (rule.operator === ">"  && n >  target)
+                return rule.color;
+
+              if (rule.operator === ">=" && n >= target)
+                return rule.color;
+
+              if (rule.operator === "<"  && n <  target)
+                return rule.color;
+
+              if (rule.operator === "<=" && n <= target)
+                return rule.color;
+
+              if (rule.operator === "==" && n === target)
+                return rule.color;
             }
           }
+
           return fontColor || "#1FA8C9";
         })(),
         letterSpacing: isDate ? 0 : -0.5,
@@ -1541,14 +1679,14 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
         whiteSpace:    "nowrap",
         width:         "100%",
       }}>
-          {displayVal}
-          
-        </div>
-
+        {displayVal}
       </div>
+
     </div>
-  );
+  </div>
+);
 }
+
 
     if (type === "table") {
       const metricLabels = extractMetricLabels(metricsProp);
