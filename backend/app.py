@@ -1942,6 +1942,8 @@ def get_chart_data():
         else:
             query_context = json.loads(raw_context)
 
+        for q in query_context.get("queries", []):
+            q["row_limit"] = max(q.get("row_limit", 0) or 0, 100000)
         # ── Apply filters to every query ──────────────────────
         for query in query_context.get("queries", []):
 
