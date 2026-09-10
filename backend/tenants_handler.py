@@ -9,6 +9,24 @@ from db_utils import log_load_error
 # TENANT: shinde_shoes
 # ---------------------------------------------------------
 
+def _parse_billdate_series(s: pd.Series) -> pd.Series:
+    """
+    Parses a date column that can arrive in two different shapes depending
+    on upload file type:
+      - .csv uploads: plain DD-MM-YYYY text, e.g. "07-09-2026"
+      - .xlsx uploads: a real Excel date cell, which pandas (dtype=str)
+        stringifies as "YYYY-MM-DD HH:MM:SS", e.g. "2026-09-08 00:00:00"
+    Applying dayfirst=True to the second shape swaps month/day and produces
+    a wrong date (e.g. Sept 8 becomes Aug 9). This detects which shape each
+    value is in and parses it the right way.
+    """
+    s = s.astype(str).str.strip()
+    iso_like = s.str.match(r'^\d{4}-\d{1,2}-\d{1,2}')
+    out = pd.Series(pd.NaT, index=s.index, dtype='datetime64[ns]')
+    out.loc[iso_like]  = pd.to_datetime(s[iso_like],  errors='coerce')
+    out.loc[~iso_like] = pd.to_datetime(s[~iso_like], dayfirst=True, errors='coerce')
+    return out
+
 def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, log_load_error, engine):
     """
     excel_max_date is now computed internally from BillDate column.
@@ -30,9 +48,11 @@ def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, log
     ].copy()
 
     # Convert to standard DD-MM-YYYY format
-    df['BillDate'] = pd.to_datetime(
-        df['BillDate'], dayfirst=True, errors='coerce'
-    ).dt.strftime('%d-%m-%Y')
+    # df['BillDate'] = pd.to_datetime(
+    #     df['BillDate'], dayfirst=True, errors='coerce'
+    # ).dt.strftime('%d-%m-%Y')
+    # Convert to standard DD-MM-YYYY format New
+    df['BillDate'] = _parse_billdate_series(df['BillDate']).dt.strftime('%d-%m-%Y')
 
     # Validate — block upload if any dates are unrecognizable
     if df['BillDate'].isna().any():
@@ -52,10 +72,14 @@ def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, log
     print(f"DEBUG [{tenant_schema}]: Excel max date: {excel_max_date}", flush=True)
 
     # ── Process LastPurDate if present (also moved from upload_excel)
+    # if 'LastPurDate' in df.columns:
+    #     df['LastPurDate'] = pd.to_datetime(
+    #         df['LastPurDate'], dayfirst=True, errors='coerce'
+    #     ).dt.strftime('%d-%m-%Y')
+
+    # ── Process LastPurDate if present (also moved from upload_excel)
     if 'LastPurDate' in df.columns:
-        df['LastPurDate'] = pd.to_datetime(
-            df['LastPurDate'], dayfirst=True, errors='coerce'
-        ).dt.strftime('%d-%m-%Y')
+        df['LastPurDate'] = _parse_billdate_series(df['LastPurDate']).dt.strftime('%d-%m-%Y')
 
     # ─────────────────────────────────────────────────────────────
     # STEP 1: Location + Date Validation
