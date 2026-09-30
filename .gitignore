@@ -3,6 +3,10 @@
 # ==========================
 .env
 *.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
 *.log
 *.sqlite3
 *.dump
@@ -53,3 +57,18 @@ docker-compose.override.yml
 *.code-workspace
 .DS_Store
 Thumbs.db
+
+# ==========================
+# Backend extras
+# ==========================
+backend/node_modules/
+# data snapshots exported for checking (business data)
+backend/*.xlsx
+# personal test script (contains login passwords)
+backend/test.py
+
+# ==========================
+# Claude Code (personal settings, local only)
+# ==========================
+.claude/
+CLAUDE.local.md

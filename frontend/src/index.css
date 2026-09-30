@@ -25,3 +25,9 @@ iframe {
   background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
   background-size: 16px 16px;
 }
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.8);  /* dark icon → bright white */
+  opacity: 1;
+  cursor: pointer;
+}
