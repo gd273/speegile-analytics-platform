@@ -1162,11 +1162,15 @@ def _parse_billdate_series(s: pd.Series) -> pd.Series:
     out.loc[~iso_like] = pd.to_datetime(s[~iso_like], dayfirst=True, errors='coerce')
     return out
 
-def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, log_load_error, engine):
+def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, log_load_error, engine,
+                        progress=None):
     """
     excel_max_date is now computed internally from BillDate column.
     No longer passed as a parameter from upload_excel.
+    progress(step) reports the current step to the upload popup (see app.py UPLOAD_STEPS).
     """
+    report = progress or (lambda step: None)
+    report('CheckingDates')
 
     # ─────────────────────────────────────────────────────────────
     # STEP 0: BillDate processing (moved from upload_excel)
@@ -1268,6 +1272,7 @@ def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, log
     # ─────────────────────────────────────────────────────────────
     # STEP 2: Truncate staging table
     # ─────────────────────────────────────────────────────────────
+    report('LoadingRows')
     print(f"DEBUG [{tenant_schema}]: Truncating staging table...", flush=True)
     conn.execute(text(
         f'TRUNCATE TABLE "{tenant_schema}"."{target_table_name}" RESTART IDENTITY'
@@ -1295,6 +1300,7 @@ def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, log
     # which is kept in the database as a fallback. It stops with a clear
     # message on a bad row instead of skipping it silently.
     # ─────────────────────────────────────────────────────────────
+    report('SavingSales')
     print(f"DEBUG [{tenant_schema}]: Calling sp_load_sales_set...", flush=True)
     conn.execute(text(
         f'CALL "{tenant_schema}".sp_load_sales_set()'
@@ -1304,6 +1310,7 @@ def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, log
     # ─────────────────────────────────────────────────────────────
     # STEP 5: Refresh date dimension
     # ─────────────────────────────────────────────────────────────
+    report('UpdatingDates')
     print(f"DEBUG [{tenant_schema}]: Calling refresh_dimdate_offsets({excel_max_date})...", flush=True)
     conn.execute(
         text(f'CALL "{tenant_schema}".refresh_dimdate_offsets(:max_date)'),
@@ -1328,6 +1335,7 @@ def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, log
     # sp_process_upload's 'sales' branch calls sp_process_sales_stock_impact()
     # with no argument, which processes every currently-unposted sale line.
     # ─────────────────────────────────────────────────────────────
+    report('UpdatingStock')
     print(f"DEBUG [{tenant_schema}]: Calling sp_process_upload(NULL, 'sales') for stock impact...", flush=True)
     conn.execute(
         text(f'CALL "{tenant_schema}".sp_process_upload(:load_id, :file_type)'),
@@ -1350,8 +1358,11 @@ def handle_shinde_shoes_stock(
     load_id,
     log_load_error,
     filename=None,
-    user_id=None
+    user_id=None,
+    progress=None
 ):
+    # progress(step) reports the current step to the upload popup (see app.py UPLOAD_STEPS).
+    report = progress or (lambda step: None)
     try:
         print(
             f"DEBUG [shinde_shoes]: Starting Inventory staging upload: "
@@ -1388,6 +1399,7 @@ def handle_shinde_shoes_stock(
         # ---------------------------------------------------------
         # 4. Insert into staging table
         # ---------------------------------------------------------
+        report('LoadingRows')
         df.to_sql(
             target_table_name,
             con=conn,
@@ -1409,6 +1421,7 @@ def handle_shinde_shoes_stock(
         # automatically — sp_validate_stock_load(load_id) and
         # sp_process_stock_load(load_id) had to be called by hand.
         # ---------------------------------------------------------
+        report('SavingStockCount')
         print(
             f"DEBUG [shinde_shoes]: Calling sp_process_upload("
             f"load_id={load_id}, 'inventory')...",
@@ -1440,7 +1453,8 @@ def handle_shinde_shoes_stock(
 # TENANT: shinde_shoes — PURCHASE file  (NEW)
 # ---------------------------------------------------------
 
-def handle_shinde_shoes_purchase(conn, df, tenant_schema, target_table_name, load_id, log_load_error):
+def handle_shinde_shoes_purchase(conn, df, tenant_schema, target_table_name, load_id, log_load_error,
+                                 progress=None):
     """
     Purchase's staging/processing is load_id-scoped end to end:
         stg_purchase_1 (this upload's raw rows, load_id tagged)
@@ -1466,8 +1480,11 @@ def handle_shinde_shoes_purchase(conn, df, tenant_schema, target_table_name, loa
     relying on this automation — otherwise it will now run the wrong
     logic automatically instead of failing loudly.
     """
+    # progress(step) reports the current step to the upload popup (see app.py UPLOAD_STEPS).
+    report = progress or (lambda step: None)
     try:
         print(f"DEBUG [shinde_shoes]: Starting Purchase staging upload (load_id={load_id})", flush=True)
+        report('LoadingRows')
 
         # Transient raw buffer — holds only this upload's rows, same
         # pattern as Sales' "stg-1". stg_purchase_2 (populated by
@@ -1491,6 +1508,7 @@ def handle_shinde_shoes_purchase(conn, df, tenant_schema, target_table_name, loa
             flush=True
         )
 
+        report('SavingPurchases')
         print(
             f"DEBUG [shinde_shoes]: Calling sp_process_upload("
             f"load_id={load_id}, 'purchase')...",

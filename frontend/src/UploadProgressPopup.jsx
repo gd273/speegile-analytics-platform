@@ -255,7 +255,7 @@ const UploadProgressPopup = () => {
         lineHeight:   1.5,
       }}>
         {isDone
-          ? "Data uploaded! Your dashboards are ready."
+          ? popupStatus.message || "Upload complete. Please refresh the page to see the updated dashboards."
           : popupStatus.message}
       </p>
 

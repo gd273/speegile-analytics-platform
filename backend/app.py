@@ -3557,7 +3557,8 @@ def _process_upload_background(
                 if tenant_name == "shinde_shoes" and file_type == "sales":
                     handle_shinde_shoes(
                         conn, df, tenant_schema, target_table_name,
-                        load_id, log_load_error, engine
+                        load_id, log_load_error, engine,
+                        progress=update_status
                     )
 
                 elif tenant_name == "shinde_shoes" and file_type == "inventory":
@@ -3569,7 +3570,8 @@ def _process_upload_background(
                         load_id,
                         log_load_error,
                         filename=clean_filename,
-                        user_id=user_id
+                        user_id=user_id,
+                        progress=update_status
                     )
 
                 # ── NEW: dedicated Purchase branch ─────────────────────
@@ -3581,7 +3583,8 @@ def _process_upload_background(
                 elif tenant_name == "shinde_shoes" and file_type == "purchase":
                     handle_shinde_shoes_purchase(
                         conn, df, tenant_schema, target_table_name,
-                        load_id, log_load_error
+                        load_id, log_load_error,
+                        progress=update_status
                     )
 
                 elif tenant_name == "apparel_sales":
@@ -3760,16 +3763,66 @@ def _process_upload_background(
         )
 
 
+# Upload steps shown in the progress popup: status -> (percent, message).
+# The background upload writes the status (update_status); the Shinde handlers report
+# their own steps (tenants_handler.py, progress=update_status). Other tenants only use
+# the generic steps.
+UPLOAD_STEPS = {
+    "Queued":           (5,   "File received. Starting..."),
+    "Reading":          (10,  "Reading the file..."),
+    "Preparing":        (15,  "Checking the file columns..."),
+    "Processing":       (20,  "Processing the data..."),
+    "CheckingDates":    (25,  "Processing the data..."),
+    "LoadingRows":      (35,  "Loading the file rows..."),
+    "SavingSales":      (50,  "Processing the data..."),
+    "UpdatingDates":    (62,  "Updating report dates..."),
+    "UpdatingStock":    (70,  "Processing the data..."),
+    "SavingStockCount": (55,  "Checking stock rows and updating stock..."),
+    "SavingPurchases":  (55,  "Checking bills and updating purchases and stock..."),
+    "Saving":           (78,  "Saving everything to the database..."),
+    "Refreshing":       (80,  "Data saved. Refreshing dashboards..."),
+    "Pass":             (100, "Upload complete. Please refresh the page to see the updated dashboards."),
+}
+
+REFRESH_PERCENT_FROM, REFRESH_PERCENT_TO = 80, 99
+
+
+def _refresh_progress(conn, tenant_schema, refreshing_since):
+    """Live progress of the dashboard refresh started for this upload, from
+    <tenant schema>.log_refresh (refresh_all_mvs commits after every view).
+    Returns (views_done, views_total) or None."""
+    if not tenant_schema or not refreshing_since:
+        return None
+    try:
+        if not conn.execute(text("SELECT to_regclass(:t) IS NOT NULL"),
+                            {"t": f'"{tenant_schema}".log_refresh'}).scalar():
+            return None
+        prog = conn.execute(text(f"""
+            SELECT mv_refreshed_count,
+                   (SELECT count(*) FROM pg_matviews WHERE schemaname = :schema) AS total
+            FROM   "{tenant_schema}".log_refresh
+            WHERE  started_at >= CAST(:since AS timestamp) - interval '5 seconds'
+            ORDER  BY refresh_id DESC
+            LIMIT  1
+        """), {"schema": tenant_schema, "since": refreshing_since}).first()
+        if prog and prog[1]:
+            return int(prog[0] or 0), int(prog[1])
+    except Exception as e:
+        print(f"DEBUG: refresh progress lookup failed: {e}", flush=True)
+    return None
+
+
 # ════════════════════════════════════════════════════════
 #  POLL ENDPOINT — frontend calls every 3 seconds
 # ════════════════════════════════════════════════════════
 @app.route('/api/upload-status/<int:load_id>', methods=['GET'])
 @login_required
 def upload_status(load_id):
+    refresh = None
     with engine.connect() as conn:
 
         row = conn.execute(text("""
-            SELECT status, filename
+            SELECT status, filename, stage_times->>'Refreshing' AS refreshing_since
             FROM   public.load_master
             WHERE  id = :lid
         """), {"lid": load_id}).mappings().first()
@@ -3792,32 +3845,25 @@ def upload_status(load_id):
             if error_row:
                 error_message = error_row["error_message"]
 
-    PERCENT_MAP = {
-        "Queued":     5,
-        "Reading":    20,
-        "Preparing":  40,
-        "Processing": 65,
-        "Saving":     85,
-        "Refreshing": 95,
-        "Pass":       100,
-        "Fail":       0,
-    }
+        if status == "Refreshing":
+            refresh = _refresh_progress(conn, session.get("tenant_schema"),
+                                        row["refreshing_since"])
 
-    MESSAGE_MAP = {
-        "Queued":     "File received, starting...",
-        "Reading":    "Reading file data...",
-        "Preparing":  "Preparing data for processing...",
-        "Processing": "Validating and processing data...",
-        "Saving":     "Saving to database...",
-        "Refreshing": "Data saved. Updating dashboards...",
-        "Pass":       "Data uploaded! Your dashboards are ready.",
-        "Fail":       error_message or "Processing failed. Please contact support.",
-    }
+    if status == "Fail":
+        percent, message = 0, error_message or "Processing failed. Please contact support."
+    else:
+        percent, message = UPLOAD_STEPS.get(status, (50, "Processing..."))
+
+    if refresh:
+        done, total = refresh
+        percent = REFRESH_PERCENT_FROM + round(
+            (REFRESH_PERCENT_TO - REFRESH_PERCENT_FROM) * min(done, total) / total)
+        message = "Data saved. Refreshing dashboards... This can take a few minutes."
 
     return jsonify({
         "status":        status,
-        "percent":       PERCENT_MAP.get(status, 50),
-        "message":       MESSAGE_MAP.get(status, "Processing..."),
+        "percent":       percent,
+        "message":       message,
         "error_message": error_message,
         "load_id":       load_id,
         "filename":      row["filename"],
