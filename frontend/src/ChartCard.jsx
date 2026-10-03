@@ -1653,21 +1653,29 @@ return (
           if (conditionalColors.length > 0) {
             for (const rule of conditionalColors) {
               const target = Number(rule.targetValue ?? 0);
+              const left   = Number(rule.targetValueLeft);
+              const right  = Number(rule.targetValueRight);
+              // Superset comparators; the backend already turns ≥ ≤ = ≠ into >= <= == !=
+              const op = String(rule.operator || "").replace(/\s+/g, "");
 
-              if (rule.operator === ">"  && n >  target)
-                return rule.color;
+              const matches = {
+                ">":     n >  target,
+                ">=":    n >= target,
+                "≥":     n >= target,
+                "<":     n <  target,
+                "<=":    n <= target,
+                "≤":     n <= target,
+                "==":    n === target,
+                "=":     n === target,
+                "!=":    n !== target,
+                "≠":     n !== target,
+                "<x<":   n >  left && n <  right,
+                "≤x≤":   n >= left && n <= right,
+                "≤x<":   n >= left && n <  right,
+                "<x≤":   n >  left && n <= right,
+              }[op];
 
-              if (rule.operator === ">=" && n >= target)
-                return rule.color;
-
-              if (rule.operator === "<"  && n <  target)
-                return rule.color;
-
-              if (rule.operator === "<=" && n <= target)
-                return rule.color;
-
-              if (rule.operator === "==" && n === target)
-                return rule.color;
+              if (matches) return rule.color;
             }
           }
 

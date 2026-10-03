@@ -2840,7 +2840,22 @@ def resolve_color_scheme(raw):
 engine = None
 if DATABASE_URL:
     try:
-        engine = create_engine(DATABASE_URL)
+        engine = create_engine(
+            DATABASE_URL,
+            # Check a pooled connection before using it; replace it if the database dropped it.
+            pool_pre_ping=True,
+            pool_recycle=300,
+            # TCP keepalives: a long query (the dashboard refresh runs for minutes without
+            # sending anything) must not look idle to the network between the backend and
+            # Render's database, which otherwise cuts the connection silently and leaves the
+            # upload waiting forever at "Refreshing".
+            connect_args={
+                "keepalives":          1,
+                "keepalives_idle":     30,
+                "keepalives_interval": 10,
+                "keepalives_count":    5,
+            },
+        )
         print("Database engine created successfully")
     except Exception as e:
         print(f"DATABASE CONNECTION FAILED: {e}")
@@ -4364,10 +4379,44 @@ def get_dashboard_charts():
                     "info":              "#1FA8C9",
                 }
 
+                # Superset theme colour families. Superset 6.0 and 6.1 store rule colours as
+                # theme tokens such as colorSuccessBg / colorSuccess / colorErrorText /
+                # colorWarningBorder: the family decides the colour, the suffix does not.
+                THEME_FAMILY_COLORS = {
+                    "success": "#22c55e",
+                    "error":   "#f87171",
+                    "danger":  "#f87171",
+                    "warning": "#fbbf24",
+                    "alert":   "#fbbf24",
+                    "info":    "#1FA8C9",
+                    "primary": "#1FA8C9",
+                }
+                THEME_TOKEN_SUFFIXES = (
+                    "bghover", "bgactive", "borderhover", "texthover", "textactive",
+                    "bg", "border", "text", "hover", "active",
+                )
+
                 def resolve_color(raw_color):
                     if not raw_color:
                         return None
+                    # colorScheme can arrive as an object, e.g. {"value": "colorSuccess"}
+                    if isinstance(raw_color, dict):
+                        raw_color = (raw_color.get("value") or raw_color.get("color")
+                                     or raw_color.get("hex"))
+                        if not raw_color:
+                            return None
                     s = str(raw_color).strip()
+                    if s.lower() in COLOR_SCHEME_MAP:
+                        return COLOR_SCHEME_MAP[s.lower()]
+                    token = s.lower()
+                    if token.startswith("color") and len(token) > len("color"):
+                        token = token[len("color"):]
+                        for suffix in THEME_TOKEN_SUFFIXES:
+                            if token.endswith(suffix) and token != suffix:
+                                token = token[: -len(suffix)]
+                                break
+                        if token in THEME_FAMILY_COLORS:
+                            return THEME_FAMILY_COLORS[token]
                     if s.startswith("#") and len(s) in [4, 7, 9]:
                         return s
                     if s.startswith("rgb("):
@@ -4430,6 +4479,10 @@ def get_dashboard_charts():
                     if not color:
                         print(f"DEBUG bignum {chart_id}: UNRESOLVED colorScheme={raw_color!r} (rule dropped)", flush=True)
                         continue
+                    # Superset writes ≥ ≤ = ≠ (and ranges like "≤ x ≤"); the app compares
+                    # with >= <= == !=, so normalise here. Range operators pass through.
+                    operator = {"≥": ">=", "≤": "<=", "=": "==", "≠": "!="}.get(
+                        str(operator).strip(), str(operator).strip())
                     conditional_colors.append({
                         "operator":         operator,
                         "targetValue":      target,
