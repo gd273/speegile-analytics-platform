@@ -2911,6 +2911,29 @@ META_CACHE_TTL    = int(os.getenv("SUPERSET_META_CACHE_TTL", "300"))
 _meta_redis       = redis.from_url(REDIS_URL)
 
 
+def superset_request(method, path, access_token=None, **kwargs):
+    """Call the Superset API. If Superset rejects the token (401) — e.g. after a Superset
+    restart while the backend still holds a cached token — log in again and retry once.
+    Returns the requests.Response."""
+    token   = access_token or get_superset_access_token()
+    headers = dict(kwargs.pop("headers", {}) or {})
+    headers["Authorization"] = f"Bearer {token}"
+
+    resp = SUPERSET_HTTP.request(method, f"{SUPERSET_URL}{path}", headers=headers, **kwargs)
+
+    if resp.status_code == 401:
+        print(f"DEBUG: Superset 401 on {path} - getting a fresh token and retrying once", flush=True)
+        fresh = get_superset_access_token(force_refresh=True)
+        if fresh:
+            headers["Authorization"] = f"Bearer {fresh}"
+            resp = SUPERSET_HTTP.request(method, f"{SUPERSET_URL}{path}", headers=headers, **kwargs)
+
+    if resp.status_code != 200:
+        print(f"DEBUG: Superset {method} {path} failed - status={resp.status_code}, "
+              f"body={resp.text[:300]}", flush=True)
+    return resp
+
+
 def superset_get_result(path, access_token, timeout=10, cache=True):
     """GET SUPERSET_URL + path; returns (status_code, result). Caches 200 responses in Redis."""
     key = META_CACHE_PREFIX + path
@@ -2922,11 +2945,7 @@ def superset_get_result(path, access_token, timeout=10, cache=True):
         except Exception as e:
             print(f"DEBUG: meta cache read failed for {path}: {e}", flush=True)
 
-    resp = SUPERSET_HTTP.get(
-        f"{SUPERSET_URL}{path}",
-        headers={"Authorization": f"Bearer {access_token}"},
-        timeout=timeout,
-    )
+    resp = superset_request("GET", path, access_token, timeout=timeout)
     if resp.status_code != 200:
         return resp.status_code, None
 
@@ -2950,10 +2969,11 @@ def clear_superset_meta_cache():
 _token_cache = {"access_token": None, "expires_at": 0}
 TOKEN_SAFETY_MARGIN = 60  # seconds — refresh a bit before it actually expires
 
-def get_superset_access_token():
+def get_superset_access_token(force_refresh=False):
     now = time.time()
     # If we already have a token that isn't about to expire, reuse it
-    if _token_cache["access_token"] and now < _token_cache["expires_at"] - TOKEN_SAFETY_MARGIN:
+    if (not force_refresh and _token_cache["access_token"]
+            and now < _token_cache["expires_at"] - TOKEN_SAFETY_MARGIN):
         return _token_cache["access_token"]
 
     try:
@@ -2980,16 +3000,17 @@ def get_superset_access_token():
 def get_all_dashboards_from_superset(access_token):
     try:
         query    = {"page": 0, "page_size": 100}
-        response = SUPERSET_HTTP.get(
-            f"{SUPERSET_URL}/api/v1/dashboard/",
+        response = superset_request(
+            "GET", "/api/v1/dashboard/", access_token,
             params={"q": json.dumps(query)},
-            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+            headers={"Content-Type": "application/json"},
             timeout=10
         )
         if response.status_code == 200:
             return response.json().get("result", [])
         return []
     except Exception as e:
+        print(f"DEBUG: Superset dashboard list error: {e}", flush=True)
         return []
 
 
@@ -4928,12 +4949,9 @@ def get_chart_data():
                     flush=True
                 )
 
-        data_resp = SUPERSET_HTTP.post(
-            f"{SUPERSET_URL}/api/v1/chart/data",
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type":  "application/json"
-            },
+        data_resp = superset_request(
+            "POST", "/api/v1/chart/data", access_token,
+            headers={"Content-Type": "application/json"},
             json=query_context,
             timeout=30
         )
@@ -5035,12 +5053,9 @@ def get_filter_options():
                 "result_format": "json",
                 "result_type":   "results"
             }
-            r    = SUPERSET_HTTP.post(
-                f"{SUPERSET_URL}/api/v1/chart/data",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Content-Type":  "application/json"
-                },
+            r    = superset_request(
+                "POST", "/api/v1/chart/data", access_token,
+                headers={"Content-Type": "application/json"},
                 json=payload,
                 timeout=15
             )
