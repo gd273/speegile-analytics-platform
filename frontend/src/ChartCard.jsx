@@ -434,8 +434,8 @@ const scrollLegend = (keys) => ({
   icon: "circle", itemHeight: 10, itemGap: 16, show: keys.length >= 1,
 });
 
-    function buildOption({ 
-      type, data, keys, xKey, selectedValue, 
+    function buildOption({
+      type, data, keys, xKey, selectedValue,
       initialKeys = [], zoomable = false,
       percentageThreshold = 0,
       otherThreshold      = 0,
@@ -561,7 +561,7 @@ const scrollLegend = (keys) => ({
                 color: ["rgba(255,255,255,0.02)", "rgba(255,255,255,0.0)"]
               }},
             },
-            
+
           visualMap: {
             min:          minVal,
             max:          maxVal,
@@ -741,7 +741,7 @@ const scrollLegend = (keys) => ({
 
     const isGrouped  = keys.length > 1;
     const showLabels = data.length <= 1150;
-    const labelRotate = data.length > 35 ? 45 : 0; 
+    const labelRotate = data.length > 35 ? 45 : 0;
     return {
       ...base,
       // ← Overrides base's multi-series "axis" tooltip. Hovering a single
@@ -764,7 +764,7 @@ const scrollLegend = (keys) => ({
             backgroundColor:  "rgba(255,255,255,0.04)",
           },
           selectorItemGap: 6,
-        }, 
+        },
 
     ...(zoomable ? {
       grid: { left: 12, right: 40, top: 36, bottom: 110, containLabel: true },
@@ -799,7 +799,7 @@ const scrollLegend = (keys) => ({
       xAxis: axisX(cats), yAxis: axisY(),
       series: sortedKeys.map((k, i) => ({
         type: "bar", name: k,
-        itemStyle: { color: getColor(k, i) }, 
+        itemStyle: { color: getColor(k, i) },
         barCategoryGap: isGrouped ? "20%" : "30%",
         barGap: isGrouped ? "5%" : "30%",
         ...(isGrouped ? {} : { barMaxWidth: 48 }),
@@ -807,16 +807,16 @@ const scrollLegend = (keys) => ({
           value: val,
           itemStyle: { color: dimmedColor(getColor(k, i), cats[ci]), borderRadius: [4, 4, 0, 0] },
         })),
-        label: { 
-          show: showLabels, 
+        label: {
+          show: showLabels,
           position: "top",
-          color: "#94a3b8", 
+          color: "#94a3b8",
           distance: 8,
-          fontSize: 9, 
-          fontFamily: "inherit", 
-          fontWeight: "600", 
-          formatter: p => fmtNum(p.value), 
-          rotate: labelRotate, 
+          fontSize: 9,
+          fontFamily: "inherit",
+          fontWeight: "600",
+          formatter: p => fmtNum(p.value),
+          rotate: labelRotate,
         },
         emphasis: { focus: "series" },
       })),
@@ -909,7 +909,7 @@ const scrollLegend = (keys) => ({
 //         data: sData(rightKey).map((val) => ({
 //           value: val,
 //           itemStyle: { color: getColor(rightKey, 1), borderRadius: [4, 4, 0, 0] },
-          
+
 //         })),
 //         label: {
 //           show: showLabels,
@@ -1287,7 +1287,7 @@ if (type === "line") {
       })),
     })),
   };
-      
+
 }
 
 
@@ -1346,10 +1346,27 @@ const chartType = getChartType(vizType);
 const activeFiltersString      = JSON.stringify(activeFilters);
 const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters, sliceId, chartType === "table"));
 
+// ── Server-side pagination for flat "Table" charts ───────────────────
+// Superset's plain Table chart (viz_type "table") is loaded page by page by
+// PivotTable from /chart-data-page (100 rows per request). Pivot tables
+// still load their full (aggregated) result through /chart-data below.
+const useServerTable = (vizType || "").toLowerCase() === "table";
+
+// Same body /chart-data would get — PivotTable adds page / search / sort.
+const serverRequest = useServerTable ? {
+  sliceId,
+  ...(dateFrom && dateTo ? { dateFrom, dateTo, timeFilterId } : {}),
+  activeFilters: Object.entries(activeFilters)
+    .filter(([, v]) => Array.isArray(v) ? v.length > 0 : (v != null && v !== ""))
+    .map(([col, val]) => ({ col, op: "IN", val: Array.isArray(val) ? val : [val] })),
+  crossFilters: buildFilterPayload(crossFilters, sliceId, true),
+} : null;
+
   useEffect(() => {
       console.log("🔄 ChartCard useEffect fired:", { sliceId, dateFrom, dateTo, timeFilterId });
     if (!sliceId) return;
     if ((dateFrom && !dateTo) || (!dateFrom && dateTo)) return;
+    if (useServerTable) { setLoading(false); return; }   // PivotTable fetches its own pages
 
     cancelRef.current = false;
     setLoading(true); setError(null); setData([]); setKeys([]); setComputedXKey(""); setColnames([]);
@@ -1372,7 +1389,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
         console.log(`Chart ${sliceId} received filters:`, body.crossFilters);
         console.log(`Chart ${sliceId} rows returned:`, res.data.data?.length);
         if (cancelRef.current) return;
-       
+
         if (res.data.success && res.data.data?.length > 0) {
             const rows         = res.data.data;
             const metricLabels = extractMetricLabels(metricsProp);
@@ -1385,7 +1402,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
 
               if (onDateRangeDetected && rows.length > 0) {
                 const xk = detectXKey(rows, xAxis, extractMetricLabels(metricsProp), groupbyProp);
-                
+
                 const dates = rows
                   .map(r => r[xk])
                   .filter(v => v != null)
@@ -1526,7 +1543,7 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
     : params.name;
   filterCol   = Object.keys(data[0])[1] || xKey;
 }
-  
+
   else {
     clickedName = params.name || params.data?.name || params.axisValue || "";
     filterCol   = xKey;
@@ -1551,6 +1568,25 @@ const crossFilterPayloadString = JSON.stringify(buildFilterPayload(crossFilters,
 
 
   const renderBody = () => {
+    // Flat Table chart → server-side pages (has its own loading / empty states)
+    if (useServerTable) {
+      if ((dateFrom && !dateTo) || (!dateFrom && dateTo)) return <Skeleton height={height} />;
+      return (
+        <PivotTable
+          serverRequest={serverRequest}
+          height={height}
+          metricKeys={extractMetricLabels(metricsProp)}
+          columnOrder={columnOrderProp}
+          showCellBars={showCellBars}
+          conditionalFormatting={conditionalFormattingProp}
+          onRowClick={(col, val) => {
+            if (!onCrossFilter) return;
+            onCrossFilter(col, val, sliceId, title, true, crossFilterScope);
+          }}
+        />
+      );
+    }
+
     if (loading) return <Skeleton height={height} />;
     if (error) return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height, color: "#f87171", fontSize: 12 }}>
@@ -1716,13 +1752,13 @@ return (
             if (!onCrossFilter) return;
             onCrossFilter(col, val, sliceId, title, true, crossFilterScope);
           }
-            
+
           }
         />
       );
     }
 
-    
+
 
 return (
   // <ReactECharts
