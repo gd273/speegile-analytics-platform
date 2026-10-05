@@ -12,6 +12,26 @@ const COLORS = [
 
 const ID_COL_PATTERN = /pincode|zip|postal|pin_code|order_id|invoice|phone|mobile|id$/i;
 
+// ── Fixed colours for year-comparison series ─────────────────────────
+// Any series whose name means "current year" is always CURRENT_YEAR_COLOR and
+// any "previous year" series is always PREVIOUS_YEAR_COLOR, on every chart —
+// no matter in which order the metrics were added in Superset.
+// Matches e.g. "Current Year", "CY", "SUM(current_yr_net)", "This Year",
+// "Previous Year", "Prev Year", "PY", "Last Year", "SUM(prev_yr_qty)".
+const CURRENT_YEAR_COLOR  = "#1FA8C9";   // teal
+const PREVIOUS_YEAR_COLOR = "#454E7C";   // slate
+const CY_SERIES_PATTERN = /(^|[^a-z])(current|curr|cy|this[\s_-]*(yr|year))([^a-z]|$)/i;
+const PY_SERIES_PATTERN = /(^|[^a-z])(previous|prev|prior|past|last|py)([^a-z]|$)/i;
+
+const yearSeriesColor = (key) => {
+  const name = String(key ?? "");
+  const isPY = PY_SERIES_PATTERN.test(name);
+  const isCY = CY_SERIES_PATTERN.test(name);
+  if (isPY && !isCY) return PREVIOUS_YEAR_COLOR;
+  if (isCY && !isPY) return CURRENT_YEAR_COLOR;
+  return null;   // not a year series (or ambiguous) → normal colouring
+};
+
 
 function useChartHeight(defaultHeight) {
   const [height, setHeight] = useState(defaultHeight);
@@ -444,7 +464,9 @@ const scrollLegend = (keys) => ({
     }) {
 
     const getColor = (key, fallbackIndex) => {
-      if (seriesColors[key]) return seriesColors[key];
+      if (seriesColors[key]) return seriesColors[key];      // colour set on the Superset dashboard wins
+      const yearColor = yearSeriesColor(key);               // Current Year / Previous Year → fixed colours
+      if (yearColor) return yearColor;
       if (initialKeys.length > 0) {
         const origIdx = initialKeys.indexOf(key);
         if (origIdx >= 0) return COLORS[origIdx % COLORS.length];
