@@ -3926,7 +3926,11 @@ def get_filtered_dashboards():
         all_dashboards = get_all_dashboards_from_superset(access_token)
         print(f"DEBUG: Total dashboards: {len(all_dashboards)}", flush=True)
 
-        filtered = filter_dashboards_by_user_roles(all_dashboards, user_roles)
+        # Only dashboards marked Published in Superset are shown (Drafts are hidden)
+        published = [d for d in all_dashboards if d.get('published')]
+        print(f"DEBUG: Published dashboards: {len(published)}", flush=True)
+
+        filtered = filter_dashboards_by_user_roles(published, user_roles)
         print(f"DEBUG: Filtered dashboards: {len(filtered)}", flush=True)
 
         dashboard_list = [{
@@ -5211,6 +5215,16 @@ def _split_table_queries(query_context):
     return main, totals
 
 
+def _chart_row_limit(query):
+    """The chart's own "Row limit" from Superset, capped at TABLE_MAX_ROWS.
+    Missing / 0 means no limit was set, so only the ceiling applies."""
+    try:
+        limit = int(query.get("row_limit") or 0)
+    except (TypeError, ValueError):
+        limit = 0
+    return min(limit, TABLE_MAX_ROWS) if limit > 0 else TABLE_MAX_ROWS
+
+
 def _apply_sort(query, sort_col, sort_dir):
     """Sort by a metric or column that already exists in the query.
     Unknown names are ignored — client-sent names never go into SQL directly."""
@@ -5406,17 +5420,25 @@ def _compute_chart_data_page(body):
 
         _apply_sort(main, sort_col, sort_dir)
 
+        # The chart's own Row limit (e.g. 20) caps the whole table, not one page
+        chart_limit = _chart_row_limit(main)
+        offset      = page * page_size
+        if offset >= chart_limit:
+            return ({"success": True, "data": [], "colnames": [], "coltypes": [],
+                     "total": chart_limit, "totalIsEstimate": False, "page": page,
+                     "pageSize": page_size, "summary": None}), 200
+
         count_q = copy.deepcopy(main)
         count_q.update({
             "is_rowcount":     True,
-            "row_limit":       TABLE_MAX_ROWS,   # Superset counts inside this limit
+            "row_limit":       chart_limit,      # Superset counts inside this limit
             "row_offset":      0,
             "orderby":         [],
             "post_processing": [],
         })
 
-        main["row_limit"]  = page_size
-        main["row_offset"] = page * page_size
+        main["row_limit"]  = min(page_size, chart_limit - offset)
+        main["row_offset"] = offset
 
         query_context["queries"]       = [main, count_q] + ([totals] if totals is not None else [])
         query_context["result_format"] = "json"
@@ -5444,6 +5466,7 @@ def _compute_chart_data_page(body):
             # pretend there is one more page so "next" stays enabled.
             total = page * page_size + len(rows) + (page_size if len(rows) == page_size else 0)
             total_is_estimate = True
+        total = min(total, chart_limit)
 
         summary = None
         if totals_res:
@@ -5503,7 +5526,7 @@ def export_chart_data():
         main, _totals = _split_table_queries(query_context)
         _add_where(main, _search_where_clause(query_context, main, body.get("search"), access_token))
         _apply_sort(main, body.get("sortCol"), body.get("sortDir"))
-        main["row_limit"]  = TABLE_MAX_ROWS
+        main["row_limit"]  = _chart_row_limit(main)
         main["row_offset"] = 0
 
         # Only the main query — with several queries Superset returns a .zip
