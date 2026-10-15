@@ -5609,6 +5609,55 @@ def get_filter_options():
                 print(f"DEBUG filter values failed for {column_name}: {e}", flush=True)
                 return []
 
+        def get_max_date(dataset_id, column_name):
+            """Latest date in the filter's column as 'YYYY-MM-DD' (None when unknown)."""
+            payload = {
+                "datasource": {"id": dataset_id, "type": "table"},
+                "force": False,
+                "queries": [{
+                    "columns":   [column_name],
+                    "metrics":   [],
+                    "filters":   [],
+                    "orderby":   [[column_name, False]],
+                    "row_limit": 1,
+                    "extras":    {"having": "", "where": ""},
+                    "applied_time_extras": {}
+                }],
+                "result_format": "json",
+                "result_type":   "results"
+            }
+            try:
+                r    = superset_request(
+                    "POST", "/api/v1/chart/data", access_token,
+                    headers={"Content-Type": "application/json"},
+                    json=payload,
+                    timeout=15
+                )
+                rows = r.json().get("result", [{}])[0].get("data", [])
+                val  = rows[0].get(column_name) if rows else None
+                if val is None:
+                    return None
+                if isinstance(val, (int, float)):   # Superset sends dates as epoch milliseconds
+                    return datetime.utcfromtimestamp(val / 1000).strftime("%Y-%m-%d")
+                return str(val)[:10]
+            except Exception as e:
+                print(f"DEBUG max date failed for {column_name}: {e}", flush=True)
+                return None
+
+        # Quick date options a dashboard author switches on in the filter's Description
+        # in Superset, e.g. "presets: day, week, 15d, quarter". No tag = Custom only.
+        ALLOWED_PRESETS = ("day", "week", "15d", "quarter")
+
+        def parse_presets(description):
+            m = re.search(r"presets\s*:\s*([A-Za-z0-9_,\s]+)", description or "", re.IGNORECASE)
+            if not m:
+                return []
+            out = []
+            for key in re.split(r"[,\s]+", m.group(1).strip().lower()):
+                if key in ALLOWED_PRESETS and key not in out:
+                    out.append(key)
+            return out
+
         # Fetch the values for every select filter in parallel instead of one by one.
         select_targets = []
         for native_filter in native_filters:
@@ -5645,6 +5694,7 @@ def get_filter_options():
             )
 
             if filter_type == "filter_time":
+                presets = parse_presets(native_filter.get("description"))
                 filter_options.append({
                     "id":            native_filter.get("id"),
                     "name":          native_filter.get("name"),
@@ -5652,6 +5702,9 @@ def get_filter_options():
                     "type":          "date",
                     "column":        col_name or "",
                     "values":        [],
+                    "presets":       presets,
+                    # only looked up when the filter has presets (Custom-only filters stay as before)
+                    "maxDate":       get_max_date(dataset_id, col_name) if presets and dataset_id and col_name else None,
                     "tabsInScope":   tabs_in_scope,
                     "chartsInScope": native_filter.get("chartsInScope", []),
                 })
@@ -5906,6 +5959,25 @@ def clear_cache():
             "success": False,
             "error":   str(e),
         }), 500
+
+
+@app.route('/api/refresh-dashboard-cache', methods=['POST'])
+@login_required
+def refresh_dashboard_cache():
+    """
+    Called by the app when the user reloads the page (F5 / hard refresh), so edited
+    filters / presets and fresh chart data show up straight away.
+    Clears the Superset definition cache (dashboard, filters, layout - shared, cheap to
+    reload) and THIS login's chart data cache only. Other users' caches are untouched.
+    """
+    try:
+        deleted  = clear_superset_meta_cache()
+        deleted += clear_session_chart_cache()
+        print(f"DEBUG: dashboard cache refreshed on page reload. {deleted} keys deleted.", flush=True)
+        return jsonify({"success": True, "keys_deleted": deleted}), 200
+    except Exception as e:
+        print(f"DEBUG: dashboard cache refresh failed: {e}", flush=True)
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/api/dashboard-cross-filter-scope", methods=["GET"])

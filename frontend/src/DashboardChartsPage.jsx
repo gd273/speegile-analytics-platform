@@ -410,6 +410,42 @@ function TabGroup({ tabs = [], chartMap, cardProps, isMobile, renderRows, onTabC
   );
 }
 
+// ── Fresh filters + data after a page reload ────────────────
+// When the page itself was reloaded (F5 / hard refresh), ask the backend once to drop the
+// cached Superset definitions and this login's cached chart data, so edited filters
+// (e.g. date presets) and new data show up. Opening the app normally keeps the caches.
+let reloadCacheRefresh = null;
+function refreshCacheOnReload() {
+  if (reloadCacheRefresh) return reloadCacheRefresh;          // only once per page load
+  let isReload = false;
+  try {
+    const nav = performance.getEntriesByType("navigation")[0];
+    isReload = nav?.type === "reload";
+  } catch (e) { /* older browser: treat as a normal visit */ }
+  reloadCacheRefresh = isReload
+    ? api.post("/refresh-dashboard-cache").catch(() => null)
+    : Promise.resolve(null);
+  return reloadCacheRefresh;
+}
+
+// ── Date quick options ──────────────────────────────────────
+// A dashboard author switches these on per filter by writing e.g. "presets: day, week, 15d, quarter"
+// in the filter's Description in Superset. No tag = Custom only (the From/To inputs below).
+const DATE_PRESETS = {
+  day:     { label: "Last day",     days: 1  },
+  week:    { label: "Last week",    days: 7  },
+  "15d":   { label: "Last 15 days", days: 15 },
+  quarter: { label: "Last quarter", days: 90 },
+};
+
+// Counts back from the latest date in the data (maxDate, "YYYY-MM-DD"); falls back to today.
+function computePresetRange(days, maxDate) {
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const end = /^\d{4}-\d{2}-\d{2}$/.test(maxDate || "") ? new Date(`${maxDate}T00:00:00Z`) : new Date(iso(new Date()) + "T00:00:00Z");
+  const start = new Date(end.getTime() - (days - 1) * 86400000);
+  return { from: iso(start), to: iso(end) };
+}
+
 // ── Filter dropdown ─────────────────────────────────────────
 function FilterDropdown({ fd, activeFilters, dateFrom, dateTo, onFilterChange, onDateFromChange, onDateToChange }) {
   const [open,   setOpen]   = useState(false);
@@ -485,6 +521,22 @@ function FilterDropdown({ fd, activeFilters, dateFrom, dateTo, onFilterChange, o
           )} */}
           {fd.type === "date" && (
             <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {(fd.presets || []).filter(k => DATE_PRESETS[k]).length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                  {(fd.presets || []).filter(k => DATE_PRESETS[k]).map(k => {
+                    const range  = computePresetRange(DATE_PRESETS[k].days, fd.maxDate);
+                    const active = draftFrom === range.from && draftTo === range.to;
+                    return (
+                      <button key={k}
+                        onClick={() => { setDraftFrom(range.from); setDraftTo(range.to); }}
+                        style={{ padding: "4px 10px", borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: "pointer", outline: "none", border: `1px solid ${active ? "#1FA8C9" : "rgba(31,168,201,0.2)"}`, background: active ? "#1FA8C9" : "rgba(31,168,201,0.07)", color: active ? "#fff" : "#5ba8b9" }}>
+                        {DATE_PRESETS[k].label}
+                      </button>
+                    );
+                  })}
+                  <span style={{ padding: "4px 10px", fontSize: 11, color: "#64748b", alignSelf: "center" }}>or pick dates:</span>
+                </div>
+              )}
               <div>
                 <p style={{ fontSize: 10, color: "#475569", marginBottom: 5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>From</p>
                 <input
@@ -1112,12 +1164,12 @@ const [crossFiltersEnabled, setCrossFiltersEnabled] = useState(false);
     setCrossFilters({});
     setDataDateRange({ min: null, max: null });
 
-    Promise.all([
+    refreshCacheOnReload().then(() => Promise.all([
       api.get("/dashboard-charts", { params: { dashboardId: dashboardNumericId } }),
       api.get("/dashboard-layout",  { params: { dashboardId: dashboardNumericId } }).catch(() => null),
       api.get("/filter-options",    { params: { dashboardId: dashboardNumericId } }).catch(() => null),
       api.get("/dashboard-cross-filter-scope", { params: { dashboardId: dashboardNumericId } }).catch(() => null),
-    ]).then(([cR, lR, fR, scR]) => {
+    ])).then(([cR, lR, fR, scR]) => {
       if (cR.data.success) setCharts(cR.data.charts.filter(c => c.viz_type !== "filter_box"));
       console.log("Loaded chart IDs:", cR.data.charts.map(c => c.slice_id)); // ← ADD
       if (lR?.data?.success) { const p = parseSupersetLayout(lR.data.layout); setSections(p); }
