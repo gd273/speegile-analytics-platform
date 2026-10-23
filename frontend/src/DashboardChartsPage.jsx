@@ -56,7 +56,7 @@ function PdfProgressOverlay({ progress }) {
 // ── Simple markdown renderer ────────────────────────────────
 function MarkdownBlock({ code }) {
   const hasHtml = /<[a-z][\s\S]*?>/i.test(code || "");
-  const containerStyle = { background: "#1e2129", border: "1px solid rgba(255,255,255,0.065)", borderRadius: 10, padding: "20px 22px", height: "100%", boxSizing: "border-box", overflowY: "auto", position: "relative" };
+  const containerStyle = { background: "#1e2129", border: "1px solid rgba(255,255,255,0.065)", borderRadius: 10, padding: "16px 20px 8px", boxSizing: "border-box", position: "relative" };
   const topBar = <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg,#1FA8C9,#454E7C,#A868B7)", opacity: 0.75 }} />;
   if (hasHtml) {
     return (
@@ -1271,7 +1271,7 @@ const applicableCrossFilters = Object.fromEntries(
         <DashboardGrid columns={gridCols} gap={12}>
           {row.map((item, cIdx) => {
             if (item.type === "markdown") return (
-              <div key={cIdx} style={{ gridColumn: isMobile ? "span 1" : `span ${item.width}`, height: unitsToPx(item.heightUnits) }}>
+              <div key={cIdx} style={{ gridColumn: isMobile ? "span 1" : `span ${item.width}`, alignSelf: "start" }}>
                 <MarkdownBlock code={item.code} />
               </div>
             );
