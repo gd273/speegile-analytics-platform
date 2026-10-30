@@ -2739,6 +2739,10 @@ from tenants_handler import handle_client_orders, handle_shinde_shoes, handle_ap
 from db_utils import log_load_error
 from datetime import datetime
 import threading
+import shutil
+import subprocess
+import tempfile
+from sqlalchemy.engine import make_url
 
 
 # -------------------- ENV loading & expansion --------------------
@@ -3073,6 +3077,82 @@ def login_required(f):
 
 
 # ---------------------------------------------------------
+# USER ACTIVITY TRACKING
+# public.user_login_sessions (one row per login) + public.user_dashboard_views (dashboards
+# opened in that login). Tracking is best-effort: a failure here never breaks login or a request.
+# ---------------------------------------------------------
+ACTIVITY_HEARTBEAT_SECONDS = 60   # how often "last seen" is refreshed while the user is active
+
+
+def activity_login(user_id, user_email, tenant_id, tenant_schema):
+    """Record a login; returns the login-session id (kept in the Flask session)."""
+    ip = (request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0]).strip()
+    with engine.begin() as conn:
+        return conn.execute(text("""
+            INSERT INTO public.user_login_sessions
+                   (user_id, user_email, tenant_id, tenant_schema, ip_address, user_agent)
+            VALUES (:uid, :email, :tid, :schema, :ip, :ua)
+            RETURNING id
+        """), {"uid": user_id, "email": user_email, "tid": tenant_id, "schema": tenant_schema,
+               "ip": ip, "ua": (request.headers.get("User-Agent") or "")[:500]}).scalar()
+
+
+def activity_logout(activity_id, reason):
+    """Close a login-session row; only the first close counts."""
+    if not activity_id:
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE public.user_login_sessions
+                SET    logout_at = now(), last_seen_at = now(), logout_reason = :reason
+                WHERE  id = :id AND logout_at IS NULL
+            """), {"id": activity_id, "reason": reason})
+    except Exception as e:
+        print(f"DEBUG: activity logout tracking failed: {e}", flush=True)
+
+
+def activity_dashboard_view(dashboard_id, dashboard_title):
+    """Record that the logged-in user opened a dashboard during this login."""
+    activity_id = session.get("activity_id")
+    try:
+        if not activity_id or dashboard_id is None:
+            return
+        with engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO public.user_dashboard_views (login_session_id, dashboard_id, dashboard_title)
+                VALUES (:sid, :did, :title)
+                ON CONFLICT (login_session_id, dashboard_id) DO UPDATE
+                SET view_count     = public.user_dashboard_views.view_count + 1,
+                    last_viewed_at = now(),
+                    dashboard_title = COALESCE(EXCLUDED.dashboard_title, public.user_dashboard_views.dashboard_title)
+            """), {"sid": activity_id, "did": int(dashboard_id), "title": dashboard_title})
+    except Exception as e:
+        print(f"DEBUG: dashboard view tracking failed: {e}", flush=True)
+
+
+@app.before_request
+def activity_heartbeat():
+    """Refresh 'last seen' at most once a minute while the user is active, so the time used
+    is known even when they close the tab or the session expires without a logout."""
+    activity_id = session.get("activity_id")
+    if not activity_id or not request.path.startswith("/api/") or engine is None:
+        return
+    now = time.time()
+    if now - session.get("activity_seen_ts", 0) < ACTIVITY_HEARTBEAT_SECONDS:
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE public.user_login_sessions SET last_seen_at = now()
+                WHERE  id = :id AND logout_at IS NULL
+            """), {"id": activity_id})
+        session["activity_seen_ts"] = now
+    except Exception as e:
+        print(f"DEBUG: activity heartbeat failed: {e}", flush=True)
+
+
+# ---------------------------------------------------------
 # AUTH ROUTES
 # ---------------------------------------------------------
 @app.route("/api/login", methods=["POST"])
@@ -3105,6 +3185,7 @@ def login():
             if not user or user.password_hash != password:
                 return jsonify({"error": "Invalid credentials"}), 401
 
+            activity_logout(session.get("activity_id"), "relogin")   # a previous login that was never closed
             session.clear()
             session.permanent          = True
             session['user']            = username
@@ -3122,6 +3203,10 @@ def login():
             session["function_name"]   = user.function_name
             session["data_cache_id"]   = new_data_cache_id()   # chart data cache: fresh for every login
             print(f"DEBUG: User upload_access for '{username}': {user.upload_access}", flush=True)
+            try:
+                session["activity_id"] = activity_login(user.id, username, user.tenant_pk, user.schema_name)
+            except Exception as track_err:
+                print(f"DEBUG: login tracking failed: {track_err}", flush=True)
             return jsonify({
                 "success": True,
                 "user": {
@@ -3141,6 +3226,7 @@ def login():
 def logout():
     removed = clear_session_chart_cache()   # this login's cached chart data
     print(f"DEBUG: logout - {removed} cached chart entries removed", flush=True)
+    activity_logout(session.get("activity_id"), "logout")
     session.clear()
     return jsonify({"success": True}), 200
 
@@ -3297,6 +3383,57 @@ def upload_excel():
         print(f"DEBUG: Procedure name   : {procedure_name}", flush=True)
         print(f"DEBUG: Function name    : {function_name}", flush=True)
 
+        # -------------------------------------------------------------
+        # Stock files carry the stock date typed by the user (stock_as_of).
+        # It must be a real date, not in the future, and later than the
+        # latest stock date already loaded.
+        # -------------------------------------------------------------
+        stock_as_of = None
+        if tenant_name == "shinde_shoes" and file_type == "inventory":
+            raw_stock_as_of = (request.form.get('stock_as_of') or '').strip()
+            if not raw_stock_as_of:
+                r.delete(lock_key)
+                return jsonify({
+                    "success": False,
+                    "needs_stock_as_of": True,
+                    "error": "Stock date is required for a stock file. Enter the date the stock is as of."
+                }), 400
+
+            try:
+                stock_as_of = datetime.strptime(raw_stock_as_of, "%Y-%m-%d").date()
+            except ValueError:
+                r.delete(lock_key)
+                return jsonify({
+                    "success": False,
+                    "needs_stock_as_of": True,
+                    "error": f"Invalid stock date '{raw_stock_as_of}'. Use the date picker (YYYY-MM-DD)."
+                }), 400
+
+            if stock_as_of > datetime.now().date():
+                r.delete(lock_key)
+                return jsonify({
+                    "success": False,
+                    "needs_stock_as_of": True,
+                    "error": f"Stock date {stock_as_of:%d-%m-%Y} is in the future."
+                }), 400
+
+            with engine.connect() as chk_conn:
+                last_stock_as_of = chk_conn.execute(text(
+                    f'SELECT MAX(stock_as_of) FROM "{tenant_schema}".stock_fact_master'
+                )).scalar()
+
+            if last_stock_as_of is not None and stock_as_of <= last_stock_as_of:
+                r.delete(lock_key)
+                return jsonify({
+                    "success": False,
+                    "needs_stock_as_of": True,
+                    "error": f"Stock date {stock_as_of:%d-%m-%Y} must be later than the latest stock "
+                             f"date already loaded ({last_stock_as_of:%d-%m-%Y}). "
+                             f"This looks like an old or already uploaded stock file."
+                }), 400
+
+            print(f"DEBUG: Stock as of     : {stock_as_of}", flush=True)
+
         with engine.connect() as load_conn:
             load_id = load_conn.execute(text("""
                 INSERT INTO public.load_master
@@ -3329,6 +3466,7 @@ def upload_excel():
                 lock_key,
                 procedure_name,
                 function_name,
+                stock_as_of,
             ),
             daemon = True
         )
@@ -3492,6 +3630,7 @@ def _process_upload_background(
     lock_key,
     procedure_name,
     function_name,
+    stock_as_of=None,
 ):
     # r = redis.from_url(os.getenv("REDIS_URL"))
     redis_client = redis.from_url(REDIS_URL)
@@ -3610,7 +3749,8 @@ def _process_upload_background(
                         log_load_error,
                         filename=clean_filename,
                         user_id=user_id,
-                        progress=update_status
+                        progress=update_status,
+                        stock_as_of=stock_as_of
                     )
 
                 # ── NEW: dedicated Purchase branch ─────────────────────
@@ -3735,8 +3875,12 @@ def _process_upload_background(
 
                 update_status('Saving')
 
+                # Sales, stock and purchase files each refresh the views once the
+                # data is committed: the stock views read the new stock snapshot and
+                # the sales views read the new sales (a failed upload never gets here).
                 needs_view_refresh = (
-                    tenant_name == "shinde_shoes" and file_type == "sales"
+                    tenant_name == "shinde_shoes"
+                    and file_type in ("sales", "inventory", "purchase")
                 )
 
                 # Committed together with the data, so a crash after this point
@@ -3796,12 +3940,142 @@ def _process_upload_background(
         if needs_view_refresh:
             update_status('Pass')
 
+        # Upload succeeded: back up this tenant's schema (background, non-critical).
+        backup_schema_async(DATABASE_URL, tenant_schema, load_id)
+
     finally:
         r.delete(lock_key)
         print(
             f"DEBUG: Upload lock released for {tenant_schema}.",
             flush=True
         )
+
+
+# ---------------------------------------------------------
+# SCHEMA BACKUP (pg_dump of one tenant schema)
+# Storage is pluggable: LocalBackupStorage keeps the dump on disk; to move backups to
+# another store later, add a class with the same save() method and return it from
+# get_backup_storage().
+# ---------------------------------------------------------
+BACKUP_DIR      = os.getenv("BACKUP_DIR", str(ROOT / "db" / "backups" / "schema_backups"))
+BACKUP_STORAGE  = os.getenv("BACKUP_STORAGE", "local").lower()
+PG_DUMP_BIN     = os.getenv("PG_DUMP_BIN", "pg_dump")
+PG_DUMP_TIMEOUT = int(os.getenv("BACKUP_TIMEOUT_SECONDS", "1800"))
+# Local testing only: name of the Postgres container to run pg_dump in (leave unset in production).
+BACKUP_DOCKER_CONTAINER = os.getenv("BACKUP_DOCKER_CONTAINER", "")
+
+_SCHEMA_NAME_RE       = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_backup_locks         = {}
+_backup_locks_guard   = threading.Lock()
+
+
+class LocalBackupStorage:
+    def __init__(self, base_dir):
+        self.base_dir = Path(base_dir)
+
+    def save(self, local_file, schema, filename):
+        """Move the finished dump into the store; returns where it ended up."""
+        target_dir = self.base_dir / schema
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / filename
+        shutil.move(str(local_file), str(target))
+        return str(target)
+
+
+def get_backup_storage():
+    if BACKUP_STORAGE == "local":
+        return LocalBackupStorage(BACKUP_DIR)
+    raise ValueError(f"Unknown BACKUP_STORAGE '{BACKUP_STORAGE}'")
+
+
+def backup_schema(database_url, schema, load_id=None):
+    """Dump `schema` (structure + data, plain SQL file) and store it.
+    Raises on failure. Returns {"schema", "file", "size_bytes", "created_at"}."""
+    if not _SCHEMA_NAME_RE.match(schema or ""):
+        raise ValueError(f"Invalid schema name: {schema!r}")
+    needed_bin = "docker" if BACKUP_DOCKER_CONTAINER else PG_DUMP_BIN
+    if not shutil.which(needed_bin):
+        raise RuntimeError(
+            f"'{needed_bin}' not found. Install the PostgreSQL client tools "
+            f"or set PG_DUMP_BIN."
+        )
+
+    url      = make_url(database_url)
+    stamp    = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{schema}_{stamp}" + (f"_load{load_id}" if load_id else "") + ".sql"
+
+    env = os.environ.copy()
+    if url.password:
+        env["PGPASSWORD"] = url.password  # keep the password off the command line
+    if url.query.get("sslmode"):
+        env["PGSSLMODE"] = url.query["sslmode"]
+
+    with _backup_locks_guard:
+        schema_lock = _backup_locks.setdefault(schema, threading.Lock())
+
+    with schema_lock:
+        tmp_dir = tempfile.mkdtemp(prefix="schema_backup_")
+        try:
+            tmp_file = os.path.join(tmp_dir, filename)
+            if BACKUP_DOCKER_CONTAINER:
+                # Local testing without pg_dump installed: run it inside the DB container
+                # (connects over the container's own port 5432; PGPASSWORD passes through).
+                cmd = ["docker", "exec", "-e", "PGPASSWORD", BACKUP_DOCKER_CONTAINER, "pg_dump",
+                       "--host", "localhost", "--port", "5432"]
+            else:
+                cmd = [PG_DUMP_BIN,
+                       "--host", url.host or "localhost", "--port", str(url.port or 5432)]
+            cmd += ["--username", url.username, "--dbname", url.database,
+                    "--schema", schema, "--format", "plain", "--no-owner"]
+            # The dump streams through stdout so it works the same inside a container.
+            with open(tmp_file, "wb") as out:
+                proc = subprocess.run(cmd, env=env, stdout=out, stderr=subprocess.PIPE,
+                                      timeout=PG_DUMP_TIMEOUT)
+            if proc.returncode != 0:
+                raise RuntimeError(
+                    f"pg_dump failed: {proc.stderr.decode(errors='replace').strip()[:500]}")
+            size     = os.path.getsize(tmp_file)
+            location = get_backup_storage().save(tmp_file, schema, filename)
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    return {
+        "schema":     schema,
+        "file":       location,
+        "size_bytes": size,
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+    }
+
+
+def backup_schema_async(database_url, schema, load_id=None):
+    """Fire-and-forget backup used after a successful upload; never raises."""
+    def run():
+        try:
+            info = backup_schema(database_url, schema, load_id)
+            print(f"DEBUG: Schema backup saved: {info['file']} ({info['size_bytes']} bytes)", flush=True)
+        except Exception as e:
+            print(f"DEBUG: Schema backup failed (non-critical): {e}", flush=True)
+
+    threading.Thread(target=run, name=f"schema-backup-{schema}", daemon=True).start()
+
+
+@app.route('/api/backup-schema', methods=['POST'])
+@login_required
+def backup_schema_endpoint():
+    """Back up the logged-in tenant's schema. The upload flow runs the same
+    backup automatically after a successful upload."""
+    tenant_schema = session.get('tenant_schema')
+    if not tenant_schema:
+        return jsonify({"success": False, "error": "No tenant context found"}), 403
+    if not DATABASE_URL:
+        return jsonify({"success": False, "error": "Database unavailable"}), 503
+    load_id = (request.get_json(silent=True) or {}).get("load_id")
+    try:
+        info = backup_schema(DATABASE_URL, tenant_schema, load_id)
+        return jsonify({"success": True, **info})
+    except Exception as e:
+        print(f"DEBUG: Schema backup failed: {e}", flush=True)
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # Upload steps shown in the progress popup: status -> (percent, message).
@@ -3817,9 +4091,8 @@ UPLOAD_STEPS = {
     "LoadingRows":      (35,  "Loading the file rows..."),
     "SavingSales":      (50,  "Processing the data..."),
     "UpdatingDates":    (62,  "Updating report dates..."),
-    "UpdatingStock":    (70,  "Processing the data..."),
-    "SavingStockCount": (55,  "Checking stock rows and updating stock..."),
-    "SavingPurchases":  (55,  "Checking bills and updating purchases and stock..."),
+    "SavingStockCount": (55,  "Checking the file date and stock rows, and updating stock..."),
+    "SavingPurchases":  (55,  "Checking the file date and bills, and saving purchases..."),
     "Saving":           (78,  "Saving everything to the database..."),
     "Refreshing":       (80,  "Data saved. Refreshing dashboards..."),
     "Pass":             (100, "Upload complete. Please refresh the page to see the updated dashboards."),
@@ -4048,6 +4321,49 @@ def truncate_table_simple():
         return f"<h1>Error</h1><p>{str(e)}</p>", 500
 
 
+def _table_column_order(form_data):
+    """Column order of a Superset table chart, as Superset shows it.
+    column_config is used only when every column in it has an `index`; some Superset
+    versions send column_config without indexes (keys in alphabetical order), which
+    would scramble the columns. Otherwise: dimensions first, then metrics, in the
+    order they were arranged in the chart's Data tab (all_columns in raw mode)."""
+    col_config = form_data.get("column_config") or {}
+    if isinstance(col_config, dict) and col_config and all(
+        isinstance(v, dict) and isinstance(v.get("index"), (int, float))
+        for v in col_config.values()
+    ):
+        return sorted(col_config.keys(), key=lambda k: col_config[k]["index"])
+
+    def _names(items):
+        if isinstance(items, str):
+            return [items] if items else []
+        out = []
+        for item in (items or []):
+            if isinstance(item, str):
+                name = item
+            elif isinstance(item, dict):
+                name = item.get("label") or item.get("column_name") or item.get("verbose_name")
+                if not name and item.get("aggregate") and isinstance(item.get("column"), dict):
+                    name = f'{item["aggregate"]}({item["column"].get("column_name", "")})'
+            else:
+                name = None
+            if name and name not in out:
+                out.append(name)
+        return out
+
+    if form_data.get("query_mode") == "raw":
+        return _names(form_data.get("all_columns"))
+
+    order = _names(form_data.get("groupby"))
+    for name in _names(form_data.get("metrics")):
+        if name not in order:
+            order.append(name)
+    for name in _names(form_data.get("percent_metrics")):
+        if f"%{name}" not in order:
+            order.append(f"%{name}")
+    return order
+
+
 @app.route("/api/dashboard-charts", methods=["GET"])
 @login_required
 def get_dashboard_charts():
@@ -4073,6 +4389,7 @@ def get_dashboard_charts():
             f"/api/v1/dashboard/{dashboard_id}", access_token, timeout=15
         )
         dashboard_meta = dashboard_meta or {}
+        activity_dashboard_view(dashboard_id, dashboard_meta.get("dashboard_title"))
         raw_json_meta  = dashboard_meta.get("json_metadata") or "{}"
         try:
             json_metadata = json.loads(raw_json_meta)
@@ -4322,10 +4639,13 @@ def get_dashboard_charts():
             is_table = viz_type and ("table" in viz_type.lower() or "pivot" in viz_type.lower())
             column_order = []
             if is_table:
-                col_config = form_data.get("column_config") or {}
-                if isinstance(col_config, dict) and col_config:
-                    column_order = sorted(col_config.keys(),
-                                          key=lambda k: col_config[k].get("index", 999))
+                if "pivot" in viz_type.lower():
+                    col_config = form_data.get("column_config") or {}
+                    if isinstance(col_config, dict) and col_config:
+                        column_order = sorted(col_config.keys(),
+                                              key=lambda k: col_config[k].get("index", 999))
+                else:
+                    column_order = _table_column_order(form_data)
 
             if is_table:
                 raw_cf = (

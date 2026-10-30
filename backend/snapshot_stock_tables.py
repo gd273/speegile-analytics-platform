@@ -36,7 +36,7 @@ def main():
     engine = create_engine(db_url)
 
     stock_fact = pd.read_sql(
-        'SELECT * FROM shinde_shoes.stock_fact_master ORDER BY "SKUKey", "LocationKey"',
+        'SELECT * FROM shinde_shoes.stock_fact_master ORDER BY "ProductCodeKey", "LocationKey", stock_as_of',
         engine,
     )
     purchase_fact = pd.read_sql(

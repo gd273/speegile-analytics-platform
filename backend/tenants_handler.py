@@ -1326,29 +1326,48 @@ def handle_shinde_shoes(conn, df, tenant_schema, target_table_name, load_id, log
     # ─────────────────────────────────────────────────────────────
 
     # ─────────────────────────────────────────────────────────────
-    # STEP 7 (NEW): stock impact — sp_batch_insert_dummy_to_stagging_to_dim
-    # above only writes FactSalesMaster/FactSalesDetail; it never posts
-    # the sale into stock_transaction / stock_fact_master. That used to
-    # be a manual step (CALL sp_process_sales_stock_impact()) — now
-    # automated through the single dispatcher, same as Purchase/Inventory.
-    # p_load_id is NULL here on purpose: Sales isn't load-scoped —
-    # sp_process_upload's 'sales' branch calls sp_process_sales_stock_impact()
-    # with no argument, which processes every currently-unposted sale line.
+    # Sales no longer updates stock. Stock only changes when a stock file is
+    # uploaded (it overwrites the qty of the products in the file), and purchases
+    # are stored by bill date without touching stock. The old step 7
+    # (sp_process_upload(NULL, 'sales') -> sp_process_sales_stock_impact) was removed.
     # ─────────────────────────────────────────────────────────────
-    report('UpdatingStock')
-    print(f"DEBUG [{tenant_schema}]: Calling sp_process_upload(NULL, 'sales') for stock impact...", flush=True)
-    conn.execute(
-        text(f'CALL "{tenant_schema}".sp_process_upload(:load_id, :file_type)'),
-        {"load_id": None, "file_type": "sales"}
-    )
-    print(f"DEBUG [{tenant_schema}]: sp_process_upload(sales) done.", flush=True)
-
     print(f"DEBUG [{tenant_schema}]: All steps completed successfully.", flush=True)
 
 
 # ---------------------------------------------------------
 # TENANT: shinde_shoes — STOCK / INVENTORY file
 # ---------------------------------------------------------
+
+def _check_one_brand_supplier_per_product(df, max_listed=50):
+    """Raise ValueError naming every Product that has more than one Brand or Supplier in the stock file."""
+    needed = ["Product", "Brand", "Supplier"]
+    missing = [c for c in needed if c not in df.columns]
+    if missing:
+        raise ValueError(f"Stock file is missing required column(s): {', '.join(missing)}.")
+
+    work = df[needed].apply(lambda col: col.astype(str).str.strip())
+    work = work[work["Product"] != ""]
+
+    problems = []
+    for column in ("Brand", "Supplier"):
+        # Blank values are not counted as a second value; case differences are not errors.
+        values = work[work[column] != ""].assign(_key=lambda d: d[column].str.upper())
+        distinct = values.groupby("Product")["_key"].nunique()
+        for product in distinct[distinct > 1].index:
+            names = sorted(values.loc[values["Product"] == product, column].unique())
+            problems.append((product, column, names))
+
+    if not problems:
+        return
+
+    problems.sort(key=lambda p: (p[0], p[1]))
+    listed = [f"{product} ({column}s: {', '.join(names)})" for product, column, names in problems[:max_listed]]
+    more = f" ... and {len(problems) - max_listed} more" if len(problems) > max_listed else ""
+    raise ValueError(
+        "File rejected: each Product must have only one Brand and one Supplier. "
+        f"{len(problems)} problem(s) found: " + "; ".join(listed) + more
+    )
+
 
 def handle_shinde_shoes_stock(
     conn,
@@ -1359,7 +1378,8 @@ def handle_shinde_shoes_stock(
     log_load_error,
     filename=None,
     user_id=None,
-    progress=None
+    progress=None,
+    stock_as_of=None
 ):
     # progress(step) reports the current step to the upload popup (see app.py UPLOAD_STEPS).
     report = progress or (lambda step: None)
@@ -1370,10 +1390,21 @@ def handle_shinde_shoes_stock(
             flush=True
         )
 
+        if stock_as_of is None:
+            raise ValueError("Stock date (stock_as_of) is required for a stock file.")
+
         # ---------------------------------------------------------
         # 1. Convert all Inventory Excel data to strings
         # ---------------------------------------------------------
         df = df.fillna("").astype(str)
+
+        # ---------------------------------------------------------
+        # 1b. One product = one brand + one supplier.
+        # Checked on the file itself, before anything is staged or any
+        # procedure runs. A product with several brands or suppliers is a
+        # data entry error: the whole file is rejected.
+        # ---------------------------------------------------------
+        _check_one_brand_supplier_per_product(df)
 
         # ---------------------------------------------------------
         # 2. Add load_id
@@ -1428,8 +1459,8 @@ def handle_shinde_shoes_stock(
             flush=True
         )
         conn.execute(
-            text(f'CALL "{tenant_schema}".sp_process_upload(:load_id, :file_type)'),
-            {"load_id": load_id, "file_type": "inventory"}
+            text(f'CALL "{tenant_schema}".sp_process_upload(:load_id, :file_type, :stock_as_of)'),
+            {"load_id": load_id, "file_type": "inventory", "stock_as_of": stock_as_of}
         )
         print(f"DEBUG [shinde_shoes]: sp_process_upload(inventory) done.", flush=True)
 
@@ -1458,27 +1489,14 @@ def handle_shinde_shoes_purchase(conn, df, tenant_schema, target_table_name, loa
     """
     Purchase's staging/processing is load_id-scoped end to end:
         stg_purchase_1 (this upload's raw rows, load_id tagged)
-          -> sp_validate_purchase_load(load_id)
-          -> stg_purchase_2 (validated, accumulates across loads)
-          -> sp_process_purchase_load(load_id)
-          -> purchase_fact_master + stock_fact_master
+          -> sp_process_upload(load_id, 'purchase'):
+               sp_check_file_date        (file name must carry a date newer than the last purchase file)
+               sp_check_sku_format, sp_check_purchase_duplicates
+               sp_validate_purchase_load -> stg_purchase_2 (validated, accumulates across loads)
+               sp_process_purchase_load  -> purchase_fact_detail (one row per bill line, by bill date)
 
-    Previously Purchase had NO dedicated Python handler at all — it fell
-    through to the generic "no handler" branch in app.py, which truncated
-    + bulk-inserted stg_purchase_1 correctly, but then called whatever
-    single procedure_name was configured in public.tenants with ZERO
-    arguments. That can never run BOTH load_id-scoped steps Purchase
-    actually needs, which is why sp_validate_purchase_load(load_id) and
-    sp_process_purchase_load(load_id) had to be called by hand after
-    every Purchase upload up to now.
-
-    NOTE: sp_process_upload's 'purchase' branch calls
-    sp_process_purchase_load(load_id) — make sure the corrected,
-    date-wise version of that procedure (not the stale whole-load
-    version) is deployed, and that stock_fact_master's primary key has
-    already been migrated to ("SKUKey","LocationKey",last_date), before
-    relying on this automation — otherwise it will now run the wrong
-    logic automatically instead of failing loudly.
+    Purchases are only stored by date for analysis (view v_purchase_daily). They do NOT
+    change stock: stock changes only when a stock file is uploaded (migrations 031-034).
     """
     # progress(step) reports the current step to the upload popup (see app.py UPLOAD_STEPS).
     report = progress or (lambda step: None)

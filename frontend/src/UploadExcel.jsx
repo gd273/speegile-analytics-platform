@@ -24,6 +24,10 @@ const UploadExcel = ({ navigate }) => {
   // ── Inline message (success / error below form) ───────
   const [message, setMessage]     = useState(null);
 
+  // ── Stock date popup (stock files only) ───────────────
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [stockDate, setStockDate]         = useState("");
+
   // ── Background processing popup state ─────────────────
   // loadId   → returned immediately from /api/upload-excel (202 response)
   // popupStatus → updated every 3s by polling /api/upload-status/<loadId>
@@ -123,8 +127,35 @@ const UploadExcel = ({ navigate }) => {
   //  3. Starts polling for background processing status
   // ─────────────────────────────────────────────────────
 
-  const handleUpload = async (e) => {
+  // Stock (inventory) files need the stock date, asked in a popup before the upload.
+  const isStockFile = (f) => /inventory/i.test(f?.name || "");
+
+  const todayStr = () => {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  };
+
+  const handleUpload = (e) => {
     e.preventDefault();
+    if (!file || isSubmitting.current) return;
+
+    if (isStockFile(file)) {
+      setMessage(null);
+      setShowDateModal(true);
+      return;
+    }
+    uploadFile(null);
+  };
+
+  const confirmStockDate = () => {
+    if (!stockDate) return;
+    setShowDateModal(false);
+    uploadFile(stockDate);
+  };
+
+  const uploadFile = async (stockAsOf) => {
     if (!file || isSubmitting.current) return;
 
     isSubmitting.current = true;
@@ -134,6 +165,7 @@ const UploadExcel = ({ navigate }) => {
 
     const formData = new FormData();
     formData.append("excel_file", file);
+    if (stockAsOf) formData.append("stock_as_of", stockAsOf);
 
     try {
       const response = await api.post("/upload-excel", formData, {
@@ -173,6 +205,8 @@ const UploadExcel = ({ navigate }) => {
         err.response?.data?.error || "An unexpected error occurred during upload.";
       setMessage({ type: "error", text: errorText });
       setIsSuccess(false);
+      // Date rejected by the server (missing / future / not later than the last stock date): ask again
+      if (err.response?.data?.needs_stock_as_of) setShowDateModal(true);
 
     } finally {
       setLoading(false);
@@ -358,6 +392,51 @@ const UploadExcel = ({ navigate }) => {
         )}
 
       </div>
+
+      {/* ── Stock date popup: shown for stock (inventory) files ── */}
+      {showDateModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="stock-date-title"
+        >
+          <div className="w-full max-w-sm bg-white p-6 rounded-2xl shadow-2xl border border-indigo-100">
+            <h3 id="stock-date-title" className="text-xl font-bold text-indigo-700 mb-2">
+              Stock date
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Enter the date this stock file is <strong>as of</strong>. It must be later than the
+              last stock date already loaded.
+            </p>
+            <input
+              type="date"
+              value={stockDate}
+              max={todayStr()}
+              onChange={(e) => setStockDate(e.target.value)}
+              className="w-full px-3 py-2 border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              autoFocus
+            />
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowDateModal(false)}
+                className="px-4 py-2 rounded-lg text-gray-700 bg-gray-100 hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmStockDate}
+                disabled={!stockDate}
+                className="px-4 py-2 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

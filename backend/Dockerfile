@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
     netcat-openbsd \
+    postgresql-client \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install (NOTE: paths are relative to build context ./backend)

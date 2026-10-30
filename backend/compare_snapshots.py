@@ -44,15 +44,17 @@ def main():
     before = pd.read_excel(before_path, sheet_name="stock_fact_master")
     after = pd.read_excel(after_path, sheet_name="stock_fact_master")
 
-    keep_cols = ["SKUKey", "LocationKey", "current_qty"]
-    if "SKU" in after.columns:
-        keep_cols_after = keep_cols + ["SKU"]
-    else:
-        keep_cols_after = keep_cols
+    # stock_fact_master is one row per product code + store + stock date; compare the latest rows only
+    if "latest_flag" in before.columns:
+        before = before[before["latest_flag"]]
+    if "latest_flag" in after.columns:
+        after = after[after["latest_flag"]]
+
+    keep_cols = ["ProductCodeKey", "LocationKey", "current_qty"]
 
     merged = before[keep_cols].merge(
-        after[keep_cols_after],
-        on=["SKUKey", "LocationKey"],
+        after[keep_cols],
+        on=["ProductCodeKey", "LocationKey"],
         how="outer",
         suffixes=("_before", "_after"),
     )
