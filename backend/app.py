@@ -4430,15 +4430,10 @@ def get_dashboard_charts():
             excluded  = [int(x) for x in scope_obj.get("excluded", [])]
 
             if not root_path:
-                all_chart_ids = []
-                for val in position_json.values():
-                    if isinstance(val, dict) and val.get("type") == "CHART":
-                        cid = val.get("meta", {}).get("chartId")
-                        if cid:
-                            all_chart_ids.append(int(cid))
-                result = [cid for cid in all_chart_ids if cid not in excluded]
-                print(f"DEBUG resolve_scope: rootPath=[] -> scanned all -> {result}", flush=True)
-                return result
+                # Superset: empty rootPath = cross-filtering disabled for this
+                # chart (nothing in scope). Same in 6.0.1 and 6.1.0.
+                print("DEBUG resolve_scope: rootPath=[] -> nothing in scope", flush=True)
+                return []
 
             def collect(node_id):
                 found = []
@@ -6356,7 +6351,8 @@ def get_cross_filter_scope():
             root_path = scope_obj.get("rootPath", [])
             excluded  = [int(x) for x in scope_obj.get("excluded", [])]
             if not root_path:
-                root_path = ["ROOT_ID"]
+                # Empty rootPath = cross-filtering disabled in Superset
+                return []
             in_scope = []
             for root_node_id in root_path:
                 in_scope.extend(collect_chart_ids_under(root_node_id, layout))
@@ -6388,6 +6384,12 @@ def get_cross_filter_scope():
                     scope_map[chart_id] = [cid for cid in resolved if cid != chart_id]
                 else:
                     scope_map[chart_id] = []
+
+        # Charts with no explicit entry (some 6.x dashboards): use global scope
+        if global_resolved is not None:
+            for cid in collect_chart_ids_under("ROOT_ID", position_json):
+                if cid not in scope_map:
+                    scope_map[cid] = [c for c in global_resolved if c != cid]
 
         return jsonify({"enabled": True, "scope": scope_map}), 200
 

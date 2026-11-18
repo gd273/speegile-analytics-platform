@@ -1242,8 +1242,11 @@ const applicableCrossFilters = Object.fromEntries(
       dateTo:   hasTimeFilter ? (dateTo   || null) : null,
       timeFilterId: hasTimeFilter ? timeFilterId : null,
       crossFilters:        applicableCrossFilters,
-      onCrossFilter:       handleCrossFilter,
-      onDrillDown:         handleFilterChange,
+      // Only charts with cross-filtering enabled in Superset can emit filters
+      onCrossFilter:       (crossFiltersEnabled
+                              && (crossFilterScopeMap[Number(chart.slice_id)] || []).length > 0)
+                            ? handleCrossFilter : undefined,
+      onDrillDown:        handleFilterChange,
       metrics:             chart.metrics             || [],
       groupby:             chart.groupby             || [],
       groupbyRows:         chart.groupby_rows        || [],
