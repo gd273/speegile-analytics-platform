@@ -5557,6 +5557,57 @@ def _apply_sort(query, sort_col, sort_dir):
     print(f"DEBUG page: sort column '{sort_col}' not in query - ignored", flush=True)
 
 
+SORT_IN_MEMORY_MAX = 10000   # chart row limits up to this are re-sorted/searched in memory
+
+
+def _limited_mode(main, sort_col, sort_dir, search):
+    """The chart has its own Row limit (e.g. Top 20) and the user sorts or searches.
+    Then the chart's own order + limit must pick the rows first; sort/search only
+    act inside those rows. Returns the chart's row limit, or 0 when not applicable."""
+    try:
+        limit = int(main.get("row_limit") or 0)
+    except (TypeError, ValueError):
+        return 0
+    has_sort   = bool(sort_col) and sort_dir in ("asc", "desc")
+    has_search = bool((search or "").strip())
+    if 0 < limit <= SORT_IN_MEMORY_MAX and (has_sort or has_search):
+        return limit
+    return 0
+
+
+def _sort_rows(rows, sort_col, sort_dir, colnames):
+    """Sort already-selected rows by one of their own columns. None goes last."""
+    if not sort_col or sort_dir not in ("asc", "desc") or sort_col not in colnames:
+        return rows
+    present = [r for r in rows if r.get(sort_col) is not None]
+    missing = [r for r in rows if r.get(sort_col) is None]
+
+    def num(v):
+        if isinstance(v, bool):
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    if all(num(r[sort_col]) is not None for r in present):
+        key = lambda r: num(r[sort_col])
+    else:
+        key = lambda r: str(r[sort_col]).lower()
+    present.sort(key=key, reverse=(sort_dir == "desc"))
+    return present + missing
+
+
+def _search_rows(rows, search, dim_cols):
+    term = (search or "").strip()[:SEARCH_MAX_LEN].lower()
+    if not term:
+        return rows
+    return [r for r in rows
+            if any(term in str(r.get(c, "")).lower() for c in dim_cols if r.get(c) is not None)]
+
+
 def _dataset_columns(datasource_id, access_token):
     """{column_name: sql_expression_or_None} for the dataset.
     Read through superset_get_result, so it uses the Redis meta cache.
@@ -5726,6 +5777,41 @@ def _compute_chart_data_page(body):
 
         main, totals = _split_table_queries(query_context)
 
+        # Row-limited chart (e.g. Top 20) + sort/search: the chart's own order and
+        # limit choose the rows, the user's sort/search only works inside them.
+        limited = _limited_mode(main, sort_col, sort_dir, search)
+        if limited:
+            main["row_offset"] = 0
+            query_context["queries"]       = [main] + ([totals] if totals is not None else [])
+            query_context["result_format"] = "json"
+            query_context["result_type"]   = "full"
+            data_resp = _post_chart_data(access_token, query_context, timeout=60)
+            if data_resp.status_code != 200:
+                msg = _superset_error_text(data_resp)
+                return ({"error": f"Superset error: {msg}"}), 502
+            results  = data_resp.json().get("result", []) or []
+            page_res = results[0] if results else {}
+            rows     = page_res.get("data", []) or []
+            colnames = page_res.get("colnames") or (list(rows[0].keys()) if rows else [])
+            coltypes = page_res.get("coltypes", []) or []
+            dim_cols = [_label_of(c) for c in main.get("columns") or []]
+            rows = _search_rows(rows, search, dim_cols)
+            rows = _sort_rows(rows, sort_col, sort_dir, colnames)
+            summary = None
+            if totals is not None and len(results) > 1:
+                t_data = results[1].get("data") or []
+                if len(t_data) == 1:
+                    summary = t_data[0]
+            offset = page * page_size
+            print(f"DEBUG page chart {slice_id}: LIMITED mode limit={limited} rows={len(rows)} "
+                  f"sort={sort_col}/{sort_dir} search={search!r}", flush=True)
+            return ({
+                "success": True, "data": rows[offset:offset + page_size],
+                "colnames": colnames, "coltypes": coltypes,
+                "total": len(rows), "totalIsEstimate": False,
+                "page": page, "pageSize": page_size, "summary": summary,
+            }), 200
+
         # Search — same WHERE on the page, the count and the totals,
         # so "N rows" and the totals row both reflect the search.
         where = _search_where_clause(query_context, main, search, access_token)
@@ -5839,8 +5925,11 @@ def export_chart_data():
             return jsonify({"error": "Chart has no datasource"}), 400
 
         main, _totals = _split_table_queries(query_context)
-        _add_where(main, _search_where_clause(query_context, main, body.get("search"), access_token))
-        _apply_sort(main, body.get("sortCol"), body.get("sortDir"))
+        # Row-limited chart (Top N): export exactly the chart's own N rows in its
+        # own order; a SQL sort/search here would pick different rows.
+        if not _limited_mode(main, body.get("sortCol"), body.get("sortDir"), body.get("search")):
+            _add_where(main, _search_where_clause(query_context, main, body.get("search"), access_token))
+            _apply_sort(main, body.get("sortCol"), body.get("sortDir"))
         main["row_limit"]  = _chart_row_limit(main)
         main["row_offset"] = 0
 
