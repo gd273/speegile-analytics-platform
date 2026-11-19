@@ -3516,19 +3516,36 @@ def _user_error_message(exc):
     return primary or str(exc)
 
 
-def refresh_views_after_commit(tenant_schema, load_id=None):
+# Which materialized views each upload type must refresh (shinde_shoes). Checked
+# against the tables every view reads:
+#   sales     -> every view reads sales data          -> 'all'   (all 17 views)
+#   inventory -> only the stock snapshot changes; just 4 views read it -> 'stock'
+#   purchase  -> no materialized view reads purchase data (v_purchase_daily is a
+#                plain view, always current) -> no refresh
+# 'all' and 'stock' are the scopes of refresh_all_mvs(p_scope).
+REFRESH_SCOPE_BY_FILE_TYPE = {"sales": "all", "inventory": "stock"}
+STOCK_SCOPE_VIEW_COUNT     = 4   # views refreshed by scope 'stock' (progress bar total)
+
+
+def refresh_views_after_commit(tenant_schema, load_id=None, scope="all"):
     """Refresh the tenant's materialized views in their own autocommit
-    transaction, after the uploaded data is committed."""
+    transaction, after the uploaded data is committed. scope is 'all' or
+    'stock' (see REFRESH_SCOPE_BY_FILE_TYPE)."""
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as rc:
         # proc_run_log: the refresh's run row gets this load id. Session-level
         # (autocommit has no surrounding transaction), so it is reset afterwards.
         rc.execute(text("SELECT set_config('proc_run.load_id', :lid, false)"),
                    {"lid": str(load_id) if load_id is not None else ""})
         try:
-            rc.execute(text(f'CALL "{tenant_schema}".refresh_all_mvs()'))
+            if scope == "all":
+                # Same call as before the scopes existed.
+                rc.execute(text(f'CALL "{tenant_schema}".refresh_all_mvs()'))
+            else:
+                rc.execute(text(f'CALL "{tenant_schema}".refresh_all_mvs(:scope)'),
+                           {"scope": scope})
         finally:
             rc.execute(text("SELECT set_config('proc_run.load_id', '', false)"))
-    print(f"DEBUG: refresh_all_mvs done for {tenant_schema}.", flush=True)
+    print(f"DEBUG: refresh_all_mvs('{scope}') done for {tenant_schema}.", flush=True)
 
 
 def clear_superset_data_cache(redis_client):
@@ -3875,12 +3892,14 @@ def _process_upload_background(
 
                 update_status('Saving')
 
-                # Sales, stock and purchase files each refresh the views once the
-                # data is committed: the stock views read the new stock snapshot and
-                # the sales views read the new sales (a failed upload never gets here).
+                # Sales and stock files refresh the views once the data is committed,
+                # only the views that read the changed data (REFRESH_SCOPE_BY_FILE_TYPE):
+                # sales -> all views, stock -> the 4 stock views, purchase -> none
+                # (a failed upload never gets here).
+                refresh_scope = REFRESH_SCOPE_BY_FILE_TYPE.get(file_type)
                 needs_view_refresh = (
                     tenant_name == "shinde_shoes"
-                    and file_type in ("sales", "inventory", "purchase")
+                    and refresh_scope is not None
                 )
 
                 # Committed together with the data, so a crash after this point
@@ -3913,7 +3932,7 @@ def _process_upload_background(
         # while the refresh itself runs, and a refresh failure keeps the data.
         if needs_view_refresh:
             try:
-                refresh_views_after_commit(tenant_schema, load_id)
+                refresh_views_after_commit(tenant_schema, load_id, refresh_scope)
             except Exception as refresh_err:
                 print(f"DEBUG: View refresh failed: {refresh_err}", flush=True)
                 _mark_load_failed(
@@ -4101,10 +4120,11 @@ UPLOAD_STEPS = {
 REFRESH_PERCENT_FROM, REFRESH_PERCENT_TO = 80, 99
 
 
-def _refresh_progress(conn, tenant_schema, refreshing_since):
+def _refresh_progress(conn, tenant_schema, refreshing_since, load_id=None):
     """Live progress of the dashboard refresh started for this upload, from
     <tenant schema>.log_refresh (refresh_all_mvs commits after every view).
-    Returns (views_done, views_total) or None."""
+    A 'stock' refresh runs only STOCK_SCOPE_VIEW_COUNT views; the scope is read
+    from proc_run_log. Returns (views_done, views_total) or None."""
     if not tenant_schema or not refreshing_since:
         return None
     try:
@@ -4120,7 +4140,17 @@ def _refresh_progress(conn, tenant_schema, refreshing_since):
             LIMIT  1
         """), {"schema": tenant_schema, "since": refreshing_since}).first()
         if prog and prog[1]:
-            return int(prog[0] or 0), int(prog[1])
+            total = int(prog[1])
+            scope = conn.execute(text(f"""
+                SELECT details->>'scope'
+                FROM   "{tenant_schema}".proc_run_log
+                WHERE  proc_name = 'refresh_all_mvs' AND load_id = :lid
+                ORDER  BY run_id DESC
+                LIMIT  1
+            """), {"lid": load_id}).scalar() if load_id is not None else None
+            if scope == "stock":
+                total = STOCK_SCOPE_VIEW_COUNT
+            return int(prog[0] or 0), total
     except Exception as e:
         print(f"DEBUG: refresh progress lookup failed: {e}", flush=True)
     return None
@@ -4161,7 +4191,7 @@ def upload_status(load_id):
 
         if status == "Refreshing":
             refresh = _refresh_progress(conn, session.get("tenant_schema"),
-                                        row["refreshing_since"])
+                                        row["refreshing_since"], load_id)
 
     if status == "Fail":
         percent, message = 0, error_message or "Processing failed. Please contact support."
