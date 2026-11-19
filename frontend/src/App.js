@@ -40,6 +40,34 @@ console.log(
   process.env.REACT_APP_SUPERSET_BASE_URL,
 );
 
+// Shows the tenant logo without flicker: waits until branding is known, preloads the
+// image, then swaps once (tenant logo, or the default if it fails to load).
+function BrandLogo({ url, fallback, ready, className }) {
+  const target = url || fallback;
+  const [src, setSrc] = useState(null);
+
+  useEffect(() => {
+    if (!ready) return undefined;
+    let cancelled = false;
+    const img = new Image();
+    img.referrerPolicy = "no-referrer";
+    img.onload = () => { if (!cancelled) setSrc(target); };
+    img.onerror = () => { if (!cancelled) setSrc(fallback); };
+    img.src = target;
+    return () => { cancelled = true; };
+  }, [ready, target, fallback]);
+
+  if (!src) return <div className={className} style={{ aspectRatio: "3 / 1" }} />;
+  return (
+    <img
+      src={src}
+      alt="Company Logo"
+      referrerPolicy="no-referrer"
+      className={className}
+    />
+  );
+}
+
 // --- Main App Wrapper ---
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -59,6 +87,7 @@ function App() {
   // --- Logo's And Branding_Name ---
   const [logoUrl, setLogoUrl] = useState("");
   const [brandingName, setBrandingName] = useState("");
+  const [brandingLoaded, setBrandingLoaded] = useState(false);
   const [defaultLogoUrl, setDefaultLogoUrl] = useState(
     "https://speegile-tenants.s3.ap-south-1.amazonaws.com/tenant-logo/SpeegileLogo.jpeg",
   ); // Fallback logo
@@ -141,6 +170,8 @@ function App() {
       setBrandingName(branding_name);
     } catch (error) {
       console.error("Failed to load branding:", error);
+    } finally {
+      setBrandingLoaded(true);
     }
   };
 
@@ -151,7 +182,7 @@ function App() {
         setIsAuthenticated(true);
         setUser(response.data.user);
         fetchDashboards();
-        await loadBranding(); // 🔥 Load branding after auth
+        // branding is loaded by the isAuthenticated effect
       } else {
         setIsAuthenticated(false);
         setUser(null);
@@ -192,7 +223,7 @@ function App() {
     setIsAuthenticated(true);
     setUser(userData);
     fetchDashboards();
-    await loadBranding(); // 👈 ADD THIS
+    // branding is loaded by the isAuthenticated effect
     navigate("/dashboards");
   };
 
@@ -205,6 +236,8 @@ function App() {
       setIsAuthenticated(false);
       setUser(null);
       setDashboards([]);
+      setLogoUrl("");
+      setBrandingLoaded(false);
       navigate("/");
     }
   };
@@ -240,14 +273,11 @@ function App() {
           {/* Left: Logo + Dropdowns */}
           <div className="flex items-center gap-8">
             <div className="flex-shrink-0">
-              <img
-                src={logoUrl || defaultLogoUrl}
-                alt="Company Logo"
+              <BrandLogo
+                url={logoUrl}
+                fallback={defaultLogoUrl}
+                ready={brandingLoaded}
                 className="w-32 h-auto object-contain"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = defaultLogoUrl;
-                }}
               />
             </div>
 
@@ -407,14 +437,11 @@ function App() {
           </button>
 
           {/* Center Logo on mobile */}
-          <img
-            src={logoUrl || defaultLogoUrl}
-            alt="Company Logo"
+          <BrandLogo
+            url={logoUrl}
+            fallback={defaultLogoUrl}
+            ready={brandingLoaded}
             className="w-24 h-auto object-contain"
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = defaultLogoUrl;
-            }}
           />
 
           {/* Right: Logout icon only on mobile */}
@@ -457,14 +484,11 @@ function App() {
           >
           {/* Drawer Header — Logo + Close button */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <img
-              src={logoUrl || defaultLogoUrl}
-              alt="Company Logo"
+            <BrandLogo
+              url={logoUrl}
+              fallback={defaultLogoUrl}
+              ready={brandingLoaded}
               className="w-24 h-auto object-contain"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = defaultLogoUrl;
-              }}
             />
             <button
               onClick={() => setIsMobileMenuOpen(false)}
