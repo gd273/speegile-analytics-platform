@@ -42,20 +42,67 @@ console.log(
 
 // Shows the tenant logo without flicker: waits until branding is known, preloads the
 // image, then swaps once (tenant logo, or the default if it fails to load).
+const LOCAL_LOGO = "/SpeegileLogo.jpeg"; // bundled with the app, always available
+
+const LOGO_CACHE_KEY = "tenantLogoCache";
+const readLogoCache = () => {
+  try { return JSON.parse(sessionStorage.getItem(LOGO_CACHE_KEY) || "null"); }
+  catch { return null; }
+};
+const writeLogoCache = (url, data) => {
+  try { sessionStorage.setItem(LOGO_CACHE_KEY, JSON.stringify({ url, data })); }
+  catch { /* storage unavailable or full */ }
+};
+const clearLogoCache = () => {
+  try { sessionStorage.removeItem(LOGO_CACHE_KEY); } catch { /* ignore */ }
+};
+const blobToDataUrl = (blob) =>
+  new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+
 function BrandLogo({ url, fallback, ready, className }) {
-  const target = url || fallback;
-  const [src, setSrc] = useState(null);
+  // Logo kept for this login session: a refresh shows it instantly, then re-checks.
+  const [src, setSrc] = useState(() => readLogoCache()?.data || null);
 
   useEffect(() => {
     if (!ready) return undefined;
+    // 1) tenant logo fetched via our backend (fresh on every refresh, no hot-link issues)
+    // 2) tenant logo straight from its URL, 3) default logo, 4) bundled admin logo.
+    const candidates = [url, fallback, LOCAL_LOGO].filter(
+      (u, i, a) => u && a.indexOf(u) === i,
+    );
     let cancelled = false;
-    const img = new Image();
-    img.referrerPolicy = "no-referrer";
-    img.onload = () => { if (!cancelled) setSrc(target); };
-    img.onerror = () => { if (!cancelled) setSrc(fallback); };
-    img.src = target;
+    const tryNext = (i) => {
+      if (cancelled) return;
+      if (i >= candidates.length) { setSrc(LOCAL_LOGO); return; }
+      const img = new Image();
+      img.referrerPolicy = "no-referrer";
+      img.onload = () => { if (!cancelled) setSrc(candidates[i]); };
+      img.onerror = () => tryNext(i + 1);
+      img.src = candidates[i];
+    };
+    const start = async () => {
+      if (url) {
+        try {
+          const res = await api.get("/branding/logo", { responseType: "blob" });
+          const dataUrl = await blobToDataUrl(res.data);
+          if (cancelled) return;
+          writeLogoCache(url, dataUrl);
+          setSrc(dataUrl);
+          return;
+        } catch (e) { /* fall through to direct URL */ }
+      } else {
+        clearLogoCache();   // tenant has no logo of its own
+      }
+      tryNext(0);
+    };
+    start();
     return () => { cancelled = true; };
-  }, [ready, target, fallback]);
+  }, [ready, url, fallback]);
 
   if (!src) return <div className={className} style={{ aspectRatio: "3 / 1" }} />;
   return (
@@ -64,6 +111,9 @@ function BrandLogo({ url, fallback, ready, className }) {
       alt="Company Logo"
       referrerPolicy="no-referrer"
       className={className}
+      onError={(e) => {
+        if (!e.target.src.endsWith(LOCAL_LOGO)) e.target.src = LOCAL_LOGO;
+      }}
     />
   );
 }
@@ -220,6 +270,7 @@ function App() {
   };
 
   const handleLoginSuccess = async (userData) => {
+    clearLogoCache();   // never show a previous user's logo
     setIsAuthenticated(true);
     setUser(userData);
     fetchDashboards();
@@ -238,6 +289,7 @@ function App() {
       setDashboards([]);
       setLogoUrl("");
       setBrandingLoaded(false);
+      clearLogoCache();
       navigate("/");
     }
   };

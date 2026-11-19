@@ -4285,7 +4285,7 @@ def get_branding():
             result = conn.execute(text("""
                 SELECT logo_url, branding_name
                 FROM public.tenant_templates
-                WHERE id = :tid
+                WHERE tenant_id = :tid
             """), {"tid": tenant_id}).mappings().first()
 
         if not result:
@@ -4298,6 +4298,53 @@ def get_branding():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+_LOGO_CACHE = {}          # tenant_id -> (fetched_at, content_type, bytes)
+_LOGO_CACHE_TTL = 3600    # seconds
+
+
+@app.route("/api/branding/logo", methods=["GET"])
+@login_required
+def get_branding_logo():
+    """Serve the tenant logo through the backend so the browser never depends on the
+    logo host accepting hot-linked / repeated requests. 404 -> frontend uses default logo."""
+    tenant_id = session.get("tenant_id")
+    if not tenant_id:
+        return jsonify({"error": "No tenant context"}), 400
+
+    def _send(content_type, data):
+        resp = Response(data, mimetype=content_type)
+        resp.headers["Cache-Control"] = "private, max-age=300"
+        return resp
+
+    cached = _LOGO_CACHE.get(tenant_id)
+    if cached and time.time() - cached[0] < _LOGO_CACHE_TTL:
+        return _send(cached[1], cached[2])
+
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT logo_url FROM public.tenant_templates WHERE tenant_id = :tid"
+            ), {"tid": tenant_id}).mappings().first()
+        logo_url = row["logo_url"] if row else None
+        if not logo_url:
+            return jsonify({"error": "No tenant logo"}), 404
+
+        r = requests.get(logo_url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()
+        if r.status_code != 200 or not ctype.startswith("image/") or not r.content:
+            raise ValueError(f"logo fetch failed: HTTP {r.status_code} {ctype}")
+        if len(r.content) > 5 * 1024 * 1024:
+            raise ValueError("logo too large")
+
+        _LOGO_CACHE[tenant_id] = (time.time(), ctype, r.content)
+        return _send(ctype, r.content)
+    except Exception as e:
+        print(f"DEBUG: tenant logo proxy failed (tenant {tenant_id}): {e}", flush=True)
+        if cached:                      # stale copy is better than none
+            return _send(cached[1], cached[2])
+        return jsonify({"error": "Logo unavailable"}), 404
 
 
 @app.route('/truncate-data', methods=['GET'])
